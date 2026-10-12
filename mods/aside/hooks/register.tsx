@@ -201,17 +201,18 @@ export const register: Register = (on, options) => {
       await setSwitch($, !now)
       $.ui.toast(now ? 'aside · on' : 'aside · off')
     }
+    const bg = off ? 'error' : 'success'
     const row = (
-      <Box key="aside-row">
+      <Box key="aside-pill" backgroundColor={bg} paddingX={1}>
         <Button key="toggle" plain onPress={press}>
-          <Text bold color="inverseText" backgroundColor={off ? 'error' : 'success'}>
-            {` aside ${off ? 'off' : 'on'} `}
+          <Text bold color="inverseText" backgroundColor={bg}>
+            {`aside ${off ? 'off' : 'on'}`}
           </Text>
         </Button>
       </Box>
     )
     const below = await drawnBelow(next, e)
-    return below === undefined ? row : <Box key="aside-band" flexDirection="column">{row}{below as never}</Box>
+    return below === undefined ? row : <Box key="aside-band" flexDirection="row" gap={1}>{row}{below as never}</Box>
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
