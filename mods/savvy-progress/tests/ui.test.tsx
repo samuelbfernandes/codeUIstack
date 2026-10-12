@@ -272,7 +272,7 @@ test('session start registers /agents-info', async ($, on) => {
   expect(registered).toEqual(['agents-info'])
 })
 
-// ---- plain words (v0.2.0): agents-info, agents info, agents -----------------------------------
+// ---- slash only: a bare typed word is not a command ------------------------------------------
 
 /** A pane list that follows ui.open / ui.close, and a bottom that lets a prompt through as text. */
 function panesBeneath(on: On) {
@@ -293,55 +293,67 @@ function panesBeneath(on: On) {
 const typed = ($: Engine, text: string, extra: object = {}) =>
   $.prompt.submit({ text, origin: { kind: 'composer' }, wait: false, ...extra } as never)
 
-for (const surface of SURFACES) {
-  test(`${surface}: each plain word toggles the pane like /agents-info and is dropped, not sent`, async ($, on) => {
-    mock.clock(on)
-    mock.store(on)
-    engineBeneath(on)
-    const open = panesBeneath(on)
-    await spawn($, 'a1')
-    await step($, 'a1')
-
-    for (const word of ['agents-info', 'Agents Info', ' agents. ']) {
-      const opened = await typed($, word)
-      expect(opened.drop).toBe('Subagent pane opened (token counts are real, costs are est.).')
-      expect(opened.text).toBeUndefined()
-      expect(open.map(p => p.id)).toEqual(['agents-info'])
-      if (word === 'agents-info') {
-        const pane = await $.ui.mount({ plugin: 'savvy-progress', surface, component: 'Pane', requestId: 'agents-info', props: PANE })
-        expect(await texts(pane)).toContain('1 helper')
-      }
-      expect((await typed($, word)).drop).toBe('Subagent pane closed.')
-      expect(open).toHaveLength(0)
-    }
-    // The slash command still gives the same words.
-    expect((await slash($)).text).toBe('Subagent pane opened (token counts are real, costs are est.).')
-  })
-}
-
-test('only the exact words count: sentences, other senders, attachments and `agents band` pass through', async ($, on) => {
+test('a bare typed agents, agents info or agents tree is not a command: it reaches the model untouched', async ($, on) => {
   mock.clock(on)
   mock.store(on)
   engineBeneath(on)
   const open = panesBeneath(on)
-  for (const text of ['agents are great', 'show agents', 'agents info please', 'agents band', 'agents-info band', 'agent']) {
+  for (const text of ['agents', 'Agents Info', 'agents-info', 'agents tree', ' agents. ', 'agents band']) {
     const out = await typed($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await typed($, 'agents', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await typed($, 'agents', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
   expect(open).toHaveLength(0)
+  expect((await slash($)).text).toBe('Subagent pane opened (token counts are real, costs are est.).')
+  expect(open.map(p => p.id)).toEqual(['agents-info'])
 })
 
-test('a failing toggle still drops the plain word, with a short notice', async ($, on) => {
-  mock.clock(on)
+for (const surface of SURFACES) {
+  test(`${surface}: a helper that goes quiet shows as stalled with its Stop button and a toast, once; activity clears it`, async ($, on) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    mock.store(on)
+    engineBeneath(on)
+    const toasts: string[] = []
+    on('ui.toast', (_$, e) => (toasts.push(e.text), { value: undefined }) as never)
+    await spawn($, 'a1')
+    await clock.advance(6 * 60_000)
+    const pane = await $.ui.mount({ plugin: 'savvy-progress', surface, component: 'Pane', requestId: 'agents-info', props: PANE })
+    expect(await texts(pane)).toContain('stalled · no activity for 6m')
+    expect(await pane.find({ key: 'stop:a1' })).toBeDefined()
+    expect(toasts.filter(t => t.includes('looks stalled'))).toHaveLength(1)
+    await clock.advance(60_000)
+    expect(toasts.filter(t => t.includes('looks stalled'))).toHaveLength(1) // said once
+    await step($, 'a1')
+    expect(await texts(pane)).not.toContain('stalled') // the mounted pane redraws on its own
+  })
+}
+
+test('stallMinutes = 0: nothing is ever called stalled', { options: { stallMinutes: 0 } }, async ($, on) => {
+  const clock = mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   engineBeneath(on)
-  on('ui.panes', () => {
-    throw new Error('boom')
-  })
-  on('prompt.submit', (_$, e) => ({ text: e.text }))
-  const out = await typed($, 'agents')
-  expect(out.drop).toBe('/agents-info could not run; see the debug log.')
+  await spawn($, 'a1')
+  await clock.advance(60 * 60_000)
+  const pane = await $.ui.mount({ plugin: 'savvy-progress', surface: 'desktop', component: 'Pane', requestId: 'agents-info', props: PANE })
+  expect(await texts(pane)).not.toContain('stalled')
 })
+
+for (const surface of SURFACES) {
+  test(`${surface}: a finished helper's bar is full; a failed one's bar stays where it stopped`, async ($, on) => {
+    const clock = mock.clock(on)
+    mock.store(on)
+    engineBeneath(on, () => [{ id: 'a2', description: 'a2', type: 'Explore', status: 'killed' }])
+    await spawn($, 'a1')
+    await spawn($, 'a2')
+    await step($, 'a1')
+    await step($, 'a2')
+    await finish($, 'a1', USAGE.a1)
+    await clock.advance(1_000)
+    const pane = await $.ui.mount({ plugin: 'savvy-progress', surface, component: 'Pane', requestId: 'agents-info', props: PANE })
+    const barLines = (await texts(pane)).split('\n').filter(l => /[█░]{4}/.test(l))
+    expect(barLines).toHaveLength(2)
+    const full = '█'.repeat(10)
+    expect(barLines.filter(l => l.includes(full))).toHaveLength(1) // the finished helper: a full bar
+    expect(barLines.filter(l => !l.includes(full))).toHaveLength(1) // the failed one: not full, where it stopped
+  })
+}

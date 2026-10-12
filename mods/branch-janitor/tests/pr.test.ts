@@ -69,7 +69,7 @@ test('prSection: only branches that exist locally, capped at eight lines', () =>
 // ---------------------------------------------------------------- the report
 
 for (const surfaces of SURFACES)
-  test(`the plain-word report lists one line per local branch with an open PR on ${surfaces.join('+')}`, async ($, on) => {
+  test(`the /branch-janitor report lists one line per local branch with an open PR on ${surfaces.join('+')}`, async ($, on) => {
     const w = world(
       on,
       repo(
@@ -89,10 +89,9 @@ for (const surfaces of SURFACES)
       { surfaces },
     )
     w.store.set(GH_USED, true)
-    const r = await $.prompt.submit({ text: 'branch-janitor', wait: false, origin: { kind: 'composer' } })
-    expect(r.drop).toContain('Branches')
-    expect(w.logs).toHaveLength(1)
-    const lines = w.logs[0]!.split('\n')
+    const r = await slash($)
+    expect(r.text).toContain('Branches')
+    const lines = r.text!.split('\n')
     expect(lines).toContain('Open pull requests')
     expect(lines).toContain('#7 open · checks pending · review none · main')
     expect(lines).toContain('#42 open · checks passing · review approved · feat')
@@ -151,7 +150,7 @@ test('a finished branch whose pull request is still open is never offered: the k
   const w = world(on, repo({ done: merged(), feat: unmerged(SHA('2')) }, { gh: { installed: true, open: [pr(42, 'done'), pr(8, 'feat')] } }))
   w.store.set(GH_USED, true)
   const r = await slash($, 'clean')
-  expect(r.text).toBe('Branches · nothing to delete right now\nType branch-janitor to see why each branch stays.')
+  expect(r.text).toBe('Branches · nothing to delete right now\nRun /branch-janitor to see why each branch stays.')
   expect(w.asks).toHaveLength(0)
   const list = (await slash($)).text as string
   expect(list.split('\n')[0]).toBe('Branches · nothing to delete, 2 to keep')

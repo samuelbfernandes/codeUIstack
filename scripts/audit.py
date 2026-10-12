@@ -33,7 +33,7 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "budget-guard": set(),
     "diagram": set(),
     "aside": set(),
-    "toolbox": set(),
+    "moddeck": set(),
 }
 ALLOW_NETWORK: set[str] = set()            # mods allowed to call $.http (none)
 NEVER_PROGRAMS = {"curl", "wget", "ssh", "scp", "nc", "ncat", "telnet", "sudo", "powershell", "pwsh", "bash", "sh", "zsh", "cmd", "python", "python3", "node", "npm", "npx", "pip", "rm", "mv", "chmod"}

@@ -34,6 +34,10 @@ export type AgentRow = {
   parentId?: string
   /** Tool calls the agent's own loop made (counted from tool.call events that carry its agentId). */
   tools?: number
+  /** The last time the engine reported anything from this agent (a request, a tool call, its spawn): the stall clock. */
+  lastAt?: number
+  /** True once a toast has said this running helper looks stalled, so it is said once. */
+  stallNoted?: boolean
 }
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed'

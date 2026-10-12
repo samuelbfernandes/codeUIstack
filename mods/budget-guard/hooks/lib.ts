@@ -70,8 +70,14 @@ export function fmtUsd(n: number): string {
   return `$${n < 10 ? n.toFixed(2) : n < 100 ? n.toFixed(1) : n.toFixed(0)}`
 }
 
-/** A limit as the person typed it: $5, $7.50. */
-export const fmtLimit = (n: number): string => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
+/** A limit as the person typed it: 80, 82.5. */
+export const fmtLimit = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(1))
+
+/** A dollar limit as the person typed it: $10, $7.50. */
+export const fmtUsdLimit = (n: number): string => `$${Number.isInteger(n) ? n : n.toFixed(2)}`
+
+/** Used out of total, both in plan points: 82/100. */
+export const fmtUsed = (n: number): string => `${Math.round(n)}/100`
 
 export function fmtTokens(n: number): string {
   if (n < 1000) return String(Math.round(n))
@@ -99,10 +105,10 @@ export function fmtReset(resetsAt: string | undefined, now: number): string | un
 
 export const fmtPct = (n: number): string => `${Math.round(n)}%`
 
-/** "5h plan", "7d plan", "spend limit"; any other kind is shown as the engine names it, spaced. */
+/** "5h window", "7d window"; any other kind is shown as the engine names it, spaced. */
 export function windowLabel(kind: string): string {
-  if (kind === 'five_hour') return '5h plan'
-  if (kind === 'seven_day') return '7d plan'
+  if (kind === 'five_hour') return '5h window'
+  if (kind === 'seven_day') return '7d window'
   return kind.replace(/_/g, ' ')
 }
 
@@ -111,9 +117,11 @@ export function windowLabel(kind: string): string {
 export type Level = 'ok' | 'warn' | 'error'
 export type Part = { text: string; level: Level }
 
-export type Thresholds = { limitUsd: number; contextWarnPct: number }
+export type Thresholds = { limitPct: number; limitUsd: number; contextWarnPct: number }
 
-export const COST_WARN_FRACTION = 0.7
+/** A dollar limit warns at 90% of it and is an error at 100%. */
+const USD_WARN_FRACTION = 0.9
+
 export const PLAN_WARN_PCT = 80
 const PLAN_ERROR_PCT = 95
 
@@ -122,22 +130,34 @@ const levelAt = (v: number, warn: number, error: number): Level => (v >= error ?
 /** The words that stand in for colour: a flagged part ends in "!" (warning) or "!!" (error). */
 export const MARK: Record<Level, string> = { ok: '', warn: ' !', error: ' !!' }
 
+/** A window text: "5h window 62/100", with " · limit 80" when a limit is set. */
+export const windowText = (w: BudgetWindow, limitPct: number): string =>
+  `${windowLabel(w.kind)} ${fmtUsed(w.pct)}${limitPct > 0 ? ` · limit ${fmtLimit(limitPct)}` : ''}`
+
+/** True when the session cost has reached a dollar limit (never with no limit). */
+export const usdReached = (usd: number, limitUsd: number): boolean => limitUsd > 0 && usd >= limitUsd
+
+/** The first plan window at or above the limit (none when there is no limit or no window). */
+export const overLimit = (windows: readonly BudgetWindow[], limitPct: number): BudgetWindow | undefined =>
+  limitPct > 0 ? windows.reduce<BudgetWindow | undefined>((hit, w) => (w.pct >= limitPct && (hit === undefined || w.pct > hit.pct) ? w : hit), undefined) : undefined
+
 /**
- * The parts of the line, or undefined while nothing matters: cost at 70% of the limit, context at the
- * warning percentage, or a plan window at 80%. When one matters, cost and context are shown too, so the
- * line reads as a whole; plan windows only when they themselves are high.
+ * The parts of the line, or undefined while nothing matters: context at the warning percentage, a plan
+ * window at 80% (or 90% of your limit), or session cost at 90% of a dollar limit. When one matters, cost
+ * and context are shown too, so the line reads as a whole; plan windows only when they themselves are high.
  */
 export function bandParts(snap: BudgetSnap, tally: BudgetTally, t: Thresholds): Part[] | undefined {
   const { usd, isEst } = costOf(snap, tally)
-  const costLevel: Level = t.limitUsd > 0 ? levelAt(usd, t.limitUsd * COST_WARN_FRACTION, t.limitUsd) : 'ok'
   const ctxLevel: Level = snap.ctxPct === null ? 'ok' : levelAt(snap.ctxPct, t.contextWarnPct, Math.max(90, t.contextWarnPct + 5))
-  const high = snap.windows.filter(w => w.pct >= PLAN_WARN_PCT)
-  if (costLevel === 'ok' && ctxLevel === 'ok' && high.length === 0) return undefined
+  const warnAt = t.limitPct > 0 ? Math.min(PLAN_WARN_PCT, t.limitPct * 0.9) : PLAN_WARN_PCT
+  const errorAt = t.limitPct > 0 ? t.limitPct : PLAN_ERROR_PCT
+  const high = snap.windows.filter(w => w.pct >= warnAt)
+  const costLevel: Level = t.limitUsd > 0 ? levelAt(usd, t.limitUsd * USD_WARN_FRACTION, t.limitUsd) : 'ok'
+  if (ctxLevel === 'ok' && high.length === 0 && costLevel === 'ok') return undefined
 
-  const cost = `Session ~${fmtUsd(usd)}${isEst ? ' est.' : ''}${t.limitUsd > 0 ? ` of ${fmtLimit(t.limitUsd)}` : ''}`
-  const parts: Part[] = [{ text: cost, level: costLevel }]
+  const parts: Part[] = [{ text: `Session ~${fmtUsd(usd)}${isEst ? ' est.' : ''}${t.limitUsd > 0 ? ` · limit ${fmtUsdLimit(t.limitUsd)}` : ''}`, level: costLevel }]
   if (snap.ctxPct !== null) parts.push({ text: `context ${fmtPct(snap.ctxPct)}`, level: ctxLevel })
-  for (const w of high) parts.push({ text: `${windowLabel(w.kind)} ${fmtPct(w.pct)}`, level: levelAt(w.pct, PLAN_WARN_PCT, PLAN_ERROR_PCT) })
+  for (const w of high) parts.push({ text: windowText(w, t.limitPct), level: levelAt(w.pct, warnAt, errorAt) })
   return parts.map(p => ({ ...p, text: p.text + MARK[p.level] }))
 }
 
@@ -147,6 +167,7 @@ type ReportInput = {
   snap: BudgetSnap
   tally: BudgetTally
   turns: BudgetTurn[]
+  limitPct: number
   limitUsd: number
   now: number
 }
@@ -154,47 +175,54 @@ type ReportInput = {
 /** One aligned row of the report. */
 const row = (label: string, value: string): string => `${label.padEnd(10)}${value}`
 
-function windowRow(w: BudgetWindow, now: number): string {
+function windowRow(w: BudgetWindow, limitPct: number, now: number): string {
   const reset = fmtReset(w.resetsAt, now)
-  return row(windowLabel(w.kind), `${fmtPct(w.pct)}${reset === undefined ? '' : ` · resets in ${reset}`}`)
+  return row(windowLabel(w.kind), `${fmtUsed(w.pct)} · ${limitPct > 0 ? `limit ${fmtLimit(limitPct)}` : 'no limit'}${reset === undefined ? '' : ` · resets in ${reset}`}`)
 }
 
 /** The first line is the headline (it becomes the one-line answer); the rest is the aligned box. */
 export function buildReport(r: ReportInput): string {
   const { usd, isEst } = costOf(r.snap, r.tally)
-  const cost = `~${fmtUsd(usd)}${isEst ? ' est.' : ''}`
-  const limit = r.limitUsd > 0 ? ` of ${fmtLimit(r.limitUsd)} limit (${fmtPct((usd / r.limitUsd) * 100)})` : ' · no limit set'
+  const cost = `~${fmtUsd(usd)}${isEst ? ' est.' : ''}${r.limitUsd > 0 ? ` · limit ${fmtUsdLimit(r.limitUsd)}` : ''}`
   const last = r.turns.at(-1)
   const cached = r.tally.cacheRead + r.tally.cacheWrite
   const tokensIn = r.tally.input + cached
   const ctx = r.snap
   return [
-    `budget-guard · session ${cost}${r.limitUsd > 0 ? ` of ${fmtLimit(r.limitUsd)}` : ''} · ${r.tally.turns} ${r.tally.turns === 1 ? 'turn' : 'turns'}`,
-    row('Cost', `${cost}${limit}`),
+    `budget-guard · session ${cost} · ${r.tally.turns} ${r.tally.turns === 1 ? 'turn' : 'turns'}`,
+    row('Cost', cost),
     row('Tokens', `in ${fmtTokens(tokensIn)} · out ${fmtTokens(r.tally.output)}`),
     row('Cache', cached === 0 ? 'nothing cached yet' : `hit ${fmtPct((r.tally.cacheRead / cached) * 100)} · read ${fmtTokens(r.tally.cacheRead)} · written ${fmtTokens(r.tally.cacheWrite)}`),
     row('Context', ctx.ctxPct === null ? 'not reported yet' : `${fmtPct(ctx.ctxPct)} full${ctx.ctxWindow === null ? '' : ` of ${fmtTokens(ctx.ctxWindow)}`}`),
     row('Last turn', last === undefined ? 'none yet' : `${fmtDuration(last.ms)} · ${fmtTokens(last.tokens)} tokens`),
     row('Longest', r.tally.turns === 0 ? 'none yet' : fmtDuration(r.tally.longestMs)),
-    ...r.snap.windows.map(w => windowRow(w, r.now)),
+    ...(r.snap.windows.length === 0
+      ? [row('Plan', `API-key use: the limit is in dollars${r.limitPct > 0 ? `; the ${fmtLimit(r.limitPct)} plan limit is idle` : ''}`)]
+      : r.snap.windows.map(w => windowRow(w, r.limitPct, r.now))),
     `Counts start when the mod loads${isEst ? '; cost is estimated from tokens at rough list prices' : ''}.`,
   ].join('\n')
 }
 
-// ---- plain words ---------------------------------------------------------------------------
+// ---- the /budget-guard argument -----------------------------------------------------------
 
-export type Word = { kind: 'report' } | { kind: 'set'; usd: number }
+export type Word = { kind: 'report' } | { kind: 'set'; pct: number } | { kind: 'setUsd'; usd: number }
 
 /**
- * A plain-word prompt (already trimmed, lower-cased, final "." removed) as a command: `usage`, `budget`
- * or `budget-guard` for the report; `budget 10` (an optional $, decimals allowed) sets the limit.
- * Anything else, including a sentence that merely contains these words, is not a command.
+ * The text after `/budget-guard`: nothing for the report; `80` (or `80%`, decimals allowed, above 100
+ * counts as 100) sets the limit in plan points; `$10` sets a dollar limit; `0` or `off` clears both.
+ * Anything else is the report.
  */
-export function parseWord(word: string): Word | undefined {
-  if (word === 'usage' || word === 'budget' || word === 'budget-guard') return { kind: 'report' }
-  const m = /^budget \$?(\d+(?:\.\d+)?)$/.exec(word)
-  return m?.[1] === undefined ? undefined : { kind: 'set', usd: Number(m[1]) }
+export function parseArgs(args: string): Word {
+  const a = args.trim().toLowerCase()
+  if (a === 'off') return { kind: 'set', pct: 0 }
+  const d = /^\$(\d+(?:\.\d+)?)$/.exec(a)
+  if (d?.[1] !== undefined) return { kind: 'setUsd', usd: Number(d[1]) }
+  const m = /^(\d+(?:\.\d+)?)%?$/.exec(a)
+  return m?.[1] === undefined ? { kind: 'report' } : { kind: 'set', pct: Math.min(100, Number(m[1])) }
 }
 
-/** What "Continue (+50%)" raises the limit to: 50% more, and never less than 10% above what is already spent. */
-export const raisedLimit = (limit: number, spent: number): number => Math.max(limit * 1.5, spent * 1.1)
+ /** What "Continue (+50%)" raises a dollar limit to: half of itself more. */
+export const raisedUsd = (limit: number): number => limit * 1.5
+
+/** What "Continue (+10 points)" raises the limit to: ten points more, never above 100. */
+export const raisedLimit = (limit: number): number => Math.min(100, limit + 10)

@@ -139,62 +139,34 @@ test('an unreadable directory after the automatic open leaves an empty tree, no 
   await ui.unmount()
 })
 
-// ---- plain words ------------------------------------------------------------------------------
+// ---- the command ------------------------------------------------------------------------------
 
-test('tree, file tree and filetree toggle the pane like /filetree and are dropped', async ($, on) => {
+test('/filetree toggles the pane', async ($, on) => {
   const w = setup(on)
-  const slashOpened = (await runCommand($)).text
+  expect((await runCommand($)).text).toBe('Filetree · open')
+  expect(names(w)).toEqual(['filetree'])
   expect((await runCommand($)).text).toBe('Filetree · closed')
-
-  for (const word of ['filetree', 'File Tree', ' TREE. ']) {
-    const opened = await typed($, word)
-    expect(opened.drop).toBe(slashOpened)
-    expect(opened.text).toBeUndefined()
-    expect(names(w)).toEqual(['filetree'])
-    expect((await typed($, word)).drop).toBe('Filetree · closed')
-    expect(names(w)).toEqual([])
-  }
+  expect(names(w)).toEqual([])
 })
 
-test('a typed word whose pane waits drops one line and logs the hint, like the command', async ($, on) => {
+test('a pane that waits for room says so, with the hint', async ($, on) => {
   const w = setup(on)
   w.open.isPlaced = false
-  const out = await typed($, 'tree')
-  expect(out.drop).toBe('Filetree · waiting for room')
-  expect(w.logs).toEqual(['Try /tui fullscreen, or a wider window.'])
+  expect((await runCommand($)).text).toBe('Filetree · waiting for room\nTry /tui fullscreen, or a wider window.')
 })
 
-test('no drop reason has a newline; the overflow goes to ui.log once', async ($, on) => {
+test('a pane that cannot be opened gives the command notice', async ($, on) => {
   const w = setup(on)
-  w.open.isPlaced = false
-  const waiting = await typed($, 'tree')
-  expect(waiting.drop).not.toContain('\n')
-  expect(w.logs.length).toBe(1)
-
-  await typed($, 'tree') // the mock left the unplaced pane up: this closes it
-  w.open.isPlaced = true
-  w.logs.length = 0
-  const opened = await typed($, 'tree') // a one-line reply logs nothing
-  expect(opened.drop).toBe('Filetree · open')
-  expect(opened.drop).not.toContain('\n')
-  expect((await typed($, 'tree')).drop).toBe('Filetree · closed')
-  expect(w.logs).toEqual([])
+  Object.defineProperty(w.open, 'isPlaced', { get: () => { throw new Error('boom') } })
+  expect((await runCommand($)).text).toBe('Filetree · could not read this folder')
 })
 
-test('only the exact words are taken: sentences, other senders and attachments pass through', async ($, on) => {
+test('a bare typed tree, file tree or filetree is not a command: it reaches the model untouched', async ($, on) => {
   const w = setup(on)
-  for (const text of ['show the tree', 'tree view please', 'trees', 'file  tree', 'filetree now', 'the file tree', '/filetree', 'tree?']) {
+  for (const text of ['tree', 'file tree', 'filetree', ' TREE. ', 'show the tree']) {
     const out = await typed($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await typed($, 'tree', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await typed($, 'tree', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
   expect(names(w)).toEqual([])
-})
-
-test('a pane that cannot be opened still drops the word, with the command notice', async ($, on) => {
-  const w = setup(on)
-  Object.defineProperty(w.open, 'isPlaced', { get: () => { throw new Error('boom') } })
-  expect((await typed($, 'tree')).drop).toBe('Filetree · could not read this folder')
 })

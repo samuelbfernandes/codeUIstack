@@ -1,6 +1,6 @@
 {
   "name": "aside",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",
@@ -8,7 +8,7 @@
     "enabled": {
       "type": "boolean",
       "title": "Enable /aside",
-      "description": "Turn off to make /aside and the word aside do nothing (no side question is ever sent).",
+      "description": "Turn off to make /aside do nothing (no side question is ever sent).",
       "default": true
     },
     "maxAnswerChars": {

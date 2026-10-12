@@ -1,6 +1,6 @@
 {
   "name": "secret-guard",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",
@@ -8,7 +8,7 @@
     "enabled": {
       "type": "boolean",
       "title": "Enabled",
-      "description": "Master switch. You can also type secret-guard off / secret-guard on in a session (remembered).",
+      "description": "Master switch. /secret-guard off or /secret-guard on switches it in a session (remembered).",
       "default": true
     },
     "redactEmails": {
@@ -26,7 +26,7 @@
     "extraPatterns": {
       "type": "string",
       "title": "Extra patterns (regular expressions)",
-      "description": "Optional. JavaScript regular expressions separated by ;; each one hides what it matches as [secret:custom]. A bad one is reported by typing secret-guard, never thrown.",
+      "description": "Optional. JavaScript regular expressions separated by ;; each one hides what it matches as [secret:custom]. A bad one is reported by /secret-guard, never thrown.",
       "default": ""
     }
   }

@@ -1,0 +1,21 @@
+{
+  "name": "moddeck",
+  "version": "0.2.5",
+  "description": "A side bar listing every mod and skill, one boxed row each: the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text).",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open automatically",
+      "description": "Open the side bar at session start where the screen can dock it beside the chat (fullscreen terminal, desktop app). Never reopens it after you close it; /moddeck toggles it.",
+      "default": true
+    },
+    "skillRows": {
+      "type": "number",
+      "title": "Skills shown at once",
+      "description": "How many skills the side bar shows before the list scrolls (▲ up / ▼ down).",
+      "default": 4
+    }
+  }
+}

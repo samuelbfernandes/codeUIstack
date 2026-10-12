@@ -2,7 +2,7 @@ import { test, expect, mock } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-/** The engine beneath the mod: a store and status/toast sinks. The on/off switch is drawn by the toolbox side bar,
+/** The engine beneath the mod: a store and status/toast sinks. The on/off switch is drawn by the moddeck side bar,
  *  which reads this mod's `isOff` state; this mod draws nothing above the prompt. */
 function world(on: On) {
   const w = { toasts: [] as string[], statuses: [] as (string | undefined)[], store: new Map<string, unknown>() }
@@ -25,9 +25,9 @@ const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, o
 const command = ($: Engine, args: string) =>
   $.command.run({ command: 'suggest-model', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as never)
 
-test('the switch: the words and /suggest-model flip one persisted flag, and off clears the status line', async ($, on) => {
+test('the switch: /suggest-model on|off flips one persisted flag, and off clears the status line', async ($, on) => {
   const w = world(on)
-  await word($, 'suggest-model off')
+  await command($, 'off')
   expect(w.store.get('off')).toBe(true)
   expect(w.statuses.at(-1)).toContain('suggest-model: off')
   await command($, 'on')

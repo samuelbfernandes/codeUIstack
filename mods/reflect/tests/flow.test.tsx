@@ -471,86 +471,52 @@ test('/reflect on cannot override enabled=false', { options: { enabled: false } 
   expect(w.asked.length).toBe(0)
 })
 
-// ------------------------------------------------- plain words (v0.2.0): reflect status|on|off
+// ------------------------------------------------- /reflect status|on|off (the / is required)
 
 for (const surface of SURFACES) {
-  test(`${surface}: plain words run /reflect, are dropped, and never reach the model`, async ($, on) => {
+  test(`${surface}: /reflect status|off|on work and leave the proposal and later corrections as expected`, async ($, on) => {
     const w = world(on)
     await $.session.start({ cwd: '/work/proj', surface, isInteractive: true })
     await propose($, w)
     const ui = await mount($, surface)
     expect(await labels(ui)).toContain('Skip') // a proposal is waiting
-    const before = w.submitted.length
 
-    const status = await submit($, 'reflect status')
-    expect(status.drop).toBe('Reflect · on') // one line; the details went to the transcript
-    expect(w.logs).toEqual(['Corrections are checked with haiku.\nWaiting · “' + RULE + '”'])
-    expect((await runCommand($, 'status')).startsWith('Reflect · on\n')).toBe(true)
-    expect(status.text).toBeUndefined()
+    expect(await runCommand($, 'status')).toBe('Reflect · on\nCorrections are checked with haiku.\nWaiting · “' + RULE + '”')
     expect(await labels(ui)).toContain('Skip') // status leaves the proposal alone
 
-    const off = await submit($, 'Reflect OFF.')
-    expect(off.drop).toBe('Reflect · off')
-    expect(await ui.find({ type: 'Button' })).toBe(undefined) // off hides the band, as the command does
+    expect((await runCommand($, 'OFF')).startsWith('Reflect · off\n')).toBe(true)
+    expect(await ui.find({ type: 'Button' })).toBe(undefined) // off hides the band
     await propose($, w)
     expect(w.asked.length).toBe(1) // off holds for later corrections
 
-    const on2 = await submit($, '  reflect on  ')
-    expect(on2.drop).toBe('Reflect · on')
+    expect((await runCommand($, '  on  ')).startsWith('Reflect · on\n')).toBe(true)
     await propose($, w)
     expect(w.asked.length).toBe(2)
-
-    // none of the three words reached the engine's own prompt entry, nor counted as a correction
-    expect(w.submitted.slice(before).filter(t => t.startsWith('reflect '))).toEqual([])
     await ui.unmount()
   })
 }
 
-test('only the exact words are taken: sentences, other senders and attachments pass through', async ($, on) => {
+test('a bare typed word is not handled: it goes to the model unchanged and the switch is unchanged', async ($, on) => {
   const w = world(on)
-  for (const text of ['reflect', 'reflect on this', 'please reflect off', 'reflect status now', 'reflects off', 'reflect  on']) {
+  for (const text of ['reflect', 'reflect status', 'reflect off', 'Reflect on.', 'please reflect off']) {
     const out = await submit($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await submit($, 'reflect off', 'plugin')).drop).toBeUndefined()
-  expect(
-    (await $.prompt.submit({ text: 'reflect off', wait: false, origin: { kind: 'composer' }, attachments: [{ type: 'image', data: 'x' }] } as never)).drop,
-  ).toBeUndefined()
+  expect(w.logs).toEqual([])
   expect(await runCommand($, 'status')).toContain('Reflect · on') // nothing above switched it off
   await w.clock.settle()
 })
 
-test('the plain words keep enabled=false in charge', { options: { enabled: false } }, async ($, on) => {
+test('/reflect on keeps enabled=false in charge', { options: { enabled: false } }, async ($, on) => {
   const w = world(on)
-  const out = await submit($, 'reflect on')
-  expect(out.drop).toBe('Reflect · off')
-  expect(w.logs).toEqual(['Turned off in the plugin settings (/config).'])
+  expect(await runCommand($, 'on')).toBe('Reflect · off\nTurned off in the plugin settings (/config).')
   await propose($, w)
   expect(w.asked.length).toBe(0)
 })
 
-test('a failing /reflect still drops the plain word, with the short notice', async ($, on) => {
+test('a failing /reflect off says nothing changed', async ($, on) => {
   const w = world(on)
   w.storeFails = true
-  expect((await submit($, 'reflect off')).drop).toBe('Reflect · that did not work')
-  expect(w.logs).toEqual(['Nothing changed.'])
-})
-
-// ---------------------------------------- one-line drop reasons (a newline is drawn as a garbled character)
-
-test('no drop reason has a newline; the overflow lines go to ui.log in one call', async ($, on) => {
-  const w = world(on)
-  for (const word of ['reflect status', 'reflect off', 'reflect on', 'reflect status']) {
-    w.logs.length = 0
-    const out = await submit($, word)
-    expect(out.drop).toBeDefined()
-    expect(out.drop).not.toContain('\n')
-    expect(out.drop?.startsWith('Reflect · ')).toBe(true)
-    expect(w.logs.length).toBe(1) // all the detail lines in ONE call
-    expect(w.logs[0]?.startsWith('Reflect')).toBe(false) // the headline is the drop, not repeated
-  }
-  w.storeFails = true
-  const failed = await submit($, 'reflect off')
-  expect(failed.drop).not.toContain('\n')
+  expect(await runCommand($, 'off')).toBe('Reflect · that did not work\nNothing changed.')
 })

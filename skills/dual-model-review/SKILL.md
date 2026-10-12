@@ -23,7 +23,7 @@ genetic/statistical theory before they land. **The implementer is never its own 
      earlier or deeper review, or where that hook is not active.
    - If the repo has `dev/dual.sh`, use it: `dev/dual.sh review --staged` (or `<paths>`). Read `dev/README.md` first.
    - Codex CLI (installed; flags checked against 0.162.0): read-only structured review of a diff:
-     `git diff --staged | codex exec -s read-only --ephemeral -C <repo> --output-schema ~/.claude/codeuistack/global/theory-review.schema.json -o /tmp/review.json "<reviewer prompt>"`.
+     `git diff --staged | codex exec -s read-only --ephemeral -C <repo> --output-schema ~/.claude/moddeck/global/theory-review.schema.json -o /tmp/review.json "<reviewer prompt>"`.
      Quick unstructured pass: `codex review --uncommitted` (or `--base <branch>`, `--commit <sha>`). `-s workspace-write` only in a
      throwaway worktree (`git worktree add ../_review <rev>`, `TMPDIR` inside it) when the reviewer must run R to get executed evidence.
    - If the Codex plugin is installed, `/codex:adversarial-review` with focus text also works. Never `/codex:rescue` (it edits files).

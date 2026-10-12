@@ -19,6 +19,7 @@ import {
   fromModelUsage,
   helperText,
   indentOf,
+  isStalled,
   isTaskTool,
   markRunning,
   parseOverrides,
@@ -26,6 +27,7 @@ import {
   rowFill,
   rowHasUsage,
   rowUsage,
+  stallMsOf,
   summarize,
   taskText,
   toolsText,
@@ -35,19 +37,10 @@ import {
   treeOrder,
 } from './lib'
 import type { Price } from './lib'
-import { plainWord } from './words'
 
 const PANE = 'agents-info'
 const COMMAND = 'agents-info'
 const STORE_HIDDEN = 'hidden'
-/** Typed alone, these do what `/agents-info` does (no `band` argument: that stays a slash command). */
-const PLAIN_WORDS = new Map([
-  ['agents-info', ''],
-  ['agents info', ''],
-  ['agents', ''],
-  ['agents tree', 'tree'],
-  ['agents-info tree', 'tree'],
-])
 /** Running helpers the band lists under its line (the pane has them all). */
 const BAND_ROWS = 3
 
@@ -93,8 +86,9 @@ async function sync($: EngineInterface) {
   )
 }
 
-async function onTick($: EngineInterface) {
+async function onTick($: EngineInterface, stallMs: number) {
   await safely(() => sync($))
+  await safely(() => noteStalls($, stallMs))
   const rows = await read($, agents)
   await update($, tick, n => (n ?? 0) + 1)
   if (!rows.some(r => r.status === 'running')) {
@@ -103,8 +97,20 @@ async function onTick($: EngineInterface) {
   }
 }
 
-function ensureTimer($: EngineInterface) {
-  timer ??= $.clock.every(1000, () => void onTick($))
+function ensureTimer($: EngineInterface, stallMs: number) {
+  timer ??= $.clock.every(1000, () => void onTick($, stallMs))
+}
+
+/** Says once, in a toast, that a running helper has gone quiet; the pane row shows it and keeps its Stop button. */
+async function noteStalls($: EngineInterface, stallMs: number) {
+  if (stallMs <= 0) return
+  const now = await $.clock.now()
+  const quiet = (await read($, agents)).filter(r => isStalled(r, now, stallMs) && r.stallNoted !== true)
+  if (quiet.length === 0) return
+  await update($, agents, rows => rows.map(r => (quiet.some(q => q.id === r.id) ? { ...r, stallNoted: true } : r)))
+  for (const r of quiet) {
+    $.ui.toast(`${r.label || r.id.slice(0, 8)} looks stalled · no activity for ${fmtDuration(now - (r.lastAt ?? r.startedAt))} · Stop it in the Subagents pane`, { timeoutMs: 10_000 })
+  }
 }
 
 async function setHidden($: EngineInterface, hidden: boolean) {
@@ -125,14 +131,15 @@ async function describeAgent($: EngineInterface, id: string, model: string): Pro
   }
 }
 
-const glyph = (r: AgentRow) => (r.status === 'running' ? '▶' : r.status === 'finished' ? '✓' : '✗')
-const statusColor = (r: AgentRow) => (r.status === 'failed' ? 'error' : r.status === 'finished' ? 'success' : undefined)
+const glyph = (r: AgentRow, stalled: boolean) => (stalled ? '⚠' : r.status === 'running' ? '▶' : r.status === 'finished' ? '✓' : '✗')
+const statusColor = (r: AgentRow, stalled: boolean) => (stalled ? 'warning' : r.status === 'failed' ? 'error' : r.status === 'finished' ? 'success' : undefined)
 
 /** "claude-sonnet-4-5-20250929" -> "sonnet-4-5". */
 const shortModel = (model: string) => model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
 
 function barFor(r: AgentRow, width: number, now: number): string {
-  const fill = rowFill(r)
+  if (r.status === 'finished') return fillBar(1, width) // done: full, whatever the context fill was
+  const fill = rowFill(r) // failed or stopped: where it stopped
   if (fill !== null) return fillBar(fill, width)
   if (r.status === 'running' && !rowHasUsage(r)) return busyBar(width, Math.floor(elapsedOf(r, now) / 1000))
   return emptyBar(width)
@@ -164,8 +171,8 @@ async function stopAgent($: EngineInterface, id: string, name: string) {
 
 const AGENTS_INFO_FAILED = '/agents-info could not run; see the debug log.'
 
-/** What `/agents-info` and its plain words do: toggle the pane; `band` toggles the line above the prompt, `tree` lists the helpers as a tree. */
-async function runAgentsInfo($: EngineInterface, args: string, plain = false): Promise<string> {
+/** What `/agents-info` does: toggle the pane; `band` toggles the line above the prompt, `tree` lists the helpers as a tree. */
+async function runAgentsInfo($: EngineInterface, args: string): Promise<string> {
   if (args.trim() === 'band') {
     const hidden = await readHidden($)
     await setHidden($, !hidden)
@@ -173,8 +180,7 @@ async function runAgentsInfo($: EngineInterface, args: string, plain = false): P
   }
   if (args.trim() === 'tree') {
     const lines = treeLines(await read($, agents), await $.clock.now())
-    // The plain word is dropped with ONE line (a newline would render as a stray mark), so the lines are joined.
-    return lines.length === 0 ? 'No subagents have run in this session.' : lines.join(plain ? ' | ' : '\n')
+    return lines.length === 0 ? 'No subagents have run in this session.' : lines.join('\n')
   }
   const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
   if (isOpen) {
@@ -197,11 +203,12 @@ async function drawnBelow<E>(next: (e: E) => unknown, e: E): Promise<object | un
 
 export const register: Register = (on, options) => {
   const overrides: Prices = parseOverrides(options.priceOverrides)
+  const stallMs = stallMsOf(options.stallMinutes)
 
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: COMMAND,
-      description: 'Show or hide the pane listing every subagent with tokens and est. cost (`band` toggles the line above the prompt, `tree` prints them nested; typing agents-info or agents does the same)',
+      description: 'Show or hide the pane listing every subagent with tokens and est. cost (`band` toggles the line above the prompt, `tree` prints them nested)',
       argumentHint: '[band|tree]',
     })
     return next(e)
@@ -211,17 +218,6 @@ export const register: Register = (on, options) => {
     // Fail-open: a failing toggle just says so; nothing else depends on this command.
     () => ({ text: AGENTS_INFO_FAILED }),
   )
-
-  // The plain words answer like the command and are dropped, so they never reach the model (no tokens).
-  // Only an exact match is touched; a failure of the toggle still drops, with the same short notice, because
-  // sending a bare "agents" to the model would cost a request for nothing. Anything else goes on untouched.
-  on('prompt.submit', async ($, e, next) => {
-    const word = plainWord(e)
-    const args = word === undefined ? undefined : PLAIN_WORDS.get(word)
-    if (args === undefined) return next(e)
-
-    return { drop: await runAgentsInfo($, args, true).catch(() => AGENTS_INFO_FAILED) }
-  }).catch(($, e, next) => next(e))
 
   // A subagent is born: this is where its description, type and model are known.
   // Fail-open: if the bookkeeping throws, the spawn goes on untouched.
@@ -244,7 +240,7 @@ export const register: Register = (on, options) => {
           model: init.model || r.model,
           ...(init.parentId ? { parentId: init.parentId } : {}),
         }))
-        ensureTimer($)
+        ensureTimer($, stallMs)
       })
     }
     return started
@@ -260,7 +256,7 @@ export const register: Register = (on, options) => {
       const known = (await read($, agents)).some(r => r.id === id)
       const init: Partial<AgentRow> = known ? {} : await describeAgent($, id, e.model)
       await update($, agents, rows => touch(rows, id, init, now, r => markRunning(r.model === '' ? { ...r, model: e.model } : r, now)))
-      ensureTimer($)
+      ensureTimer($, stallMs)
     })
 
     const response = yield* next(e)
@@ -282,7 +278,8 @@ export const register: Register = (on, options) => {
     await safely(async () => {
       if (e.agentId !== undefined) {
         const id = e.agentId
-        await update($, agents, rows => countTool(rows, id))
+        const at = await $.clock.now()
+        await update($, agents, rows => countTool(rows, id, at))
       } else if (isTaskTool(e.tool)) {
         const result = (ran as { result?: unknown }).result
         await update($, tasks, items => applyTaskTool(items ?? [], e.tool, e, result))
@@ -399,12 +396,14 @@ export const register: Register = (on, options) => {
             {summary.tokens === 0 ? 'no usage yet' : fmtCost(summary.cost, summary.unpriced > 0)} · {fmtDuration(summary.elapsedMs)}
           </Text>
         )}
-        {shown.slice(0, room).map(({ row: r, depth }) => (
+        {shown.slice(0, room).map(({ row: r, depth }) => {
+          const stalled = isStalled(r, now, stallMs)
+          return (
           <Box key={`row:${r.id}`} flexDirection="column">
             <Box>
-              <Text color={statusColor(r)}>
+              <Text color={statusColor(r, stalled)}>
                 {indentOf(depth)}
-                {glyph(r)} {r.label || r.id.slice(0, 8)} <Text dimColor>({[r.type, shortModel(r.model)].filter(Boolean).join(', ')}) {r.status}</Text>
+                {glyph(r, stalled)} {r.label || r.id.slice(0, 8)} <Text dimColor>({[r.type, shortModel(r.model)].filter(Boolean).join(', ')}) {stalled ? `stalled · no activity for ${fmtDuration(now - (r.lastAt ?? r.startedAt))}` : r.status}</Text>
               </Text>
               {r.status === 'running' && (
                 <Button key={`stop:${r.id}`} label="Stop" variant="secondary" onPress={() => void stopAgent($, r.id, r.label || r.id.slice(0, 8))} />
@@ -416,7 +415,8 @@ export const register: Register = (on, options) => {
               {barFor(r, width, now)} {figures(r, now, overrides)}
             </Text>
           </Box>
-        ))}
+          )
+        })}
         {shown.length > room && <Text dimColor>+{shown.length - room} more (older)</Text>}
         {rows.length > 0 && <Text dimColor>est. = token counts x built-in price table; context bar = latest request vs an assumed window.</Text>}
       </Box>

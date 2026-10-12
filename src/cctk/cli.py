@@ -157,7 +157,7 @@ def cmd_install(args, update: bool = False) -> int:
 
 def _done(lay: installer.Layout, ctx: installer.Ctx, ident: dict) -> None:
     print("\nDone." + (f" {len(ctx.warnings)} warning(s) above." if ctx.warnings else ""))
-    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; type a word alone to ask one:  branch-janitor   suggest-model   cache-tax")
+    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; open the side bar with /moddeck, or run one:  /branch-janitor   /suggest-model   /cache-tax")
     print(f"What each tool does: {lay.stage / 'docs' / 'TOOLS.md'}" if (lay.stage / "TOOLS.md").exists() else "What each tool does: see docs/TOOLS.md in the repository.")
     cli = ident["cli"]
     where = "" if lay.user else f" --scope project --project {lay.project}"

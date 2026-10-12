@@ -1,7 +1,7 @@
 {
   "name": "budget-guard",
-  "version": "0.1.0",
-  "description": "A quiet usage line above the prompt that appears only when cost, context or your plan window needs a look, and an optional spending limit that asks before the next prompt instead of refusing. Type usage for a short report.",
+  "version": "0.3.0",
+  "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /budget-guard for a short report.",
   "author": {
     "name": "Samuel Fernandes"
   },
@@ -10,13 +10,21 @@
     "enabled": {
       "type": "boolean",
       "title": "Enabled",
-      "description": "Track usage, show the line and apply the spending limit. Off: the mod does nothing at all.",
+      "description": "Track usage, show the line and apply the limits. Off: the mod does nothing at all.",
       "default": true
+    },
+    "limitPct": {
+      "type": "number",
+      "title": "Usage limit (% of plan window)",
+      "description": "0 = no limit. When any plan window (5h / 7d) is at or above this many points out of 100, the next prompt you type asks once: continue (+10 points), continue without a limit, or hold it. Tool calls in a running turn are never stopped. /budget-guard 80 sets it for the current session only.",
+      "default": 0,
+      "min": 0,
+      "max": 100
     },
     "limitUsd": {
       "type": "number",
-      "title": "Spending limit (USD per session)",
-      "description": "0 = no limit. When the session estimate reaches it, the next prompt you type asks once: continue (+50%), continue without a limit, or hold it. Tool calls in a running turn are never stopped. Typing budget 10 sets it for the current session only.",
+      "title": "Spending limit (USD)",
+      "description": "Spending limit in USD for this session; for API-key use, where no plan window is reported. 0 = no limit. /budget-guard $10 sets it for the current session only.",
       "default": 0,
       "min": 0,
       "max": 1000000

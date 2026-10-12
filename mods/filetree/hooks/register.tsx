@@ -18,8 +18,6 @@ import {
   touch,
   visibleRows,
 } from './model'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 const PANE = 'filetree'
 const TITLE = 'Filetree'
@@ -29,8 +27,6 @@ const RESCAN_GAP_MS = 3000
 const MIN_COLUMNS = 40
 const HINT = 'Side panel · use /tui fullscreen'
 const FAILED = 'Filetree · could not read this folder'
-/** Typed alone, these toggle the pane like `/filetree`. */
-const PLAIN_WORDS = new Set(['filetree', 'file tree', 'tree'])
 /** Surfaces that dock a pane beside the transcript; the others (a phone, an editor panel) are left alone. */
 const PANE_SURFACES = new Set(['terminal', 'desktop'])
 
@@ -105,9 +101,9 @@ function defer($: Dollar, work: () => Promise<void>): void {
   })
 }
 
-/** What `/filetree` and its plain words do: close the pane, or scan and open it. `isFullscreen` is unknown for a typed word.
+/** What `/filetree` does: close the pane, or scan and open it.
  * The text is a headline and at most one dim detail line. */
-async function toggleTree($: Dollar, isFullscreen: boolean | undefined): Promise<string> {
+async function toggleTree($: Dollar, isFullscreen: boolean): Promise<string> {
   await update($, autoOpen, () => 'done') // the person has taken over: never open it for them after this
   if (await isPaneOpen($)) {
     await $.ui.close({ id: PANE })
@@ -227,7 +223,7 @@ export const register: Register = (on, options) => {
   // ---- the commands ---------------------------------------------------------------------------------------------
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'filetree', description: 'Show or hide the file tree beside the chat (typing tree does the same)' })
+    await $.command.register({ name: 'filetree', description: 'Show or hide the file tree beside the chat' })
     // Only where a person is at a surface that docks panes; anywhere else this does nothing, silently.
     if (settings.isAutoOpen && e.isInteractive && e.surface !== null && PANE_SURFACES.has(e.surface)) {
       defer($, () => autoOpenTree($))
@@ -239,15 +235,6 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'filetree' }, async ($, e) => ({ text: await toggleTree($, e.presentation.isFullscreen) })).catch(
     () => ({ text: FAILED }),
   )
-
-  // The plain words are dropped, so they never reach the model (no tokens). Only an exact match is touched; a failed
-  // toggle still drops the word, with the same notice as the command, rather than send a bare "tree" to the model.
-  on('prompt.submit', async ($, e, next) => {
-    const word = plainWord(e)
-    if (word === undefined || !PLAIN_WORDS.has(word)) return next(e)
-
-    return dropWith({ log: text => $.ui.log(text) }, await toggleTree($, undefined).catch(() => FAILED))
-  }).catch(($, e, next) => next(e))
 
   // ---- following Claude's tools ---------------------------------------------------------------------------------
 

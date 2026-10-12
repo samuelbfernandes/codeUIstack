@@ -1,6 +1,6 @@
-# Conda route:   conda env create -f environment.yml && conda activate codeuistack-installer && codeuistack --plan
+# Conda route:   conda env create -f environment.yml && conda activate moddeck-installer && moddeck --plan
 # The installer is a plain Python package with no dependencies; conda only provides Python and pip here.
-name: codeuistack-installer
+name: moddeck-installer
 channels: [conda-forge]
 dependencies:
   - python>=3.9

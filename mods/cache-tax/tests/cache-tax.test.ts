@@ -333,102 +333,36 @@ test('the ttl comes from userConfig', { options: { cacheTtlMinutes: 5, onCold: '
   expect(w.logs.join('\n')).toContain('Idle 6m')
 })
 
-// ---- plain word `cache-tax` (v0.2.0) ----------------------------------------------------------
+// ---- slash only ---------------------------------------------------------------------------------
 
-test('the plain word cache-tax answers like /cache-tax and never reaches the model', async ($, on) => {
+test('a bare typed cache-tax or keepwarm is not a command: it reaches the model untouched', async ($, on) => {
   const w = world(on)
   await start($)
   await turn($, 't1')
   await w.clock.advance(10 * MIN)
-  const slashText = await slash($, 'cache-tax')
-  for (const typed of ['cache-tax', '  Cache-Tax  ', 'CACHE-TAX.']) {
-    w.logs.length = 0
-    const out = await submit($, typed)
-    const [headline, ...rest] = slashText.split('\n')
-    expect(out.drop).toBe(headline)
-    expect(w.logs).toEqual([rest.join('\n')])
-    expect(out.text).toBeUndefined()
-  }
-  expect(w.forks).toBe(0)
-})
-
-test('the plain word is answered even when the cache is cold, and does not arm the guard', STOP, async ($, on) => {
-  const w = world(on)
-  await start($)
-  await turn($, 't1')
-  await w.clock.advance(90 * MIN)
-  const out = await submit($, 'cache-tax')
-  expect(out.drop).toBe('Cache cold · next message ~$1.50')
-  expect(await slash($, 'cache-tax')).not.toContain('on hold')
-  expect((await submit($, 'a real message')).drop).toContain('Cache went cold') // the guard still stops this once
-  expect(await slash($, 'cache-tax')).toContain('on hold: send the same text again to continue')
-})
-
-test('only the exact word counts: a sentence, another sender or an attachment goes through', async ($, on) => {
-  const w = world(on)
-  await start($)
-  await turn($, 't1')
-  await w.clock.advance(10 * MIN)
-  for (const text of ['what is cache-tax', 'cache-tax now', 'cache-taxes', 'the cache-tax']) {
+  for (const text of ['cache-tax', 'CACHE-TAX.', 'keepwarm', 'keepwarm on']) {
     const out = await submit($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await submit($, 'cache-tax', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await submit($, 'cache-tax', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
-})
-
-test('keepwarm has no plain word: typing it starts nothing and reaches the model', async ($, on) => {
-  const w = world(on)
-  await start($)
-  await turn($, 't1')
-  for (const text of ['keepwarm', 'keepwarm on', 'keep warm']) {
-    const out = await submit($, text)
-    expect(out.drop).toBeUndefined()
-    expect(out.text).toBe(text)
-  }
+  expect(w.logs).toEqual([])
   expect(await slash($, 'keepwarm')).toContain('Keep-warm is off')
   expect(w.forks).toBe(0)
 })
 
-test('the plain word fails soft: a broken report still drops, with a short notice', async ($, on) => {
-  const w = world(on)
-  await start($)
-  await turn($, 't1')
-  w.modelThrows = true // the report reads the model name
-  const out = await submit($, 'cache-tax')
-  expect(out.drop).toBe("Couldn't read the cache state")
-})
-
 // ---- one-line drop reasons ------------------------------------------------------------------
 
-test('no drop reason ever contains a line break; the detail goes to ui.log', STOP, async ($, on) => {
+test('the cold stop reason has no line break; the detail goes to ui.log', STOP, async ($, on) => {
   const w = world(on)
   await start($)
   await turn($, 't1')
-  const reasons: string[] = []
-
-  await w.clock.advance(10 * MIN)
-  reasons.push((await submit($, 'cache-tax')).drop) // warm report
-  await w.clock.advance(60 * MIN)
-  reasons.push((await submit($, 'cache-tax')).drop) // cold report
-  reasons.push((await submit($, 'hold me')).drop) // the cold stop
-  await slash($, 'keepwarm', '2h')
-  reasons.push((await submit($, 'cache-tax')).drop) // report with keep-warm on
-
-  expect(reasons).toHaveLength(4)
-  for (const reason of reasons) {
-    expect(typeof reason).toBe('string')
-    expect(reason).not.toMatch(/[\r\n\t\u0000-\u001f]/)
-    expect(reason.length).toBeGreaterThan(0)
-  }
-  // detail lines were logged, as multi-line notes, and none repeats the headline
-  expect(w.logs.length).toBe(4)
-  for (const note of w.logs) expect(note.split('\n')[0]).not.toBe('')
-  expect(w.logs.filter(note => note.includes('\n'))).toHaveLength(3) // the three reports; the stop's detail is one line
-  expect(w.logs.join('\n')).toContain('Context  ~150k tokens')
-  expect(w.logs.join('\n')).toContain('Estimates · Opus · 60 min cache')
-  expect(w.logs.join('\n')).not.toContain('Cache warm')
+  await w.clock.advance(70 * MIN)
+  const reason = (await submit($, 'hold me')).drop
+  expect(typeof reason).toBe('string')
+  expect(reason).not.toMatch(/[\r\n\t\u0000-\u001f]/)
+  expect(reason).toContain('Cache went cold')
+  expect(w.logs).toHaveLength(1)
+  expect(w.logs[0]).toContain('Idle')
 })
 
 test('dropWith: first line is the reason, the rest is one ui.log call', () => {

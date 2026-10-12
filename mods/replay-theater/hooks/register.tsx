@@ -5,8 +5,6 @@ import type { Edit } from '../types'
 import { MAX_EDITS, MAX_PRIOR_BYTES, editFromCall, fileCount, looksLikeShellWrite, stepIndex } from './edits'
 import type { Prior } from './edits'
 import { unifiedDiff } from './diff'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 const PANE = 'replay-theater'
 
@@ -76,7 +74,7 @@ async function hintAfterTurn($: EngineInterface, files: number): Promise<void> {
   const last = await read($, hintAt)
   if (last !== 0 && now - last < HINT_GAP_MS) return
   await update($, hintAt, () => now)
-  $.ui.toast(`${files} files changed · type replay to review`)
+  $.ui.toast(`${files} files changed · /replay to review`)
 }
 
 /** What the hooks below this one drew in the band. Only one tree can fill the band, so a mod that draws returns its row with this under it (never instead of it), and the other mods' rows stay visible. */
@@ -93,7 +91,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'replay',
-      description: 'Step through the file edits from the last turn (typing replay does the same)',
+      description: 'Step through the file edits from the last turn',
       argumentHint: '[all]',
     })
 
@@ -115,7 +113,7 @@ export const register: Register = (on, options) => {
     if (arg !== '' && arg !== 'all') return { text: 'Replay · /replay for the last turn, /replay all for the session' }
 
     return { text: await openReplay($, arg === 'all' ? 'all' : 'turn') }
-  })
+  }).catch(() => ({ text: 'Replay · could not open' }))
 
   // Recording. Observational and fail-open: the call is never altered, denied
   // or delayed by a failure here; an error in this hook just means the edit is
@@ -166,15 +164,10 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // The band goes away as soon as the next prompt is sent. The exact plain word `replay` does what /replay does
-  // and is dropped, so it never reaches the model (no tokens); if opening fails it is still dropped, with a short
-  // notice. Every other prompt passes on untouched, and any failure here passes the prompt on too (fail-open).
+  // The band goes away as soon as the next prompt is sent. The prompt itself passes on untouched, and any failure
+  // here passes it on too (fail-open).
   on('prompt.submit', async ($, e, next) => {
     await update($, ready, () => null).catch(() => {})
-    if (plainWord(e) === 'replay') {
-      return dropWith({ log: text => $.ui.log(text) }, await openReplay($, 'turn').catch(() => 'Replay · could not open'))
-    }
-
     return next(e)
   }).catch(($, e, next) => next(e))
 

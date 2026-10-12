@@ -1,5 +1,5 @@
 {
-  "name": "codeuistack",
+  "name": "moddeck",
   "owner": {
     "name": "Samuel Fernandes"
   },
@@ -20,12 +20,12 @@
     {
       "name": "branch-janitor",
       "source": "./mods/branch-janitor",
-      "description": "Watches your git branches by itself (nothing to type) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question."
+      "description": "Watches your git branches by itself (nothing to run) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question."
     },
     {
       "name": "budget-guard",
       "source": "./mods/budget-guard",
-      "description": "A quiet usage line above the prompt that appears only when cost, context or your plan window needs a look, and an optional spending limit that asks before the next prompt instead of refusing. Type usage for a short report."
+      "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /budget-guard for a short report."
     },
     {
       "name": "cache-tax",
@@ -35,12 +35,17 @@
     {
       "name": "diagram",
       "source": "./mods/diagram",
-      "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: type diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
+      "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: run /diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
     },
     {
       "name": "filetree",
       "source": "./mods/filetree",
       "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only."
+    },
+    {
+      "name": "moddeck",
+      "source": "./mods/moddeck",
+      "description": "A side bar listing every mod and skill, one boxed row each: the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
     },
     {
       "name": "reflect",
@@ -50,7 +55,7 @@
     {
       "name": "replay-theater",
       "source": "./mods/replay-theater",
-      "description": "/replay (or just typing replay) steps through every file edit Claude made in the last turn (or the session), one diff at a time."
+      "description": "/replay steps through every file edit Claude made in the last turn (or the session), one diff at a time."
     },
     {
       "name": "review-cost",
@@ -75,12 +80,7 @@
     {
       "name": "tool-skins",
       "source": "./mods/tool-skins",
-      "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> (or typing skins / skin <theme>) switches live."
-    },
-    {
-      "name": "toolbox",
-      "source": "./mods/toolbox",
-      "description": "A side bar listing every mod and skill, one boxed row each: click a switch (green on, red off) to flip it, pick a skin from a dropdown, or click any other row to put its command in the prompt box."
+      "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> switches live."
     }
   ]
 }

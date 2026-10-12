@@ -1,6 +1,6 @@
 {
   "name": "reflect",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Turns your corrections (\"no, use pnpm\", \"never do X\") into rules you can save to CLAUDE.md with one click.",
   "author": {
     "name": "Samuel Fernandes"

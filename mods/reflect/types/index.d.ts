@@ -12,7 +12,7 @@ declare module 'claude-code' {
       isEditing: boolean
       /** Counts prompt submits; a model reply for an older count is stale. */
       seq: number
-      /** The persisted on/off switch, mirrored for the toolbox side bar. */
+      /** The persisted on/off switch, mirrored for the moddeck side bar. */
       isOff: boolean
     }
   }

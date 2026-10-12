@@ -1,6 +1,6 @@
 # branch-janitor
 
-Install (Claude Code 2.1.287 or later): `/plugin install branch-janitor --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install branch-janitor --marketplace samuelbfernandes/moddeck`
 
 ## What it does
 Notices when the work a git branch was made for is finished, checks that deleting it loses nothing, and **offers** to
@@ -13,13 +13,11 @@ pull request is never offered: the list says `#42 still open`. Each question say
 ## Use
 Nothing to type. Every prompt costs one quick `git for-each-ref`; only if your branches changed does it look properly,
 so a merge done in a plain terminal is noticed on your next prompt. It also looks after Claude's own `git merge/pull/push/
-checkout/fetch --prune`, `gh pr merge`, and at session start. To look on demand, send exactly one of these as a prompt
-(answered here, never sent to Claude, so it costs nothing):
-- `branch-janitor` (also `janitor`, `clean branches`, `cleanup branches`, `delete merged branches`) lists every branch and deletes
-  nothing. With `gh`, it ends with one line per local branch that has an open pull request:
+checkout/fetch --prune`, `gh pr merge`, and at session start. To look on demand, run a slash command:
+- `/branch-janitor` lists every branch and deletes nothing. With `gh`, it ends with one line per local branch that has an open pull request:
   `#42 open · checks passing · review approved · my-branch` (checks: passing, failing, pending, none; review: approved, changes requested, none).
-- `branch-janitor clean` scans now and offers. `branch-janitor off` / `on` stops / resumes it in this repository.
-A sentence that only contains these words is an ordinary prompt. `/branch-janitor [clean|on|off]` works too. `/plugin disable branch-janitor` turns it off everywhere.
+- `/branch-janitor clean` scans now and offers. `/branch-janitor off` / `on` stops / resumes it in this repository.
+`/plugin disable branch-janitor` turns it off everywhere.
 
 ## Settings and limits
 `minMinutes` (30), `protectedBranches` (main, master, develop, dev, trunk, release/*, gh-pages; yours replaces it), `staleDays` (60).

@@ -21,7 +21,7 @@ Goal: every project has ONE committed, canonical `AGENTS.md` (read by Claude Cod
    - `AGENTS.md` from the template below, filled with detected facts. Keep it under ~220 lines.
    - `CLAUDE.md` (pointer) and make sure it is git-ignored.
    - `.gitignore` additions (append missing lines only).
-   - `.githooks/commit-msg` from the global hook: copy `~/.claude/codeuistack/global/githooks/commit-msg` and `_lib.sh`
+   - `.githooks/commit-msg` from the global hook: copy `~/.claude/moddeck/global/githooks/commit-msg` and `_lib.sh`
      if that path exists, then (with the user's OK) `git config core.hooksPath .githooks`.
    - `docs/DECISIONS.md` and `docs/THEORY_REVIEW.md` stubs when the project is scientific/method code.
 4. **Never** commit anything yourself, never add AI attribution to any file, never invent decision IDs, citations or

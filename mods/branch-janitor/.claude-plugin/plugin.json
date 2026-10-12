@@ -1,7 +1,7 @@
 {
   "name": "branch-janitor",
-  "version": "0.4.0",
-  "description": "Watches your git branches by itself (nothing to type) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question.",
+  "version": "0.4.1",
+  "description": "Watches your git branches by itself (nothing to run) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question.",
   "author": {
     "name": "Samuel Fernandes"
   },
@@ -31,7 +31,7 @@
     "staleDays": {
       "type": "number",
       "title": "Quiet days to list as stale",
-      "description": "'branch-janitor' lists unmerged branches untouched for more than this many days (information only).",
+      "description": "'/branch-janitor' lists unmerged branches untouched for more than this many days (information only).",
       "default": 60
     }
   }

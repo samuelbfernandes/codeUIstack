@@ -1,6 +1,6 @@
 # blast-radius
 
-Install (Claude Code 2.1.287 or later): `/plugin install blast-radius --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install blast-radius --marketplace samuelbfernandes/moddeck`
 
 ## What it does
 Holds risky Bash commands and shows what they would destroy before they run. The question opens with one line, the risk as a plain word and what is about to happen, then the command, a few short rows and two answers: **Cancel** (first, so Enter means no) and **Proceed**. Cancel, Esc, free text, a dismissed dialog or a headless run all refuse, and the model is told why. **A safety net, not a permission system:** it only adds a question and never approves anything; keep your normal permissions on.

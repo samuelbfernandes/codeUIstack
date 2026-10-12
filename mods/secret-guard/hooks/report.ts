@@ -24,7 +24,7 @@ export const announce = (hits: Hits): string => {
 
 export type ReportInput = { tally: Tally; isOn: boolean; offBySetting: boolean; problems: readonly string[] }
 
-/** The reply to `secret-guard`: a headline, then dim detail lines (dropWith logs everything after the first). */
+/** The reply to `/secret-guard`: a headline, then detail lines. */
 export function report(r: ReportInput): string {
   const hidden = countOf(r.tally.tool) + countOf(r.tally.typed)
   const state = r.isOn ? 'on' : r.offBySetting ? 'off in settings' : 'off'
@@ -34,7 +34,7 @@ export function report(r: ReportInput): string {
   const asked = [kindsText(r.tally.typed), r.tally.held > 0 ? `held ${r.tally.held}` : '', r.tally.sentAsTyped > 0 ? `sent as typed ${r.tally.sentAsTyped}` : '']
   if (asked.some(x => x !== '')) lines.push(`Typed prompts: ${asked.filter(x => x !== '').join(' · ')}`)
   for (const problem of r.problems) lines.push(`Problem: ${problem}`)
-  lines.push(r.isOn ? 'Type secret-guard off to pause it.' : r.offBySetting ? 'Turn it on in the plugin settings.' : 'Type secret-guard on to resume.')
+  lines.push(r.isOn ? 'Type /secret-guard off to pause it.' : r.offBySetting ? 'Turn it on in the plugin settings.' : 'Type /secret-guard on to resume.')
   return lines.join('\n')
 }
 

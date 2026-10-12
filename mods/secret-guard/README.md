@@ -1,6 +1,6 @@
 # secret-guard
 
-Install: `/plugin install secret-guard --marketplace samuelbfernandes/codeUIstack`
+Install: `/plugin install secret-guard --marketplace samuelbfernandes/moddeck`
 
 Keeps API keys, tokens, passwords and private keys out of what the model reads.
 
@@ -17,11 +17,13 @@ Keeps API keys, tokens, passwords and private keys out of what the model reads.
   Git SHAs, hashes, base64 data and `password <- NULL` are left alone. Counts and kinds are kept, never a secret.
 
 ## Use
-    secret-guard        what was hidden this session, by kind   (also /secret-guard)
-    secret-guard off    pause it (remembered);  secret-guard on  resumes
+    /secret-guard        what was hidden this session, by kind
+    /secret-guard off    pause it (remembered);  /secret-guard on  resumes
+
+The `/` is required: a bare `secret-guard` goes to the model like any prompt.
 
 ## Turn off
-`secret-guard off`, or the `enabled` setting, or `/plugin disable secret-guard`.
+`/secret-guard off`, or the `enabled` setting, or `/plugin disable secret-guard`.
 
 ## Settings
 `enabled`, `askOnPrompt` (default on; off = typed prompts are not checked), `redactEmails` (default off; IP addresses are

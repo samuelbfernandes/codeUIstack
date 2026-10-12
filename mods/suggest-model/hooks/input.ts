@@ -1,4 +1,4 @@
-// What is NOT worth evaluating, and the plain-word commands. Pure functions, no I/O.
+// What is NOT worth evaluating. Pure functions, no I/O.
 
 const CONFIRMATIONS = new Set([
   'y', 'yes', 'yep', 'yeah', 'yup', 'ok', 'okay', 'k', 'sure', 'no', 'n', 'nope', 'thanks', 'thank you', 'thx', 'ty',
@@ -30,16 +30,3 @@ export function looksLikeToolOutput(text: string): boolean {
 
 /** True for the prompts that are never judged: slash commands, confirmations, pasted output. */
 export const isNotATask = (text: string): boolean => text.startsWith('/') || isConfirmation(text) || looksLikeToolOutput(text)
-
-export type PlainWord = 'status' | 'on' | 'off'
-
-/**
- * `suggest-model`, `suggest model`, `suggest-model on`, `suggest-model off` (and the spaced spellings), EXACTLY:
- * trimmed, any case, one optional trailing full stop. A prompt that merely contains the words is not one.
- */
-export function plainWord(text: string): PlainWord | undefined {
-  const t = text.trim().toLowerCase().replace(/\.$/, '').trim().replace(/\s+/g, ' ')
-  const m = /^suggest[- ]model(?: (on|off))?$/.exec(t)
-  if (m === null) return undefined
-  return m[1] === 'on' ? 'on' : m[1] === 'off' ? 'off' : 'status'
-}

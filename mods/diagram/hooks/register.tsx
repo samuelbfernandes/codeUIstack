@@ -3,11 +3,9 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import { lastMermaid } from './extract'
 import { drawDiagram } from './render'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 const PANE = 'diagram'
-const HINT = 'Diagram · type diagram to see it'
+const HINT = 'Diagram · /diagram to see it'
 const FAILED = 'Diagram · could not open'
 
 // The last mermaid block of a final answer, as text. A drawing reads it, so a new answer redraws an open pane.
@@ -17,7 +15,7 @@ async function isPaneOpen($: EngineInterface): Promise<boolean> {
   return (await $.ui.panes()).some(pane => pane.id === PANE)
 }
 
-/** What `/diagram` and the plain word `diagram` do. The text is a headline and at most one dim detail line. */
+/** What `/diagram` does. The text is a headline and at most one dim detail line. */
 async function openDiagram($: EngineInterface): Promise<string> {
   if ((await read($, last)) === null) return 'Diagram · nothing to show yet\nNo mermaid diagram in an answer so far.'
   const opened = await $.ui.open({ id: PANE, title: 'Diagram', focus: true, closeOnEscape: true })
@@ -33,19 +31,11 @@ async function closeDiagram($: EngineInterface): Promise<string> {
   return 'Diagram · closed'
 }
 
-/** The plain words, with runs of spaces folded: `diagram  close` counts. Anything else is a normal prompt. */
-function actionOf(word: string | undefined): 'open' | 'close' | undefined {
-  const normal = word?.replace(/\s+/g, ' ')
-  if (normal === 'diagram') return 'open'
-
-  return normal === 'diagram close' ? 'close' : undefined
-}
-
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'diagram',
-      description: "Draw the last mermaid diagram from Claude's answer in a pane (typing diagram does the same)",
+      description: "Draw the last mermaid diagram from Claude's answer in a pane",
       argumentHint: '[close]',
     })
 
@@ -74,17 +64,6 @@ export const register: Register = (on, options) => {
     if (e.agentId === undefined && e.reason === 'answer') await remember($, e.answer, options.hint !== false).catch(() => undefined)
 
     return next(e)
-  }).catch(($, e, next) => next(e))
-
-  // The plain words are dropped, so they never reach the model (no tokens). Only an exact match is touched; a failed
-  // action still drops the word, with a short notice, rather than send a bare "diagram" to the model. Any other prompt
-  // passes on untouched, and a failure of this hook passes it on too (fail-open).
-  on('prompt.submit', async ($, e, next) => {
-    const action = actionOf(plainWord(e))
-    if (action === undefined) return next(e)
-    const text = await (action === 'open' ? openDiagram($) : closeDiagram($)).catch(() => FAILED)
-
-    return dropWith({ log: line => $.ui.log(line) }, text)
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
