@@ -15,7 +15,7 @@ These are the author's picks, chosen for how often the problem they solve comes 
 |---|---|---|
 | **blast-radius** | An `rm -rf` or `git reset --hard` is one keystroke from losing a week of work | Before a risky command: exactly what would be lost (uncommitted changes, untracked and ignored files, unpushed commits), a **Folder risk** report (what the folder is, how big, how recent, what git could restore, recoverable yes / partly / no), a risk level, and **Cancel** as the first answer |
 | **cache-tax** | After a pause, Claude's prompt cache goes cold and the next message silently costs much more | One stop before such a message with the estimated price; `/keepwarm` (costs tokens, so it is explicit) keeps the cache warm |
-| **model-fit** | A typo fix does not need your strongest model; a proof or a hard bug does | Every prompt is checked. On a clear mismatch the prompt is held and a dialog opens: "Don't use Sonnet for this task" or "Opus is overkill", with a fit-and-cost table and the model it recommends (switch, run as a subagent, or keep going). A status line shows the verdict each time |
+| **suggest-model** | A typo fix does not need your strongest model; a proof or a hard bug does | Every prompt is checked. On a clear mismatch the prompt is held and a dialog opens: "Don't use Sonnet for this task" or "Opus is overkill", with a fit-and-cost table and the model it recommends (switch, run as a subagent, or keep going). A status line shows the verdict each time |
 | **branch-janitor** | Dozens of finished branches pile up, and deleting the wrong one hurts | It watches by itself, even for merges done in another terminal: "this branch looks finished, nothing would be lost, delete it?" with the command to restore it. The remote copy is a separate question |
 | **review-cost** (Codex users) | An automatic second-model review before a push is great until you see the bill | A green / amber / red estimate of the review's tokens and a Review / Skip button |
 | **secret-guard** | An API key or token in a file Claude reads, or in a prompt you paste, goes to the model | Secret-looking text is replaced by a placeholder before Claude sees it; a typed prompt with a secret asks first |
@@ -32,6 +32,7 @@ Look first, then decide. Nothing changes until you confirm.
 ```bash
 pipx install git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1
 codeuistack install --plan     # prints every change it would make, then stops
+codeuistack install --standard # one line, no questions: the recommended set (or --all: every mod, rule and guard)
 codeuistack                    # asks a few questions, shows the plan, applies it
 ```
 
@@ -61,17 +62,13 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
 
-## Upgrading from the earlier name (sci-toolkit)
-
-Unzip the new version, then run `sh install.sh status`: it lists the old install. `sh install.sh update` removes it and installs this version with the same choices (add `--scope project --project DIR` for a project install). `sh install.sh uninstall` removes every version it finds. Start a new Claude Code session afterwards.
-
 ## The fourteen mods
 
 | Mod | One line |
 |---|---|
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
-| `model-fit` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
+| `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
 | `branch-janitor` | Notices a finished branch, verifies it is safe to delete, offers to delete it |
 | `review-cost` | Shows the token cost of a Codex review before a push |
 | `reflect` | Offers to save a rule when you correct Claude |
@@ -84,7 +81,7 @@ Unzip the new version, then run `sh install.sh status`: it lists the old install
 | `diagram` | Draws Claude's mermaid diagrams as box art, offline |
 | `aside` | A quick side question in a pane, kept out of the conversation (uses a little credit) |
 
-**No slash needed.** Everything that costs no credit runs by itself, and the status commands answer to plain words: type `branch-janitor`, `model-fit`, `cache-tax`, `agents-info`, `replay`, `filetree`, `skins`, `usage`, `secret-guard` or `diagram` as your whole prompt and it is handled on your computer, never sent to Claude. See [docs/TOOLS.md](docs/TOOLS.md).
+**No slash needed.** Everything that costs no credit runs by itself, and the status commands answer to plain words: type `branch-janitor`, `suggest-model`, `cache-tax`, `agents-info`, `replay`, `filetree`, `skins`, `usage`, `secret-guard` or `diagram` as your whole prompt and it is handled on your computer, never sent to Claude. See [docs/TOOLS.md](docs/TOOLS.md).
 
 Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
 Turn any mod off with `/plugin disable <name>`.
@@ -100,7 +97,7 @@ their own line are your whole prompt; they are answered on your computer and nev
 |---|---|---|
 | **blast-radius** | Ask Claude: `create a folder build with a file a.txt, then delete the build folder` | Before `rm -rf build`: a box with the risk level, what is in the folder, what git could restore, "Recoverable: yes / partly / no", and **Cancel** as the first answer |
 | **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
-| **model-fit** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **model-fit on** chip above the prompt; `model-fit off` / `model-fit on` / `model-fit explain <text>` |
+| **suggest-model** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **suggest-model on** chip above the prompt; `suggest-model off` / `suggest-model on` / `suggest-model explain <text>` |
 | **branch-janitor** | `git checkout -b demo`, commit a file, then in another terminal `git checkout main && git merge demo`. Send any prompt in Claude Code | "Delete 1 finished branch?" with the command to restore it. Type `branch-janitor` for the list (with `gh`: open pull requests and their checks) |
 | **review-cost** | Needs Codex. In a repo with a `docs/THEORY_REVIEW.md` file, change a method file and ask Claude to `git push` | A green / amber / red estimate of the review's tokens with **Review / Skip** |
 | **reflect** | Tell Claude: `no, in this repo we always use tabs, never spaces` | A small band "Reflect" with the rule and **Save / Global / Edit / Skip** (saves to `CLAUDE.md`) |
@@ -160,7 +157,7 @@ The installer never installs these. They are popular, and each has a cost or cat
 | thedotmack/claude-mem | Automatic memory across sessions | Runs model summaries of your tool use (tokens) and stores them; think hard before it records unpublished data |
 | github/spec-kit, Fission-AI/OpenSpec | Spec-driven workflows | Many manual steps and prompts; OpenSpec has telemetry on by default |
 | ruvnet/ruflo, SuperClaude Framework | Agent swarms, many commands and modes | Large always-present instructions, no measured token cost, background workers |
-| musistudio/claude-code-router | Route requests across providers | Built for API keys across providers; `model-fit` does the cheap version |
+| musistudio/claude-code-router | Route requests across providers | Built for API keys across providers; `suggest-model` does the cheap version |
 | openai/codex-plugin-cc | Codex commands in Claude Code | Its review gate reviews every reply and warns it can drain usage limits |
 | wshobson/agents, davila7/claude-code-templates | Catalogs of 100+ agents and skills | Browse, do not bulk-install: each piece costs context |
 

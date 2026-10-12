@@ -21,7 +21,16 @@ type Fork = { isAnswered: true; text: string; usage: typeof USAGE } | { isAnswer
 
 /** Everything beneath the plugin: the fork (answered by `w.fork`, optionally held back), panes, log and toasts. */
 function world(on: On) {
+  const store = new Map<string, unknown>()
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => (store.set(e.key, e.value), { value: undefined }))
+  on('store.delete', (_$, e) => (store.delete(e.key), { value: undefined }))
+  on('ui.render', ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box key="engine-band" />
+  })
   const w = {
+    store,
     clock: mock.clock(on, { now: 1_000_000 }),
     session: mock.session(on),
     forkPrompts: [] as string[],
@@ -252,4 +261,59 @@ test('the command is registered as immediate and session end clears the asides',
   const ui = await mountPane($, 'terminal')
   expect(await texts(ui)).toEqual(['No side questions yet · /aside your question'])
   await ui.unmount()
+})
+
+const BAND = { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} }
+const mountBand = ($: Engine, surface: (typeof SURFACES)[number], props: object = BAND) =>
+  $.ui.mount({ plugin: 'aside', surface, component: 'AbovePrompt', props } as never)
+const bandText = async (ui: { findAll: (q: { type: string }) => Promise<{ text: string }[]> }) =>
+  (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
+
+for (const surface of SURFACES) {
+  test(`${surface}: the green aside chip is the button; clicking turns aside off (red) and on again`, async ($, on) => {
+    const w = world(on)
+    const band = await mountBand($, surface)
+    expect(await bandText(band)).toContain('aside on')
+    expect(JSON.stringify(await band.findAll({ type: 'Text' }))).toContain('success')
+    await band.press({ key: 'toggle' })
+    expect(w.store.get('off')).toBe(true)
+    expect(await bandText(band)).toContain('aside off')
+    expect(JSON.stringify(await band.findAll({ type: 'Text' }))).toContain('error')
+    expect(JSON.stringify(await band.findAll({ type: 'Text' }))).not.toContain('Turn o')
+    await band.press({ key: 'toggle' })
+    expect(w.store.has('off')).toBe(false)
+    expect(await bandText(band)).toContain('aside on')
+  })
+}
+
+test('while off, /aside <question> sends nothing and says how to turn it on; /aside on lifts it', async ($, on) => {
+  const w = world(on)
+  expect((await slash($, 'off')).text).toContain('Aside · off')
+  const r = await slash($, 'what is REML?')
+  expect(r.text).toContain('Aside is off')
+  expect(w.forkPrompts).toHaveLength(0)
+  expect((await slash($, 'on')).text).toBe('Aside · on')
+  expect((await slash($, 'what is REML?')).text).toContain('thinking')
+})
+
+test('typing "aside off" / "aside on" flips the switch and is dropped; a prompt that merely mentions it is not', async ($, on) => {
+  const w = world(on)
+  expect(await typed($, 'aside off')).toEqual({ drop: 'Aside · off · type aside on, or click the chip, to turn it back on' })
+  expect(w.store.get('off')).toBe(true)
+  expect(await typed($, 'Aside on.')).toEqual({ drop: 'Aside · on' })
+  expect(w.store.has('off')).toBe(false)
+  expect(await typed($, 'please aside off now')).toEqual({ text: 'please aside off now' })
+})
+
+test('showButton = false: no chip', { options: { showButton: false } }, async ($, on) => {
+  world(on)
+  const band = await mountBand($, 'terminal')
+  expect(await band.find({ key: 'toggle' })).toBeUndefined()
+})
+
+test('enabled = false: no chip, and on does not override it', { options: { enabled: false } }, async ($, on) => {
+  world(on)
+  const band = await mountBand($, 'terminal')
+  expect(await band.find({ key: 'toggle' })).toBeUndefined()
+  expect((await slash($, 'on')).text).toContain('disabled')
 })

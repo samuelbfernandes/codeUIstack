@@ -28,7 +28,7 @@ function world(on: On) {
 }
 
 const mount = ($: Engine, surface: (typeof SURFACES)[number], props: object = BAND) =>
-  $.ui.mount({ plugin: 'model-fit', surface, component: 'AbovePrompt', props } as never)
+  $.ui.mount({ plugin: 'suggest-model', surface, component: 'AbovePrompt', props } as never)
 
 const texts = async (ui: { findAll: (q: { type: string }) => Promise<{ text: string }[]> }) =>
   (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
@@ -36,35 +36,35 @@ const texts = async (ui: { findAll: (q: { type: string }) => Promise<{ text: str
 const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } } as never)
 
 for (const surface of SURFACES) {
-  test(`${surface}: the band shows ON and a Turn off button`, async ($, on) => {
+  test(`${surface}: the band shows ON and the chip is the button`, async ($, on) => {
     world(on)
     const band = await mount($, surface)
-    expect(await texts(band)).toContain('model-fit on')
+    expect(await texts(band)).toContain('suggest-model on')
     expect(await band.find({ key: 'toggle' })).toBeDefined()
   })
 
-  test(`${surface}: pressing the button turns model-fit off, clears the status, persists, and flips back`, async ($, on) => {
+  test(`${surface}: pressing the button turns suggest-model off, clears the status, persists, and flips back`, async ($, on) => {
     const w = world(on)
     const band = await mount($, surface)
     await band.press({ key: 'toggle' })
     expect(w.store.get('off')).toBe(true)
-    expect(w.statuses.at(-1)).toContain('model-fit: off')
-    expect(w.toasts.at(-1)).toContain('model-fit · off')
-    expect(await texts(band)).toContain('model-fit off')
+    expect(w.statuses.at(-1)).toContain('suggest-model: off')
+    expect(w.toasts.at(-1)).toContain('suggest-model · off')
+    expect(await texts(band)).toContain('suggest-model off')
     await band.press({ key: 'toggle' })
     expect(w.store.has('off')).toBe(false)
     expect(w.statuses.at(-1)).toBeUndefined()
-    expect(await texts(band)).toContain('model-fit on')
-    expect(w.toasts.at(-1)).toContain('model-fit · on')
+    expect(await texts(band)).toContain('suggest-model on')
+    expect(w.toasts.at(-1)).toContain('suggest-model · on')
   })
 
   test(`${surface}: the plain words and the button are one switch`, async ($, on) => {
     const w = world(on)
     const band = await mount($, surface)
-    await word($, 'model-fit off')
-    expect(await texts(band)).toContain('model-fit off')
-    await word($, 'model-fit on')
-    expect(await texts(band)).toContain('model-fit on')
+    await word($, 'suggest-model off')
+    expect(await texts(band)).toContain('suggest-model off')
+    await word($, 'suggest-model on')
+    expect(await texts(band)).toContain('suggest-model on')
     await band.press({ key: 'toggle' })
     expect(w.store.get('off')).toBe(true)
     // while off, a mismatch is not even checked
@@ -77,8 +77,8 @@ for (const surface of SURFACES) {
     w.store.set('off', true)
     await $.session.start({ cwd: '/work' } as never)
     const band = await mount($, surface)
-    expect(await texts(band)).toContain('model-fit off')
-    expect(w.statuses.at(-1)).toContain('model-fit: off')
+    expect(await texts(band)).toContain('suggest-model off')
+    expect(w.statuses.at(-1)).toContain('suggest-model: off')
   })
 
   test(`${surface}: the band yields to a survey`, async ($, on) => {
@@ -90,7 +90,7 @@ for (const surface of SURFACES) {
 
 test('surfaces that do not raise the band get nothing from the mod', async ($, on) => {
   world(on)
-  const band = await $.ui.mount({ plugin: 'model-fit', surface: 'mobile', component: 'AbovePrompt', props: BAND } as never)
+  const band = await $.ui.mount({ plugin: 'suggest-model', surface: 'mobile', component: 'AbovePrompt', props: BAND } as never)
   expect(await band.find({ key: 'toggle' })).toBeUndefined()
 })
 
@@ -106,16 +106,17 @@ test('enabled = false in the settings: no button either', { options: { enabled: 
   expect(await band.find({ key: 'toggle' })).toBeUndefined()
 })
 
-test('the chip is green when on and red when off, and sits outside the button', async ($, on) => {
+test('the chip is green when on and red when off, and is the button itself (no Turn on/off label)', async ($, on) => {
   world(on)
   const band = await mount($, 'desktop')
-  const chip = async () => (await band.findAll({ type: 'Text' })).find(t => t.text.includes('model-fit'))
+  const chip = async () => (await band.findAll({ type: 'Text' })).find(t => t.text.includes('suggest-model'))
   const before = await chip()
   expect(JSON.stringify(before)).toContain('success')
-  await word($, 'model-fit off')
+  await word($, 'suggest-model off')
   expect(JSON.stringify(await chip())).toContain('error')
   const button = (await band.findAll({ type: 'Button' }))[0]
-  expect(JSON.stringify(button)).toContain('Turn on')
+  expect(JSON.stringify(button)).toContain('suggest-model off')
+  expect(JSON.stringify(await band.findAll({ type: 'Text' }))).not.toContain('Turn o')
 })
 
 for (const surface of SURFACES) {

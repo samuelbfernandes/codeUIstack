@@ -43,11 +43,6 @@
       "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only."
     },
     {
-      "name": "model-fit",
-      "source": "./mods/model-fit",
-      "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
-    },
-    {
       "name": "reflect",
       "source": "./mods/reflect",
       "description": "Turns your corrections (\"no, use pnpm\", \"never do X\") into rules you can save to CLAUDE.md with one click."
@@ -71,6 +66,11 @@
       "name": "secret-guard",
       "source": "./mods/secret-guard",
       "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent."
+    },
+    {
+      "name": "suggest-model",
+      "source": "./mods/suggest-model",
+      "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
     },
     {
       "name": "tool-skins",

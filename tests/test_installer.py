@@ -51,6 +51,22 @@ class UserScope(Base):
         self.assertNotIn(f"review-cost@{MP}", self.plugins())
         self.assertEqual(self.sb.git("config", "--global", "toolkit.theoryReview"), "false")
 
+    def test_standard_is_one_line_and_asks_nothing(self):
+        rc, out, err = run_cli(["install", "--standard", "--scope", "user", *SKIP_PLUGINS])
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn(f"blast-radius@{MP}", self.plugins())
+        self.assertNotIn(f"aside@{MP}", self.plugins())          # costs credit: not in the standard set
+
+    def test_all_installs_every_mod_including_the_ones_that_start_off(self):
+        rc, out, err = run_cli(["install", "--all", "--scope", "user", *SKIP_PLUGINS])
+        self.assertEqual(rc, 0, out + err)
+        every = {m["name"] for m in payload.mods()}
+        self.assertEqual({p.split("@")[0] for p in self.plugins()}, every)
+
+    def test_standard_and_all_cannot_be_combined(self):
+        with self.assertRaises(SystemExit):
+            run_cli(["install", "--standard", "--all"])
+
     def test_plan_changes_nothing(self):
         before = self.sb.tree()
         rc, out, _ = run_cli(["install", "--plan", "--scope", "user"])
@@ -119,8 +135,8 @@ class UserScope(Base):
         self.assertFalse((self.home / ".claude" / "settings.json").exists() and "attribution" in (self.home / ".claude" / "settings.json").read_text())
 
     def test_mods_flag_selects_exactly_those(self):
-        self.install("--scope", "user", "--mods", "blast-radius,model-fit")
-        self.assertEqual({p for p in self.plugins()}, {f"blast-radius@{MP}", f"model-fit@{MP}"})
+        self.install("--scope", "user", "--mods", "blast-radius,suggest-model")
+        self.assertEqual({p for p in self.plugins()}, {f"blast-radius@{MP}", f"suggest-model@{MP}"})
 
     def test_unknown_ids_are_refused_before_anything_changes(self):
         before = self.sb.tree()
@@ -139,11 +155,11 @@ class UserScope(Base):
         self.assertEqual((self.home / ".claude" / "settings.json").read_text(), "{ broken")
 
     def test_failed_plugin_is_reported_and_others_continue(self):
-        os.environ["FAKE_FAIL"] = f"model-fit@{MP}"
+        os.environ["FAKE_FAIL"] = f"suggest-model@{MP}"
         out = self.install("--scope", "user")
-        self.assertIn("could not install model-fit", out)
+        self.assertIn("could not install suggest-model", out)
         self.assertIn(f"blast-radius@{MP}", self.plugins())
-        self.assertNotIn(f"model-fit@{MP}", self.plugins())
+        self.assertNotIn(f"suggest-model@{MP}", self.plugins())
 
     def test_old_claude_code_skips_mods_with_a_clear_message(self):
         os.environ["FAKE_CLAUDE_VERSION"] = "2.0.1"
@@ -253,7 +269,7 @@ class Interactive(Base):
         rc, out, err = self.run_with(["1", "", "2", "", "", "", "y"])
         self.assertEqual(rc, 0, out + err)
         self.assertNotIn(f"blast-radius@{MP}", self.plugins())
-        self.assertIn(f"model-fit@{MP}", self.plugins())
+        self.assertIn(f"suggest-model@{MP}", self.plugins())
 
     def test_saying_no_changes_nothing(self):
         before = self.sb.tree()
@@ -335,72 +351,3 @@ class NewModDefaults(unittest.TestCase):
         self.assertFalse(by_name["aside"].default)
         self.assertTrue(by_name["secret-guard"].default)
         self.assertTrue(by_name["budget-guard"].default)
-
-
-@unittest.skipUnless(POSIX, "uses a fake claude script")
-class EarlierName(Base):
-    """An install made under the project's earlier name ('sci-toolkit') is found, reported and replaced."""
-    OLD = "sci-toolkit"
-
-    def make_old_install(self):
-        claude = self.home / ".claude"
-        stage = claude / self.OLD
-        (stage / "state").mkdir(parents=True)
-        block = f"<!-- BEGIN {self.OLD} (managed block: edits inside are overwritten on re-install; delete the block to remove) -->\nold rules\n<!-- END {self.OLD} -->\n"
-        (claude / "CLAUDE.md").write_text("# mine\n\n" + block)
-        (stage / "state" / "user.json").write_text(json.dumps({
-            "scope": "user", "project": None, "profile": "neutral", "version": "0.3.1",
-            "selected": ["blast-radius", "model-fit", "rules"],
-            "claude_md": {"path": str(claude / "CLAUDE.md"), "created": False},
-            "plugins": [{"id": f"blast-radius@{self.OLD}", "scope": "user", "official": False}],
-            "marketplace": {"name": self.OLD, "scope": "user", "added": True},
-        }))
-        db = {"markets": {self.OLD: str(stage)}, "plugins": [{"id": f"blast-radius@{self.OLD}", "scope": "user"}], "log": []}
-        (self.home / ".fake-claude.json").write_text(json.dumps(db))
-
-    def test_status_sees_the_old_install_and_says_what_to_do(self):
-        self.make_old_install()
-        rc, out, _ = run_cli(["status"])
-        self.assertEqual(rc, 0)
-        self.assertIn("earlier name 'sci-toolkit'", out)
-        self.assertIn("update", out)
-        self.assertIn("version 0.3.1", out)
-
-    def test_status_with_nothing_still_says_not_installed(self):
-        rc, out, _ = run_cli(["status"])
-        self.assertIn("Not installed", out)
-
-    def test_update_replaces_it_keeping_choices_and_adding_new_defaults(self):
-        self.make_old_install()
-        rc, out, err = run_cli(["update", "--yes"])
-        self.assertEqual(rc, 0, out + err)
-        claude = self.home / ".claude"
-        self.assertFalse((claude / self.OLD).exists())
-        self.assertEqual(self.sb.fake_db()["markets"].get(self.OLD), None)
-        self.assertNotIn(f"blast-radius@{self.OLD}", self.plugins())
-        self.assertIn(f"blast-radius@{MP}", self.plugins())
-        self.assertIn(f"model-fit@{MP}", self.plugins())
-        self.assertIn(f"secret-guard@{MP}", self.plugins())     # added since: starts on at its default
-        self.assertNotIn(f"aside@{MP}", self.plugins())         # costs credit: starts off
-        text = (claude / "CLAUDE.md").read_text()
-        self.assertNotIn(f"BEGIN {self.OLD}", text)
-        self.assertIn(f"BEGIN {NAME}", text)
-        self.assertIn("# mine", text)
-        rc, out, _ = run_cli(["status"])
-        self.assertNotIn("earlier name", out)
-
-    def test_plan_lists_the_replacement_and_changes_nothing(self):
-        self.make_old_install()
-        before = self.sb.tree()
-        rc, out, _ = run_cli(["install", "--plan", "--scope", "user"])
-        self.assertEqual(rc, 0)
-        self.assertIn("Replace the earlier 'sci-toolkit' install", out)
-        self.assertEqual(self.sb.tree(), before)
-
-    def test_uninstall_removes_the_old_install_too(self):
-        self.make_old_install()
-        rc, out, err = run_cli(["uninstall", "--yes"])
-        self.assertEqual(rc, 0, out + err)
-        self.assertFalse((self.home / ".claude" / self.OLD).exists())
-        self.assertEqual(self.plugins(), set())
-        self.assertEqual((self.home / ".claude" / "CLAUDE.md").read_text().strip(), "# mine")

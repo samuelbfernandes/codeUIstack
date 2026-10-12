@@ -1,5 +1,5 @@
-/** One prediction as /model-fit status lists it. The prompt is cut to a short snippet and lives in session memory only. */
-export type ModelFitEntry = {
+/** One prediction as /suggest-model status lists it. The prompt is cut to a short snippet and lives in session memory only. */
+export type SuggestModelEntry = {
   snippet: string
   tier: 'light' | 'standard' | 'deep' | 'review'
   confidence: number
@@ -10,7 +10,7 @@ export type ModelFitEntry = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-fit': {
+    'suggest-model': {
       /** Prompts from the person checked this session. */
       seen: number
       /** "Keep ... and don't suggest again this session" was chosen. */
@@ -20,7 +20,7 @@ declare module 'claude-code' {
       /** Result of the one `codex --version` probe; null = not probed yet. */
       codexOk: boolean | null
       /** The last predictions, newest last (at most 5). */
-      recent: ModelFitEntry[]
+      recent: SuggestModelEntry[]
     }
   }
 }

@@ -17,6 +17,18 @@ Inside Claude Code:
 Repeat the second line for each mod you want (`/plugin install` lists them). You get the mods; you do not get the rules,
 git guards or the checklist of built-in features. Good for trying one tool.
 
+## One line
+
+No prior install, no questions (replace `v0.4.1` with the release you want):
+
+```
+pipx run --spec git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1 codeuistack install --standard
+```
+
+`--standard` is the recommended set; `--all` adds every mod (including the ones that spend credit, such as aside) and every rule, skill and git guard.
+Built-in features and third-party plugins stay at their defaults in both. Add `--plan` to only look. With uv: `uvx --from git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1 codeuistack install --standard`.
+Then start a new Claude Code session.
+
 ## B. Full installer with pipx or uv (recommended)
 
 ```
@@ -56,7 +68,7 @@ install.cmd --plan              # Windows (double-clicking install.cmd also work
 4. The plan, then a final yes or no.
 
 Without questions: `codeuistack install --yes` (defaults), plus any of `--scope project --project DIR`, `--profile lab`,
-`--mods blast-radius,model-fit`, `--with sandbox`, `--without filetree`, `--force-hooks`. `codeuistack list` shows every id.
+`--mods blast-radius,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `codeuistack list` shows every id.
 
 ## Afterwards
 

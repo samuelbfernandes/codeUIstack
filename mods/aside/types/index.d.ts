@@ -22,6 +22,8 @@ declare module 'claude-code' {
     aside: {
       /** Newest first, at most five. */
       asides: AsideEntry[]
+      /** The persisted on/off switch, mirrored here so the band's chip redraws when it flips. */
+      isOff: boolean
     }
   }
 }

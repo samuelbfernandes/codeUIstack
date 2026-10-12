@@ -2,28 +2,28 @@ import { test, expect } from 'claude-code/testing'
 
 import { isConfirmation, isNotATask, looksLikeToolOutput, plainWord } from '../hooks/input'
 
-test('plain words: exactly model-fit / model fit with an optional on or off', () => {
-  expect(plainWord('model-fit')).toBe('status')
-  expect(plainWord('model fit')).toBe('status')
-  expect(plainWord('  Model-Fit  ')).toBe('status')
-  expect(plainWord('model-fit.')).toBe('status')
-  expect(plainWord('model-fit off')).toBe('off')
-  expect(plainWord('Model Fit ON.')).toBe('on')
-  expect(plainWord('model-fit   on')).toBe('on')
+test('plain words: exactly suggest-model / suggest model with an optional on or off', () => {
+  expect(plainWord('suggest-model')).toBe('status')
+  expect(plainWord('suggest-model')).toBe('status')
+  expect(plainWord('  Suggest-Model  ')).toBe('status')
+  expect(plainWord('suggest-model.')).toBe('status')
+  expect(plainWord('suggest-model off')).toBe('off')
+  expect(plainWord('Suggest Model ON.')).toBe('on')
+  expect(plainWord('suggest-model   on')).toBe('on')
 })
 
 test('plain words: a prompt that merely contains the keyword is never one', () => {
   for (const t of [
-    'model-fit please',
-    'what does model-fit do',
-    'turn model-fit off for this session',
-    'model-fit explain derive the BLUP',
+    'suggest-model please',
+    'what does suggest-model do',
+    'turn suggest-model off for this session',
+    'suggest-model explain derive the BLUP',
     'the model fit is poor, refit with REML',
-    'model-fits',
-    'model-fit off now',
-    'model-fit on..',
-    '/model-fit',
-    'model-fit\nmore text',
+    'suggest-models',
+    'suggest-model off now',
+    'suggest-model on..',
+    '/suggest-model',
+    'suggest-model\nmore text',
     '',
   ]) {
     expect(plainWord(t)).toBeUndefined()
@@ -50,7 +50,7 @@ test('pasted tool output is recognised; a bulleted or numbered request is not', 
 })
 
 test('isNotATask covers slash commands, confirmations and pasted output', () => {
-  expect(isNotATask('/model fit')).toBe(true)
+  expect(isNotATask('/suggest model')).toBe(true)
   expect(isNotATask('yes')).toBe(true)
   expect(isNotATask('<bash-stdout>x</bash-stdout>')).toBe(true)
   expect(isNotATask('derive the BLUP variance')).toBe(false)
