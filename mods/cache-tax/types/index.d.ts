@@ -29,6 +29,15 @@ export type CacheTaxTotals = {
   /** Last completed turn: all four counts summed, and its output tokens; 0 = no turn yet. */
   lastTokens: number
   lastOut: number
+  /** Uncached input tokens summed over the same turns (for the session hit rate). */
+  input: number
+}
+
+export type CacheTaxCache = {
+  /** When the main conversation's prompt cache goes cold, in $.clock.now() ms; null when unknown or before the first response. */
+  expiresAt: number | null
+  /** Cache-read share of all input tokens this session, 0-100, one decimal; null before the first response. */
+  hitRate: number | null
 }
 
 declare module 'claude-code' {
@@ -42,6 +51,8 @@ declare module 'claude-code' {
       cold: { tokens: number } | null
       paid: { count: number; usd: number }
       totals: CacheTaxTotals
+      /** Display mirror for other mods: the cache's expiry clock time and the hit rate. */
+      cache: CacheTaxCache
       /** The '/keepwarm 90m' hint was shown in a cold-cache question this session. */
       hinted: boolean
       keepwarm: CacheTaxKeepwarm | null

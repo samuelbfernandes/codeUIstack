@@ -20,6 +20,13 @@ These are the author's picks, chosen for how often the problem they solve comes 
 | **review-cost** (Codex users) | An automatic second-model review before a push is great until you see the bill | A green / amber / red estimate of the review's tokens and a Review / Skip button |
 | **secret-guard** | An API key or token in a file Claude reads, or in a prompt you paste, goes to the model | Secret-looking text is replaced by a placeholder before Claude sees it; a typed prompt with a secret asks first |
 | **budget-guard** | A long session quietly runs up a bill, or the context fills | A quiet usage line that appears only when cost, context or your plan window matters; an optional spending limit that asks |
+| **data-guard** | In a scratch repo `echo "email,age" > people.csv && git add people.csv`, then ask Claude to `git commit -m test` | A dialog naming the data file and the personal-looking column `email` (names only, never values) with **Hold it / Commit anyway / Fix it** |
+| **big-file-guard** | Put a csv over 256 KB in the folder and ask Claude to read it. Then `/big-file-guard` | Claude gets the first 200 lines plus a note; the word shows tokens saved |
+| **repro-log** | Ask Claude to run a Python script, then type `/repro` | A file in `.moddeck/repro/` with the commands, versions and seeds |
+| **auto-test** | `/auto-test on`, ask Claude to edit a file in a project with tests | "auto-test · passed" or "FAILED" with the last lines of the output |
+| **prompt-library** | Type `/prompts add eda | Profile this dataset`, then click it in the side bar | The text appears in the prompt box, not sent |
+| **checkpoint** | Edit a file, type `/checkpoint`, edit it again, then `/checkpoint restore <name>` | A dialog listing the files that would change, with **Snapshot first, then restore** first |
+| **long-run-ping** | `/long-run-ping test` | A toast, a sound and a notification |
 | **Git guards** | A `.env` or a private key committed, a force-push to main | Refused at commit or push, in every repository (or just one) |
 | **Hardened settings** | A cloned repo or a prompt-injected page tries to read your SSH keys | Claude's file tools cannot read SSH, cloud, GPG, registry or `.env` files (shell commands need the sandbox option) |
 
@@ -62,11 +69,11 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
 
-## The fifteen mods
+## The twenty-two mods
 
 | Mod | One line |
 |---|---|
-| `moddeck` | A side bar with every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
+| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity) and every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
 | `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
@@ -81,8 +88,15 @@ commit; Codex sends code to OpenAI when you enable it).
 | `budget-guard` | A quiet usage line and an optional spending limit |
 | `diagram` | Draws Claude's mermaid diagrams as box art, offline |
 | `aside` | A quick side question in a pane, kept out of the conversation (uses a little credit) |
+| `data-guard` | Asks before a commit holds large files, data files (csv, parquet, rds…), personal-looking column names, or notebooks with outputs (it can strip them) |
+| `big-file-guard` | Reads only the first lines of a big csv, json or log, so it costs fewer tokens |
+| `repro-log` | `/repro` writes a re-runnable recipe of what the session ran (commands, versions, seeds, files) |
+| `auto-test` | Runs your tests after a turn that changed code and shows pass or fail (off until you switch it on) |
+| `prompt-library` | `/prompts`: saved prompts per project, one click in the side bar |
+| `checkpoint` | `/checkpoint`: safety snapshots of your working tree; restoring shows what you would lose first |
+| `long-run-ping` | A toast, sound and notification when a long turn or command finishes |
 
-**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/skin`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
+**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/skin`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
 Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
 Turn any mod off with `/plugin disable <name>`.

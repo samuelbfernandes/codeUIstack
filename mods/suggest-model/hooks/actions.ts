@@ -72,13 +72,13 @@ export const manualSwitchHint = (alias: Alias): string =>
 
 // ---------------------------------------------------------------------- subagent
 
-/** Starts the subagent in the background. Resolves true when it started, false (never throws) otherwise. */
-export async function spawnSubagent(spawn: Spawn, text: string, alias: Alias): Promise<boolean> {
+/** Starts the subagent in the background. Never throws: `ok`, or `why` (the engine's own reason, cut short). */
+export async function spawnSubagent(spawn: Spawn, text: string, alias: Alias): Promise<{ ok: true } | { ok: false; why: string }> {
   try {
     const r = await spawn({ prompt: text, description: describeTask(text), model: alias })
-    return r.deny === undefined
-  } catch {
-    return false
+    return r.deny === undefined ? { ok: true } : { ok: false, why: String(r.deny).slice(0, 160) }
+  } catch (error) {
+    return { ok: false, why: (error instanceof Error ? error.message : 'the call failed').slice(0, 160) }
   }
 }
 

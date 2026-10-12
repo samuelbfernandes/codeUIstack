@@ -132,3 +132,42 @@ export function hitPercent(read: number, write: number): number | null {
   const total = read + write
   return total > 0 ? Math.round((read / total) * 100) : null
 }
+
+/** Share of all input tokens read from cache, 0-100 with one decimal; null when no input was counted. */
+export function hitRate(read: number, write: number, uncached: number): number | null {
+  const total = read + write + uncached
+  if (!(total > 0) || !Number.isFinite(total)) return null
+  return Math.round((read / total) * 1000) / 10
+}
+
+/** When the cache goes cold: the last response plus the TTL; null before any response (at = 0) or on bad input. */
+export function expiryAt(lastResponseAt: number, ttlMs: number): number | null {
+  return lastResponseAt > 0 && Number.isFinite(lastResponseAt) && ttlMs > 0 ? lastResponseAt + ttlMs : null
+}
+
+const two = (n: number): string => String(n).padStart(2, '0')
+
+/**
+ * Local wall-clock time of an epoch in ms ("14:30", or "2:30 pm"). Uses the JS Date local getters, so it is
+ * the machine's own zone; the plugin API has no timezone call, and a sandbox without a zone shows UTC.
+ */
+export function fmtClock(ms: number, hour24 = true): string {
+  const d = new Date(ms)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  const h = d.getHours()
+  if (hour24) return `${two(h)}:${two(d.getMinutes())}`
+  return `${h % 12 === 0 ? 12 : h % 12}:${two(d.getMinutes())} ${h < 12 ? 'am' : 'pm'}`
+}
+
+/** "14:30", "expired" once past, "unknown" when null. */
+export function fmtExpiry(expiresAt: number | null, now: number, hour24 = true): string {
+  if (expiresAt === null) return 'unknown'
+  return expiresAt <= now ? 'expired' : fmtClock(expiresAt, hour24)
+}
+
+/** "Cache until 14:30 · hit 87%"; "Cache expired", "Cache until unknown"; hit omitted when null. */
+export function cacheClockLine(expiresAt: number | null, hit: number | null, now: number, hour24 = true): string {
+  const when = fmtExpiry(expiresAt, now, hour24)
+  const head = when === 'expired' ? 'Cache expired' : `Cache until ${when}`
+  return hit === null ? head : `${head} · hit ${hit % 1 === 0 ? hit : hit.toFixed(1)}%`
+}

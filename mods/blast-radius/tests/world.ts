@@ -6,7 +6,7 @@ import type { On } from 'claude-code'
 export type Answer = string | 'REJECT'
 export type Probe = (argv: string[], cwd?: string) => { exitCode?: number; stdout?: string; stderr?: string } | undefined
 
-export function world(on: On, o: { answer?: Answer; probe?: Probe; cwd?: string; surfaces?: readonly ('terminal' | 'desktop')[] } = {}) {
+export function world(on: On, o: { answer?: Answer; probe?: Probe; cwd?: string; surfaces?: readonly ('terminal' | 'desktop')[]; store?: Record<string, unknown> } = {}) {
   const w = {
     probes: [] as { argv: string[]; cwd?: string }[],
     asks: [] as { question: string; options: string[]; header: string }[],
@@ -15,8 +15,16 @@ export function world(on: On, o: { answer?: Answer; probe?: Probe; cwd?: string;
     status: [] as (string | undefined)[],
     clock: mock.clock(on),
     answer: o.answer ?? 'Cancel',
+    store: new Map<string, unknown>(Object.entries(o.store ?? {})),
+    state: new Map<string, unknown>(),
   }
   mock.env(on, { HOME: '/home/sam' })
+  // The plugin's own store and state, in memory and readable by the test (`state` holds what the atom mirrors).
+  on('store.get', (_$, e) => ({ value: w.store.get(e.key) }))
+  on('store.set', (_$, e) => (w.store.set(e.key, e.value), { value: undefined }))
+  on('store.delete', (_$, e) => (w.store.delete(e.key), { value: undefined }))
+  on('state.get', (_$, e) => ({ value: { value: w.state.get(`${e.plugin}.${e.key}`), version: w.state.has(`${e.plugin}.${e.key}`) ? 1 : 0 } as never }))
+  on('state.set', (_$, e) => (w.state.set(`${e.plugin}.${e.key}`, e.value), { value: { isSet: true, version: 1 } as never }))
   on('session.surfaces', () => ({ value: o.surfaces ?? ['terminal'] }))
   on('session.cwd', () => ({ value: o.cwd ?? '/work' }))
   on('process.run', (_$, e) => {

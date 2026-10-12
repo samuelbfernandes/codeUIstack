@@ -28,6 +28,9 @@ export type BudgetSnap = {
   windows: BudgetWindow[]
 }
 
+/** The cost ledger mirror: today's spend (USD) and the spend since the weekly (seven_day) window opened; null without one. */
+export type BudgetLedger = { today: number; week: number | null }
+
 declare module 'claude-code' {
   interface PluginState {
     'budget-guard': {
@@ -41,6 +44,10 @@ declare module 'claude-code' {
       /** The dollar limit set by `/budget-guard $N` for this session; null = use the setting. */
       limitUsd: number | null
       snap: BudgetSnap
+      /** Per-day cost ledger mirror read by the moddeck side bar; the days themselves live in $.store 'ledger'. */
+      ledger: BudgetLedger
+      /** The last cost reading of this session ({ startedAt, usd }) so only growth is added to the ledger; internal. */
+      lastCost: { startedAt: number; usd: number } | null
     }
   }
 }

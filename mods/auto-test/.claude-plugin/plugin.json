@@ -1,0 +1,35 @@
+{
+  "name": "auto-test",
+  "version": "0.1.0",
+  "description": "Runs the project's tests once at the end of a turn in which Claude edited files, and shows a green or red result. Off until you type /auto-test on.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable auto-test",
+      "description": "Turn off to make /auto-test do nothing (no test is ever run).",
+      "default": true
+    },
+    "command": {
+      "type": "string",
+      "title": "Test command",
+      "description": "Run this instead of the detected test command (pytest, npm test, cargo test, devtools::test(), go test). Empty means detect. /auto-test command <cmd> sets one for the current project and wins over this.",
+      "default": ""
+    },
+    "timeoutSec": {
+      "type": "number",
+      "title": "Time limit (seconds)",
+      "description": "A test run that takes longer is stopped and reported as could not run.",
+      "default": 120,
+      "min": 5,
+      "max": 600
+    },
+    "tellModel": {
+      "type": "boolean",
+      "title": "Tell Claude when tests fail",
+      "description": "When on, a failed run adds a short note to the conversation so Claude can fix it on your next message. Off by default: nothing is sent to the model.",
+      "default": false
+    }
+  }
+}

@@ -3,6 +3,23 @@ import type { PluginOptions } from 'claude-code'
 import { FALLBACK_RISKY } from './classify'
 
 export type AskFrom = 'low' | 'medium' | 'high'
+/** The runtime choice: the three `askFrom` bars plus `off` (never ask). */
+export type Level = AskFrom | 'off'
+export const LEVELS: readonly Level[] = ['off', 'low', 'medium', 'high']
+
+/** One line per level, for `/blast-radius` with no argument. */
+export const LEVEL_MEANING: Record<Level, string> = {
+  off: 'never ask',
+  low: 'ask for everything, even low risk',
+  medium: 'ask from medium risk up',
+  high: 'ask only for high risk',
+}
+
+/** A stored or typed word as a level, or undefined when it is none. */
+export const asLevel = (v: unknown): Level | undefined => {
+  const t = typeof v === 'string' ? v.trim().toLowerCase() : ''
+  return (LEVELS as readonly string[]).includes(t) ? (t as Level) : undefined
+}
 export type BlastConfig = { maxListed: number; extraPatterns: RegExp[]; badPatterns: string[]; askFrom: AskFrom }
 
 /** Rank of a risk level for the `askFrom` bar. Unknown (not checked) ranks with high: it is never skipped. */

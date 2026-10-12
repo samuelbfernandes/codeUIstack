@@ -265,8 +265,10 @@ class Interactive(Base):
             self.assertEqual(q, [], "unused answers")
 
     def test_questions_toggle_and_confirm(self):
-        # scope=1 (user), rules=Enter (neutral), mods: toggle #1 then Enter, rules: Enter, add-ons: Enter, confirm y
-        rc, out, err = self.run_with(["1", "", "2", "", "", "", "y"])
+        # scope=1 (user), rules=Enter (neutral), mods: toggle blast-radius then Enter, rules: Enter, add-ons: Enter, confirm y
+        names = [m["name"] for m in payload.mods()]
+        number = str(names.index("blast-radius") + 1)  # the list follows marketplace.json, so look the number up
+        rc, out, err = self.run_with(["1", "", number, "", "", "", "y"])
         self.assertEqual(rc, 0, out + err)
         self.assertNotIn(f"blast-radius@{MP}", self.plugins())
         self.assertIn(f"suggest-model@{MP}", self.plugins())

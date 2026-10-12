@@ -1,0 +1,23 @@
+{
+  "name": "prompt-library",
+  "version": "0.1.0",
+  "description": "Keeps your saved prompts, per project: /prompts add, use, rename, remove. The moddeck side bar shows them.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable /prompts",
+      "description": "Turn off to make /prompts do nothing.",
+      "default": true
+    },
+    "maxItems": {
+      "type": "number",
+      "title": "Most prompts kept per project",
+      "description": "Adding past this is refused.",
+      "default": 50,
+      "min": 1,
+      "max": 200
+    }
+  }
+}

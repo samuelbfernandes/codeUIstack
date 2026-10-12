@@ -1,0 +1,29 @@
+{
+  "name": "repro-log",
+  "version": "0.1.0",
+  "description": "Keeps a reproducibility recipe for data work: the analysis commands that succeeded and the files you changed. /repro writes it to .moddeck/repro/ with git commit, versions, lock files, seeds and a runnable command list. Secrets are never written.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable repro-log",
+      "description": "Turn off to record nothing and make /repro do nothing.",
+      "default": true
+    },
+    "programs": {
+      "type": "string",
+      "title": "Programs that count as analysis runs",
+      "description": "Comma list. A command is recorded when it succeeds and starts with one of these (two words such as 'cargo run' or 'R CMD' are allowed).",
+      "default": "python,python3,Rscript,R CMD,jupyter nbconvert,quarto,snakemake,make,dvc,pytest,node,cargo run,julia,uv run"
+    },
+    "maxSteps": {
+      "type": "number",
+      "title": "Most steps kept",
+      "description": "Only the last this many steps are kept per project.",
+      "default": 200,
+      "min": 10,
+      "max": 1000
+    }
+  }
+}

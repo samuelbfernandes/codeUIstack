@@ -269,10 +269,10 @@ async function act($: Dollar, cfg: Cfg, choice: Choice, text: string, alias: Ali
   }
   if (choice === 'subagent' && alias !== undefined) {
     await tally($, 'a')
-    if (await spawnSubagent(args => $.agent.spawn(args), text, alias)) {
-      return { kind: 'drop', reason: `Sent to a ${alias} subagent; its answer will appear when done` }
-    }
-    $.ui.toast('suggest-model · could not start the subagent, sending to the current model')
+    const started = await spawnSubagent(args => $.agent.spawn(args), text, alias)
+    if (started.ok) return { kind: 'drop', reason: `Sent to a ${alias} subagent; its answer will appear when done` }
+    $.ui.toast(`suggest-model · could not start the subagent (${started.why}), sending to the current model`, { timeoutMs: 10000 })
+    $.ui.log(`suggest-model · subagent not started: ${started.why}`)
     return PASS
   }
   if (choice === 'codex') {

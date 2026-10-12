@@ -1,0 +1,31 @@
+{
+  "name": "big-file-guard",
+  "version": "0.1.0",
+  "description": "Saves tokens: when the model reads a large data or log file whole, it gets the first lines and a note, unless it asks for a range itself.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable big-file-guard",
+      "description": "Turn off to let every file be read whole.",
+      "default": true
+    },
+    "maxKb": {
+      "type": "number",
+      "title": "Large file size (KB)",
+      "description": "A csv, tsv, json, jsonl, ndjson, log or txt file bigger than this is cut to its first lines.",
+      "default": 256,
+      "min": 1,
+      "max": 1048576
+    },
+    "headLines": {
+      "type": "number",
+      "title": "Lines shown",
+      "description": "How many lines from the top the model gets for a large file.",
+      "default": 200,
+      "min": 1,
+      "max": 10000
+    }
+  }
+}

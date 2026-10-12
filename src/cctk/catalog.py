@@ -67,6 +67,13 @@ MOD_META: dict[str, tuple[str, str, bool]] = {
     "diagram": ("none", "", False),
     "aside": ("a little: only when you run /aside", "", False),
     "moddeck": ("none", "", True),
+    "data-guard": ("none", "", True),
+    "big-file-guard": ("none (it saves tokens)", "", True),
+    "repro-log": ("none", "", False),
+    "auto-test": ("none (off until you switch it on; it runs your tests)", "", False),
+    "prompt-library": ("none", "", False),
+    "checkpoint": ("none", "", True),
+    "long-run-ping": ("none", "", False),
 }
 # Mods that spend model credit when used: listed, but not switched on until the person chooses them.
 OFF_BY_DEFAULT = {"aside"}

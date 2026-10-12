@@ -1,6 +1,6 @@
 {
   "name": "cache-tax",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm.",
   "author": {
     "name": "Samuel Fernandes"
@@ -34,6 +34,18 @@
       "description": "A cold cache is only worth a question when it costs at least this much more than a warm one.",
       "default": 0.25,
       "min": 0
+    },
+    "showCacheClock": {
+      "type": "boolean",
+      "title": "Show the cache expiry time",
+      "description": "Add 'Cache until 14:30 · hit 87%' to the /cache-tax report.",
+      "default": true
+    },
+    "hourCycle24": {
+      "type": "boolean",
+      "title": "24-hour clock",
+      "description": "Show cache times as 14:30 (on) or 2:30 pm (off).",
+      "default": true
     }
   }
 }

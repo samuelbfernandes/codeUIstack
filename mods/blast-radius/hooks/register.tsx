@@ -13,21 +13,57 @@
 //   option is Cancel, which is the one the dialog highlights, so Enter means no.
 //   There is no timeout of our own: the dialog stays until answered; an interrupt
 //   (Esc, or the turn being stopped) rejects the ask and that is treated as Cancel.
+import { atom, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import { classify } from './classify'
-import { failClosedReason, isBelowBar, readConfig } from './config'
+import { LEVELS, LEVEL_MEANING, asLevel, failClosedReason, isBelowBar, readConfig } from './config'
+import type { Level } from './config'
 import { denyText, dialogText, toastText } from './format'
 import { measureAll } from './measure'
 import type { Run } from './measure'
 import { looksWindows, unmeasured } from './windows'
 
 const PROBE_TIMEOUT_MS = 20_000
+const COMMAND = 'blast-radius'
+
+/** Mirror of the persisted runtime level (`$.store` 'level'), so other mods can read it with $.state.get. */
+const levelAtom = atom({ plugin: 'blast-radius', key: 'level' } as const, 'medium')
+
+/** The level in force: the person's runtime choice if there is one, else the `askFrom` setting. */
+async function levelNow($: EngineInterface, fallback: Level): Promise<Level> {
+  return asLevel(await safe(() => $.store.get('level'))) ?? fallback
+}
+
+const describe = (l: Level): string => `${l} (${LEVEL_MEANING[l]})`
+
+async function runCommand($: EngineInterface, args: string, fallback: Level): Promise<string> {
+  const word = args.trim().toLowerCase()
+  const current = await levelNow($, fallback)
+  if (word === '') {
+    return [
+      `Blast radius · ${describe(current)}`,
+      `Levels: ${LEVELS.map(l => `${l} = ${LEVEL_MEANING[l]}`).join(' · ')} · /blast-radius <level> to change`,
+    ].join('\n')
+  }
+  const next = asLevel(word)
+  if (next === undefined) return `Blast radius · "${args.trim().slice(0, 30)}" is not a level, nothing changed · use off, low, medium or high (now ${current})`
+  try {
+    await $.store.set('level', next)
+    await update($, levelAtom, () => next)
+  } catch {
+    return 'Blast radius · that did not work, nothing changed'
+  }
+  return `Blast radius · ${describe(next)}`
+}
 
 export const register: Register = (on, options) => {
   const cfg = readConfig(options)
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    // The person's runtime level overrides the setting; off is fail-open, before anything is classified.
+    const level = await levelNow($, cfg.askFrom)
+    if (level === 'off') return next(e)
     const cwd = await safe(() => $.session.cwd())
     const home = await safe(() => $.env.get('HOME'))
     const found = classify(e.command, { cwd, home, extraPatterns: cfg.extraPatterns })
@@ -43,7 +79,7 @@ export const register: Register = (on, options) => {
     if (reports.length === 0 && unlisted === 0) return next(e) // conditions not met, e.g. `> new-file`
     // Below the `askFrom` bar nothing is shown: a command whose every part is lower risk goes through. A part that
     // was not checked (unlisted) or whose level is unknown always asks.
-    if (isBelowBar(reports.map(r => r.risk?.level ?? 'unknown'), unlisted, cfg.askFrom)) return next(e)
+    if (isBelowBar(reports.map(r => r.risk?.level ?? 'unknown'), unlisted, level)) return next(e)
 
     const verdict = await confirm($, dialogText(e.command, reports, unlisted, cwd, cfg.maxListed))
     if (verdict.isYes) {
@@ -68,11 +104,26 @@ export const register: Register = (on, options) => {
     return deny === undefined ? next(e) : { deny }
   })
 
-  if (cfg.badPatterns.length)
-    on('session.start', ($, e, next) => {
-      $.ui.toast(`blast-radius: ignored invalid extra patterns: ${cfg.badPatterns.map(p => p.replace(/\s+/g, ' ')).join(', ')}`, { timeoutMs: 10_000 })
-      return next(e)
-    })
+  on('session.start', async ($, e, next) => {
+    const level = await levelNow($, cfg.askFrom)
+    await safe(() => update($, levelAtom, () => level)) // the mirror starts from what is stored, else the setting
+    await safe(() =>
+      $.command.register({
+        name: COMMAND,
+        description: 'Change how much blast-radius asks about: /blast-radius [off|low|medium|high]',
+        argumentHint: '[off|low|medium|high]',
+      }),
+    ) // fail-open: without the command the setting still works
+    if (cfg.badPatterns.length)
+      await safe(() =>
+        $.ui.toast(`blast-radius: ignored invalid extra patterns: ${cfg.badPatterns.map(p => p.replace(/\s+/g, ' ')).join(', ')}`, { timeoutMs: 10_000 }),
+      )
+    return next(e)
+  })
+
+  on('command.run', { command: COMMAND }, async ($, e) => ({ text: await runCommand($, e.args, cfg.askFrom) })).catch(() => ({
+    text: 'Blast radius · that did not work, nothing changed',
+  }))
 }
 
 async function isWindows($: EngineInterface, cwd: string | undefined, home: string | undefined): Promise<boolean> {

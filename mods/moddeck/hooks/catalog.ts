@@ -23,6 +23,8 @@ export type Tool = {
   isSkin?: boolean
   /** What a click does (rows that are not switches). */
   click?: Action
+  /** A dropdown of levels, one of them `off`: green while on, red while off. The pick runs `/<command> <level>` at once. */
+  levels?: string[]
   /** A row with nothing to type says when it appears instead. */
   note?: string
   /** Indented under the row: only while a switch is on, always for the others. Two or more, never one. */
@@ -44,9 +46,42 @@ export const TOOLS: Tool[] = [
   // These two work by themselves with no command, so their state is what matters: a green/red switch (a click flips it).
   { id: 'reflect', label: 'reflect', costs: true, isSwitch: true, command: 'reflect' },
   { id: 'secret-guard', label: 'secret-guard', isSwitch: true, command: 'secret-guard' },
+  // New switches: each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
+  { id: 'data-guard', label: 'data-guard', isSwitch: true, command: 'data-guard' },
+  { id: 'big-file-guard', label: 'big-file-guard', isSwitch: true, command: 'big-file-guard' },
+  {
+    id: 'repro-log',
+    label: 'repro-log',
+    isSwitch: true,
+    command: 'repro',
+    options: [
+      { label: 'write the recipe', text: '/repro', run: true },
+      { label: 'status', text: '/repro status', run: true },
+    ],
+  },
+  {
+    id: 'auto-test',
+    label: 'auto-test',
+    isSwitch: true,
+    command: 'auto-test',
+    options: [
+      { label: 'run the tests now', text: '/auto-test run', run: true },
+      { label: 'status', text: '/auto-test status', run: true },
+    ],
+  },
+  { id: 'long-run-ping', label: 'long-run-ping', isSwitch: true, command: 'long-run-ping' },
   { id: 'skin', label: 'skin', isSkin: true },
-  { id: 'blast-radius', label: 'blast-radius', note: 'appears before a risky command' },
-  { id: 'review-cost', label: 'review-cost', note: 'appears before a push is reviewed' },
+  { id: 'blast-radius', label: 'blast-radius', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
+  { id: 'review-cost', label: 'review-cost', command: 'review-cost', levels: ['off', 'on'] },
+  {
+    id: 'checkpoint',
+    label: 'checkpoint',
+    click: { text: '/checkpoint', run: true },
+    options: [
+      { label: 'list', text: '/checkpoint list', run: true },
+      { label: 'restore', text: '/checkpoint restore ', run: false },
+    ],
+  },
   {
     id: 'branch-janitor',
     label: 'branch-janitor',
@@ -90,3 +125,6 @@ export function splitCommand(text: string): { command: string; args: string } {
   const at = body.indexOf(' ')
   return at === -1 ? { command: body, args: '' } : { command: body.slice(0, at), args: body.slice(at + 1).trim() }
 }
+
+/** One saved prompt, as prompt-library keeps it. */
+export type SavedPrompt = { name: string; text: string }

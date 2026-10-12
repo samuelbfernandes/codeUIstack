@@ -1,6 +1,6 @@
 {
   "name": "budget-guard",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /budget-guard for a short report.",
   "author": {
     "name": "Samuel Fernandes"
@@ -41,6 +41,24 @@
       "type": "boolean",
       "title": "Usage line",
       "description": "Show the quiet usage line above the prompt box (terminal and desktop). It stays hidden until something matters.",
+      "default": true
+    },
+    "showPace": {
+      "type": "boolean",
+      "title": "Usage pace",
+      "description": "Mark a plan window (5h / 7d) that is on pace to run out before it resets with a ▲ in the usage line and the report. Never blocks anything.",
+      "default": true
+    },
+    "showDailyCost": {
+      "type": "boolean",
+      "title": "Daily cost",
+      "description": "Show \"Today $x\" (spend across sessions, kept locally for 60 days) in the usage line and the report.",
+      "default": true
+    },
+    "showWeeklyCost": {
+      "type": "boolean",
+      "title": "Weekly cost",
+      "description": "Show \"Week $y\" (spend since the weekly plan window opened) when the account reports a 7d window.",
       "default": true
     }
   }
