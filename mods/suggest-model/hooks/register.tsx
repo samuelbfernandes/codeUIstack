@@ -37,7 +37,7 @@ type Dollar = EngineInterface
 
 const seen = atom({ plugin: 'suggest-model', key: 'seen' } as const, 0)
 const isMuted = atom({ plugin: 'suggest-model', key: 'isMuted' } as const, false)
-/** Mirror of the persisted on/off switch (`$.store` 'off'), so the button redraws when ANY path flips it. */
+/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the toolbox side bar so it redraws when ANY path flips it. */
 const isOff = atom({ plugin: 'suggest-model', key: 'isOff' } as const, false)
 const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
 const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
@@ -58,7 +58,6 @@ type Cfg = {
   isEnabled: boolean
   statusLine: boolean
   /** Draw the on/off button in the band above the prompt. */
-  showButton: boolean
   costs: Costs
   /** Pieces of the cost setting that were ignored (shown by explain and status). */
   costProblems: string[]
@@ -78,7 +77,6 @@ export function readConfig(o: Readonly<Record<string, unknown>>): Cfg {
     useClassifier: o.useClassifier === true,
     isEnabled: o.enabled !== false,
     statusLine: o.statusLine !== false,
-    showButton: o.showButton !== false,
     costs,
     costProblems: problems,
   }
@@ -117,7 +115,7 @@ async function tally($: Dollar, kind: 'a' | 'd'): Promise<void> {
 
 const OFF_STATUS = 'suggest-model: off · type suggest-model on'
 
-/** The one place the switch changes, for the button, the plain words and /suggest-model alike. */
+/** The one place the switch changes, for the toolbox side bar, the plain words and /suggest-model alike. */
 async function setSwitch($: Dollar, cfg: Cfg, off: boolean): Promise<void> {
   if (off) {
     await $.store.set('off', true)
@@ -361,16 +359,6 @@ async function runCommand($: Dollar, args: string, cfg: Cfg): Promise<string> {
 
 // --------------------------------------------------------------------- register
 
-/** What the hooks below this one drew in the band. Only one tree can fill the band, so a mod that draws returns its row with this under it (never instead of it), and the other mods' rows stay visible. */
-async function drawnBelow<E>(next: (e: E) => unknown, e: E): Promise<object | undefined> {
-  try {
-    const tree = await next(e)
-    return tree !== null && typeof tree === 'object' ? tree : undefined
-  } catch {
-    return undefined
-  }
-}
-
 export const register: Register = (on, options) => {
   const cfg = readConfig(options)
 
@@ -393,37 +381,6 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'suggest-model' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
     text: 'suggest-model · that did not work, nothing changed',
   }))
-
-  // The on/off button sits in the band directly above the prompt (the lowest slot under the chat; the
-  // engine raises it on the terminal and desktop only). Like every other band in this toolkit it returns
-  // its own small tree (embedding what `next` returns was refused by the real engine's validator in the
-  // worst case, which would have left NO button), and it steps aside for a survey or a question.
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!cfg.isEnabled || !cfg.showButton || e.props.hasSurvey) return next(e)
-    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
-    const off = await read($, isOff)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const flip = async () => {
-      const now = await read($, isOff)
-      await setSwitch($, cfg, !now)
-      $.ui.toast(now ? 'suggest-model · on' : 'suggest-model · off')
-    }
-    // One control, drawn as a colored pill: a Box carries the color (green on, red off) so it shows on every
-    // surface, and a plain Button inside it is the click target. The pill sits at the left of the band and
-    // whatever another mod drew there goes to its right, so several mods' pills line up on one row.
-    const bg = off ? 'error' : 'success'
-    const row = (
-      <Box key="suggest-pill" backgroundColor={bg} paddingX={1}>
-        <Button key="toggle" plain onPress={flip}>
-          <Text bold color="inverseText" backgroundColor={bg}>
-            {`suggest ${off ? 'off' : 'on'}`}
-          </Text>
-        </Button>
-      </Box>
-    )
-    const below = await drawnBelow(next, e)
-    return below === undefined ? row : <Box key="suggest-band" flexDirection="row" gap={1}>{row}{below as never}</Box>
-  }).catch(($, e, next) => next(e))
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started
   // (the current model must not also answer), or for a plain-word command handled right here.

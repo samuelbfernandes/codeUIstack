@@ -4,8 +4,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { SKILLS, SKINS, SWITCHES, TOOLS, priced } from './catalog'
-import type { Fill, Switch } from './catalog'
+import { SKILLS, SKINS, TOOLS, priced } from './catalog'
+import type { Fill, SwitchId, Tool } from './catalog'
 import { dropWith } from './reply'
 import { plainWord } from './words'
 
@@ -44,7 +44,7 @@ async function valueOf(read: Promise<unknown>): Promise<unknown> {
   }
 }
 
-async function seen($: Dollar): Promise<Record<Switch['id'] | 'skin', unknown>> {
+async function seen($: Dollar): Promise<Record<SwitchId | 'skin', unknown>> {
   return {
     aside: await valueOf($.state.get(ASIDE_OFF as never)),
     suggest: await valueOf($.state.get(SUGGEST_OFF as never)),
@@ -57,9 +57,9 @@ async function seen($: Dollar): Promise<Record<Switch['id'] | 'skin', unknown>> 
 const firstLine = (text: string | undefined): string => (text ?? '').split('\n')[0]?.trim() ?? ''
 
 /** A switch click: run the mod's own `on` / `off` at once; its reply becomes a toast. */
-async function flip($: Dollar, s: Switch, isOn: boolean): Promise<void> {
+async function flip($: Dollar, s: Tool, isOn: boolean): Promise<void> {
   try {
-    const out = (await $.command.run({ command: s.command, args: isOn ? 'off' : 'on' })) as { text?: string } | undefined
+    const out = (await $.command.run({ command: s.command ?? s.id, args: isOn ? 'off' : 'on' })) as { text?: string } | undefined
     $.ui.toast(firstLine(out?.text) || `${s.label} · ${isOn ? 'off' : 'on'}`)
   } catch {
     $.ui.toast(`Toolbox · could not switch ${s.label}`)
@@ -144,56 +144,79 @@ export const register: Register = (on, options) => {
 
     // Switches: only the ones whose state this side bar can read; the pill is the button.
     const values = await seen($)
-    const switches = []
-    for (const s of SWITCHES) {
-      const isOn = s.isOn(values[s.id])
-      if (isOn === undefined) continue
-      const bg = isOn ? 'success' : 'error'
-      switches.push(
-        <Box key={`pill:${s.id}`} backgroundColor={bg} paddingX={1}>
-          <Button key={`switch:${s.id}`} plain onPress={() => flip($, s, isOn)}>
-            <Text bold color="inverseText" backgroundColor={bg}>
-              {`${priced(s.label, s.costs)} ${isOn ? 'on' : 'off'}`}
-            </Text>
-          </Button>
-        </Box>,
-      )
+    const readers: Record<SwitchId, (v: unknown) => boolean | undefined> = {
+      aside: v => (typeof v === 'boolean' ? !v : undefined),
+      suggest: v => (typeof v === 'boolean' ? !v : undefined),
+      reflect: v => (typeof v === 'boolean' ? !v : undefined),
+      'secret-guard': v => (typeof v === 'boolean' ? v : undefined),
     }
 
-    const theme = values.skin
-    const item = (f: Fill, prefix: string) => (
-      <Button key={`${prefix}:${f.id}`} plain onPress={() => fill($, f)}>
-        {priced(f.label, f.costs)}
+    // Every row is a box with a round border, one per row. A switch is green (on) or red (off).
+    const row = (key: string, child: unknown, color?: string) => (
+      <Box key={key} borderStyle="round" borderColor={color} paddingX={1}>
+        {child as never}
+      </Box>
+    )
+    const fillButton = (key: string, label: string, f: Fill | { text: string }, costs?: boolean) => (
+      <Button key={key} plain onPress={() => fill($, { label, text: f.text, costs })}>
+        {priced(label, costs)}
       </Button>
     )
 
+    const tools = TOOLS.map(t => {
+      if (t.isSkin) {
+        // tool-skins keeps its theme in state only once one has been picked, so an unset one reads as the default.
+        const theme = typeof values.skin === 'string' && SKINS.includes(values.skin) ? values.skin : SKINS[0]!
+        return row(
+          'row:skin',
+          <Select key="skin" label="Skin " value={theme} options={SKINS.map(name => ({ value: name }))} onSelect={(name: string) => chooseSkin($, name)} />,
+        )
+      }
+      if (t.switchId !== undefined) {
+        const isOn = readers[t.switchId](values[t.switchId])
+        if (isOn !== undefined) {
+          const bg = isOn ? 'success' : 'error'
+          return (
+            <Box key={`row:${t.id}`} borderStyle="round" borderColor={bg} backgroundColor={bg} paddingX={1}>
+              <Button key={`switch:${t.id}`} plain onPress={() => flip($, t, isOn)}>
+                <Text bold color="inverseText" backgroundColor={bg}>
+                  {`${priced(t.label, t.costs)} · ${isOn ? 'on' : 'off'}`}
+                </Text>
+              </Button>
+            </Box>
+          )
+        }
+      }
+      if (t.fill !== undefined) return row(`row:${t.id}`, fillButton(`tool:${t.id}`, t.label, { text: t.fill }, t.costs))
+      return row(`row:${t.id}`, <Text dimColor>{`${t.label} · ${t.note ?? 'runs by itself'}`}</Text>)
+    })
+
+    const skills = SKILLS.map(k => row(`row:skill:${k.id}`, fillButton(`skill:${k.id}`, k.label, k)))
+
+    // Options sit below the tools, indented under the mod they belong to.
+    const options = TOOLS.filter(t => (t.options ?? []).length > 0).map(t => (
+      <Box key={`options:${t.id}`} flexDirection="column">
+        <Text dimColor>{t.label}</Text>
+        <Box flexDirection="column" paddingLeft={2}>
+          {(t.options ?? []).map(o => fillButton(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
+        </Box>
+      </Box>
+    ))
+
     return (
       <Box flexDirection="column" gap={1}>
-        {switches.length > 0 && (
-          <Box flexDirection="column">
-            <Text bold>Switches</Text>
-            <Box flexDirection="row" flexWrap="wrap" gap={1}>
-              {switches}
-            </Box>
-          </Box>
-        )}
-        {typeof theme === 'string' && (
-          <Select
-            key="skin"
-            label="Skin "
-            value={SKINS.includes(theme) ? theme : SKINS[0]}
-            options={SKINS.map(name => ({ value: name }))}
-            onSelect={(name: string) => chooseSkin($, name)}
-          />
-        )}
         <Box flexDirection="column">
           <Text bold>Tools</Text>
-          <Text dimColor>Click to put it in the prompt box</Text>
-          {TOOLS.map(t => item(t, 'tool'))}
+          <Text dimColor>Green or red: click to switch. Others: click to put it in the prompt box</Text>
+          {tools}
         </Box>
         <Box flexDirection="column">
           <Text bold>Skills</Text>
-          {SKILLS.map(s => item(s, 'skill'))}
+          {skills}
+        </Box>
+        <Box flexDirection="column">
+          <Text bold>Options</Text>
+          {options}
         </Box>
         <Text dimColor>$ = spends model tokens</Text>
       </Box>

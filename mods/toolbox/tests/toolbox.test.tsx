@@ -70,24 +70,25 @@ for (const surface of SURFACES) {
     await run($, 'aside', 'on')
     await run($, 'suggest-model', 'on')
     const pane = await mount($, surface)
-    expect(await texts(pane)).toContain('$ aside on')
-    expect(await texts(pane)).toContain('suggest on')
+    expect(await texts(pane)).toContain('$ aside · on')
+    expect(await texts(pane)).toContain('suggest · on')
     expect(JSON.stringify(await pane.findAll({ type: 'Text' }))).toContain('success')
     await pane.press({ key: 'switch:aside' })
-    expect(await texts(pane)).toContain('$ aside off')
+    expect(await texts(pane)).toContain('$ aside · off')
     expect(JSON.stringify(await pane.findAll({ type: 'Text' }))).toContain('error')
     expect(w.toasts.at(-1)).toBe('Aside · off')
     await pane.press({ key: 'switch:aside' })
-    expect(await texts(pane)).toContain('$ aside on')
+    expect(await texts(pane)).toContain('$ aside · on')
   })
 
   test(`${surface}: any other item goes in the prompt box and nothing is sent`, MODS, async ($, on) => {
     const w = world(on)
     const pane = await mount($, surface)
     await pane.press({ key: 'tool:branch-janitor' })
-    await pane.press({ key: 'tool:aside-ask' })
+    await pane.press({ key: 'option:aside:/aside ' })
+    await pane.press({ key: 'option:reflect:reflect status' })
     await pane.press({ key: 'skill:dual-model-review' })
-    expect(w.filled).toEqual(['branch-janitor', '/aside ', 'Use the dual-model-review skill to review my last change'])
+    expect(w.filled).toEqual(['branch-janitor', '/aside ', 'reflect status', 'Use the dual-model-review skill to review my last change'])
   })
 }
 
@@ -96,13 +97,11 @@ test('a switch the side bar cannot see is not drawn', async ($, on) => {
   const pane = await mount($, 'desktop')
   expect(await pane.find({ key: 'switch:aside' })).toBeUndefined()
   expect(await pane.find({ key: 'switch:reflect' })).toBeUndefined()
-  expect(await texts(pane)).not.toContain('Switches')
-  expect(await pane.find({ key: 'tool:usage' })).toBeDefined()
+  expect(await pane.find({ key: 'tool:branch-janitor' })).toBeDefined()
 })
 
-test('the skin dropdown switches at once through /skin', MODS, async ($, on) => {
+test('the skin dropdown is always listed, even before a skin was ever picked, and switches at once through /skin', MODS, async ($, on) => {
   const w = world(on)
-  await run($, 'skin', 'noir')
   const pane = await mount($, 'desktop')
   expect(await pane.find({ key: 'skin' })).toBeDefined()
   await pane.select({ key: 'skin', value: 'dracula' } as never)
@@ -123,4 +122,17 @@ test('typing toolbox toggles the side bar and is not sent', async ($, on) => {
 test('the pane says $ means tokens', async ($, on) => {
   world(on)
   expect(await texts(await mount($, 'terminal'))).toContain('$ = spends model tokens')
+})
+
+test('every tool is listed, one boxed row each, and the options sit below them', MODS, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'desktop')
+  for (const id of ['aside', 'suggest', 'reflect', 'secret-guard', 'skin', 'blast-radius', 'review-cost', 'branch-janitor', 'cache-tax', 'budget-guard', 'savvy-progress', 'filetree', 'replay-theater', 'diagram']) {
+    expect(await pane.find({ key: `row:${id}` })).toBeDefined()
+  }
+  const shown = await texts(pane)
+  expect(shown).toContain('blast-radius · appears before a risky command')
+  expect(shown.indexOf('Options')).toBeGreaterThan(shown.indexOf('Skills'))
+  expect(await pane.find({ key: 'option:reflect:reflect status' })).toBeDefined()
+  expect(await pane.find({ key: 'option:cache-tax:/keepwarm 90m' })).toBeDefined()
 })

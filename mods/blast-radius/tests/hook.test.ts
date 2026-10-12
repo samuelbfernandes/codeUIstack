@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { failClosedReason, readConfig } from '../hooks/config'
+import { failClosedReason, isBelowBar, readConfig } from '../hooks/config'
 import { buildDir, world } from './world'
 
 
@@ -271,4 +271,18 @@ test('the dialog stays short: a headline, the command, a few aligned rows, then 
   expect(q.split('\n').length).toBeLessThanOrEqual(16)
   expect(q).toContain('+25 more') // the default shows 5 rows
   expect(q.split('\n')[0]).toBe('🔴 Unknown risk · deletes 30 files')
+})
+
+test('askFrom: the default skips low risk, unknown and high always ask, low asks about everything', () => {
+  expect(readConfig({}).askFrom).toBe('medium')
+  expect(readConfig({ askFrom: 'nonsense' }).askFrom).toBe('medium')
+  expect(readConfig({ askFrom: 'high' }).askFrom).toBe('high')
+  expect(isBelowBar(['low'], 0, 'medium')).toBe(true)
+  expect(isBelowBar(['low', 'low'], 0, 'medium')).toBe(true)
+  expect(isBelowBar(['low', 'medium'], 0, 'medium')).toBe(false) // one part at the bar is enough to ask
+  expect(isBelowBar(['unknown'], 0, 'high')).toBe(false)
+  expect(isBelowBar(['high'], 0, 'high')).toBe(false)
+  expect(isBelowBar(['medium'], 0, 'high')).toBe(true)
+  expect(isBelowBar(['low'], 1, 'high')).toBe(false) // a command that was not checked always asks
+  expect(isBelowBar(['low'], 0, 'low')).toBe(false)
 })

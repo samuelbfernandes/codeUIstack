@@ -2,10 +2,8 @@ import { test, expect, mock } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-const SURFACES = ['terminal', 'desktop'] as const
-const BAND = { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} }
-
-/** The engine beneath the mod: a store, status/toast sinks, an empty band of its own. */
+/** The engine beneath the mod: a store and status/toast sinks. The on/off switch is drawn by the toolbox side bar,
+ *  which reads this mod's `isOff` state; this mod draws nothing above the prompt. */
 function world(on: On) {
   const w = { toasts: [] as string[], statuses: [] as (string | undefined)[], store: new Map<string, unknown>() }
   mock.clock(on)
@@ -20,110 +18,48 @@ function world(on: On) {
   on('command.register', (_$, e) => ({ value: { command: e.name } }))
   on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  return w
+}
+
+const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } } as never)
+const command = ($: Engine, args: string) =>
+  $.command.run({ command: 'suggest-model', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as never)
+
+test('the switch: the words and /suggest-model flip one persisted flag, and off clears the status line', async ($, on) => {
+  const w = world(on)
+  await word($, 'suggest-model off')
+  expect(w.store.get('off')).toBe(true)
+  expect(w.statuses.at(-1)).toContain('suggest-model: off')
+  await command($, 'on')
+  expect(w.store.has('off')).toBe(false)
+  expect(w.statuses.at(-1)).toBeUndefined()
+})
+
+test('while off, a mismatch is not even checked', async ($, on) => {
+  const w = world(on)
+  w.store.set('off', true)
+  const out = await word($, 'derive the BLUP variance of the genomic breeding value under REML')
+  expect(out.text).toContain('BLUP')
+})
+
+test('a switch left off in an earlier session shows OFF at once', async ($, on) => {
+  const w = world(on)
+  w.store.set('off', true)
+  await $.session.start({ cwd: '/work' } as never)
+  expect(w.statuses.at(-1)).toContain('suggest-model: off')
+})
+
+test('nothing is drawn above the prompt any more', async ($, on) => {
+  world(on)
   on('ui.render', ($, e) => {
     const { Box } = $.ui.resolve(e)
     return <Box key="engine-band" />
   })
-  return w
-}
-
-const mount = ($: Engine, surface: (typeof SURFACES)[number], props: object = BAND) =>
-  $.ui.mount({ plugin: 'suggest-model', surface, component: 'AbovePrompt', props } as never)
-
-const texts = async (ui: { findAll: (q: { type: string }) => Promise<{ text: string }[]> }) =>
-  (await ui.findAll({ type: 'Text' })).map(t => t.text).join('')
-
-const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } } as never)
-
-for (const surface of SURFACES) {
-  test(`${surface}: the band shows ON and the chip is the button`, async ($, on) => {
-    world(on)
-    const band = await mount($, surface)
-    expect(await texts(band)).toContain('suggest on')
-    expect(await band.find({ key: 'toggle' })).toBeDefined()
-  })
-
-  test(`${surface}: pressing the button turns suggest-model off, clears the status, persists, and flips back`, async ($, on) => {
-    const w = world(on)
-    const band = await mount($, surface)
-    await band.press({ key: 'toggle' })
-    expect(w.store.get('off')).toBe(true)
-    expect(w.statuses.at(-1)).toContain('suggest-model: off')
-    expect(w.toasts.at(-1)).toContain('suggest-model · off')
-    expect(await texts(band)).toContain('suggest off')
-    await band.press({ key: 'toggle' })
-    expect(w.store.has('off')).toBe(false)
-    expect(w.statuses.at(-1)).toBeUndefined()
-    expect(await texts(band)).toContain('suggest on')
-    expect(w.toasts.at(-1)).toContain('suggest-model · on')
-  })
-
-  test(`${surface}: the plain words and the button are one switch`, async ($, on) => {
-    const w = world(on)
-    const band = await mount($, surface)
-    await word($, 'suggest-model off')
-    expect(await texts(band)).toContain('suggest off')
-    await word($, 'suggest-model on')
-    expect(await texts(band)).toContain('suggest on')
-    await band.press({ key: 'toggle' })
-    expect(w.store.get('off')).toBe(true)
-    // while off, a mismatch is not even checked
-    const out = await word($, 'derive the BLUP variance of the genomic breeding value under REML')
-    expect(out.text).toContain('BLUP')
-  })
-
-  test(`${surface}: a switch left off in an earlier session shows OFF at once`, async ($, on) => {
-    const w = world(on)
-    w.store.set('off', true)
-    await $.session.start({ cwd: '/work' } as never)
-    const band = await mount($, surface)
-    expect(await texts(band)).toContain('suggest off')
-    expect(w.statuses.at(-1)).toContain('suggest-model: off')
-  })
-
-  test(`${surface}: the band yields to a survey`, async ($, on) => {
-    world(on)
-    const band = await mount($, surface, { ...BAND, hasSurvey: true })
-    expect(await band.find({ key: 'toggle' })).toBeUndefined()
-  })
-}
-
-test('surfaces that do not raise the band get nothing from the mod', async ($, on) => {
-  world(on)
-  const band = await $.ui.mount({ plugin: 'suggest-model', surface: 'mobile', component: 'AbovePrompt', props: BAND } as never)
+  const band = await $.ui.mount({
+    plugin: 'suggest-model',
+    surface: 'desktop',
+    component: 'AbovePrompt',
+    props: { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} },
+  } as never)
   expect(await band.find({ key: 'toggle' })).toBeUndefined()
 })
-
-test('showButton = false: no button', { options: { showButton: false } }, async ($, on) => {
-  world(on)
-  const band = await mount($, 'terminal')
-  expect(await band.find({ key: 'toggle' })).toBeUndefined()
-})
-
-test('enabled = false in the settings: no button either', { options: { enabled: false } }, async ($, on) => {
-  world(on)
-  const band = await mount($, 'terminal')
-  expect(await band.find({ key: 'toggle' })).toBeUndefined()
-})
-
-test('the chip is green when on and red when off, and is the button itself (no Turn on/off label)', async ($, on) => {
-  world(on)
-  const band = await mount($, 'desktop')
-  const chip = async () => (await band.findAll({ type: 'Text' })).find(t => t.text.includes('suggest'))
-  const before = await chip()
-  expect(JSON.stringify(before)).toContain('success')
-  await word($, 'suggest-model off')
-  expect(JSON.stringify(await chip())).toContain('error')
-  const button = (await band.findAll({ type: 'Button' }))[0]
-  expect(JSON.stringify(button)).toContain('suggest off')
-  expect(JSON.stringify(await band.findAll({ type: 'Text' }))).not.toContain('Turn o')
-})
-
-for (const surface of SURFACES) {
-  test(`${surface}: another mod's band below it stays visible (the chip is stacked on top, never instead)`, async ($, on) => {
-    world(on)
-    const band = await mount($, surface)
-    expect(await band.find({ key: 'toggle' })).toBeDefined()
-    expect(await band.find({ key: 'engine-band' })).toBeDefined()
-  })
-}

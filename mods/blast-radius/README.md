@@ -53,7 +53,7 @@ For a folder a held command would delete, overwrite or change recursively, the d
 - **Recoverable:** `Yes`, `Partly`, `No` or `Unknown`, with the reason. It sets the level: only build output or a fully pushed folder is Low; irreplaceable data or unpushed work is High.
 
 ## Settings and turning off
-`/plugin` > blast-radius: `maxListed` (rows shown under a list, default 5), `extraPatterns` (regexes; a matching command is held, nothing measured). Turn off: `/plugin disable blast-radius`.
+`/plugin` > blast-radius: `askFrom` (`low`, `medium` default, `high`: the lowest risk level that opens the dialog; at the default a low-risk command runs without one, and unknown always asks), `maxListed` (rows shown under a list, default 5), `extraPatterns` (regexes; a matching command is held, nothing measured). Turn off: `/plugin disable blast-radius`.
 
 The level carries a coloured dot, since the dialog takes plain text only: 🔴 high, 🟠 medium, 🟢 low, and 🔴 unknown (a folder that could not be checked counts as red).
 

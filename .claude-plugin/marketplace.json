@@ -80,7 +80,7 @@
     {
       "name": "toolbox",
       "source": "./mods/toolbox",
-      "description": "A side bar listing the toolkit's mods and skills: click a switch (green on, red off) to flip it, pick a skin from a dropdown, or click any other item to put its command in the prompt box."
+      "description": "A side bar listing every mod and skill, one boxed row each: click a switch (green on, red off) to flip it, pick a skin from a dropdown, or click any other row to put its command in the prompt box."
     }
   ]
 }

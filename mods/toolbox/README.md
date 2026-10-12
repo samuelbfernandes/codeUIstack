@@ -5,13 +5,17 @@ Install (Claude Code 2.1.295 or later): `/plugin install toolbox --marketplace s
 A side bar beside the chat with the toolkit's mods and skills.
 
 ## What is in it
-- **Switches**: a pill per mod with an on/off switch, green when on and red when off (`aside`, `suggest`, `reflect`,
-  `secret-guard`). Click a pill to flip it: it runs that mod's own `on` / `off` command at once and shows its reply as a toast.
-  Only the switches this side bar can read are drawn; a mod that is not installed simply does not appear.
-- **Skin**: a dropdown of the tool-skins themes. Picking one switches at once (`/skin <name>`). Shown when tool-skins is installed.
-- **Tools** and **Skills**: click one to put its command in the prompt box (for example `branch-janitor`, `usage`, `/aside `).
-  Nothing is sent until you press Enter.
-- A `$` marks what spends model tokens (aside, reflect).
+- **Tools**: every mod, one boxed row each. A mod with an on/off switch (`aside`, `suggest`, `reflect`, `secret-guard`) is a
+  green row when on and red when off; click it to flip it at once (it runs that mod's own `on` / `off` command and shows
+  the reply as a toast). Only switches this side bar can read are coloured; a mod that is not installed does not appear.
+  The **skin** row is a dropdown of the tool-skins themes (always listed; picking one switches at once with `/skin <name>`).
+  Every other row is clickable and puts its command in the prompt box (for example `branch-janitor`, `usage`); rows
+  for mods that run by themselves (`blast-radius`, `review-cost`) say when they appear.
+- **Skills**: one boxed row each; a click puts the request in the prompt box.
+- **Options**: below, under each mod's name and indented, the extra forms of its command (`reflect` → `status`,
+  `cache-tax` → `/keepwarm 90m`, `branch-janitor` → `clean`, ...). A click puts it in the prompt box; nothing is sent
+  until you press Enter.
+- A `$` marks what spends model tokens (aside, reflect, `/keepwarm`).
 
 ## Use
 It opens by itself at session start where the screen can dock it (fullscreen terminal, desktop app), once per session.

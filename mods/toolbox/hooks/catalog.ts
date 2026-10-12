@@ -1,48 +1,65 @@
-// What the side bar lists. Switches are read live from each mod's own state (only the ones this side bar can see are
-// drawn); a click runs that mod's own command at once. Everything else is put in the prompt box for the person to send.
+// What the side bar lists: every mod, one boxed row each; then the skills; then each mod's options, indented.
+// A mod with an on/off switch is drawn as a green/red row (read live from its own state, only when this side bar can
+// see it) and a click flips it at once through its own command. Every other click puts a command in the prompt box.
 
-/** A mod with an on/off switch the side bar can read (register.tsx names its state); `isOn` reads it (undefined = cannot tell). */
-export type Switch = {
-  id: 'aside' | 'suggest' | 'reflect' | 'secret-guard'
+/** The mods whose switch the side bar can read; register.tsx names each state, so the list of reads can be checked. */
+export type SwitchId = 'aside' | 'suggest' | 'reflect' | 'secret-guard'
+
+/** A command put in the prompt box. A text ending in a space waits for the person to finish it. */
+export type Fill = { label: string; text: string; costs?: boolean }
+
+export type Tool = {
+  id: string
   label: string
-  command: string
-  isOn: (value: unknown) => boolean | undefined
-  /** Spends model tokens when on: drawn with a "$". */
-  costs: boolean
+  /** Spends model tokens: drawn with a "$". */
+  costs?: boolean
+  /** A switch: `command` is run with `on` / `off`. */
+  switchId?: SwitchId
+  command?: string
+  /** The main click for a row that is not a switch. */
+  fill?: string
+  /** The row is the skin dropdown. */
+  isSkin?: boolean
+  /** A row with nothing to type says when it appears instead. */
+  note?: string
+  /** Shown below the tools, indented under the mod's name. */
+  options?: Fill[]
 }
 
-const offFlag = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? !value : undefined)
-const onFlag = (value: unknown): boolean | undefined => (typeof value === 'boolean' ? value : undefined)
-
-export const SWITCHES: Switch[] = [
-  { id: 'aside', label: 'aside', command: 'aside', isOn: offFlag, costs: true },
-  { id: 'suggest', label: 'suggest', command: 'suggest-model', isOn: offFlag, costs: false },
-  { id: 'reflect', label: 'reflect', command: 'reflect', isOn: offFlag, costs: true },
-  { id: 'secret-guard', label: 'secret-guard', command: 'secret-guard', isOn: onFlag, costs: false },
+export const TOOLS: Tool[] = [
+  { id: 'aside', label: 'aside', costs: true, switchId: 'aside', command: 'aside', options: [{ label: 'ask a side question', text: '/aside ', costs: true }] },
+  {
+    id: 'suggest',
+    label: 'suggest',
+    switchId: 'suggest',
+    command: 'suggest-model',
+    options: [
+      { label: 'status', text: 'suggest-model' },
+      { label: 'explain a prompt', text: '/suggest-model explain ' },
+    ],
+  },
+  { id: 'reflect', label: 'reflect', costs: true, switchId: 'reflect', command: 'reflect', options: [{ label: 'status', text: 'reflect status' }] },
+  { id: 'secret-guard', label: 'secret-guard', switchId: 'secret-guard', command: 'secret-guard', options: [{ label: 'status', text: 'secret-guard' }] },
+  { id: 'skin', label: 'skin', isSkin: true, options: [{ label: 'list the skins', text: 'skins' }] },
+  { id: 'blast-radius', label: 'blast-radius', note: 'appears before a risky command' },
+  { id: 'review-cost', label: 'review-cost', note: 'appears before a push is reviewed' },
+  { id: 'branch-janitor', label: 'branch-janitor', fill: 'branch-janitor', options: [{ label: 'clean', text: 'branch-janitor clean' }, { label: 'off', text: 'branch-janitor off' }] },
+  { id: 'cache-tax', label: 'cache-tax', fill: 'cache-tax', options: [{ label: 'keep the cache warm', text: '/keepwarm 90m', costs: true }, { label: 'stop keeping it warm', text: '/keepwarm off' }] },
+  { id: 'budget-guard', label: 'budget-guard', fill: 'usage', options: [{ label: 'set a $10 limit', text: 'budget 10' }] },
+  { id: 'savvy-progress', label: 'savvy-progress', fill: 'agents-info', options: [{ label: 'helper tree', text: 'agents tree' }] },
+  { id: 'filetree', label: 'filetree', fill: 'filetree' },
+  { id: 'replay-theater', label: 'replay-theater', fill: 'replay' },
+  { id: 'diagram', label: 'diagram', fill: 'diagram', options: [{ label: 'close', text: 'diagram close' }] },
 ]
 
-/** An item that fills the prompt box. A text ending in a space waits for the person to finish it. */
-export type Fill = { id: string; label: string; text: string; costs: boolean }
+export type Skill = { id: string; label: string; text: string }
 
-export const TOOLS: Fill[] = [
-  { id: 'aside-ask', label: 'aside · ask a side question', text: '/aside ', costs: true },
-  { id: 'suggest-explain', label: 'suggest · test a prompt', text: '/suggest-model explain ', costs: false },
-  { id: 'branch-janitor', label: 'branch-janitor · finished branches', text: 'branch-janitor', costs: false },
-  { id: 'cache-tax', label: 'cache-tax · cache status', text: 'cache-tax', costs: false },
-  { id: 'usage', label: 'budget-guard · usage report', text: 'usage', costs: false },
-  { id: 'agents', label: 'savvy-progress · helper agents', text: 'agents-info', costs: false },
-  { id: 'filetree', label: 'filetree · file tree', text: 'filetree', costs: false },
-  { id: 'replay', label: 'replay-theater · replay edits', text: 'replay', costs: false },
-  { id: 'diagram', label: 'diagram · draw the last mermaid', text: 'diagram', costs: false },
-  { id: 'reflect-status', label: 'reflect · status', text: 'reflect status', costs: false },
-]
-
-export const SKILLS: Fill[] = [
-  { id: 'dual-model-review', label: 'dual-model-review', text: 'Use the dual-model-review skill to review my last change', costs: false },
-  { id: 'agents-md-scaffold', label: 'agents-md-scaffold', text: 'Use the agents-md-scaffold skill to set up AGENTS.md for this repo', costs: false },
+export const SKILLS: Skill[] = [
+  { id: 'dual-model-review', label: 'dual-model-review', text: 'Use the dual-model-review skill to review my last change' },
+  { id: 'agents-md-scaffold', label: 'agents-md-scaffold', text: 'Use the agents-md-scaffold skill to set up AGENTS.md for this repo' },
 ]
 
 /** tool-skins' theme names, in its own order. */
 export const SKINS = ['noir', 'tokyo-night', 'dracula', 'catppuccin', 'gruvbox', 'nord', 'solarized-dark']
 
-export const priced = (label: string, costs: boolean): string => (costs ? `$ ${label}` : label)
+export const priced = (label: string, costs: boolean | undefined): string => (costs ? `$ ${label}` : label)

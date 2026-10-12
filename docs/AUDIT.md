@@ -19,7 +19,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | review-cost | no | git | no | no | tool.call, ui.render |
 | savvy-progress | no | none | no | no | agent.spawn, command.run, prompt.submit, session.start, tool.call, turn.complete, turn.step, ui.render |
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
-| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start, ui.render |
+| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start |
 | tool-skins | no | none | no | no | command.run, prompt.submit, session.start, ui.render |
 | toolbox | no | none | no | no | command.run, prompt.submit, session.start, ui.render |
 
