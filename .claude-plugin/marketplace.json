@@ -76,6 +76,11 @@
       "name": "tool-skins",
       "source": "./mods/tool-skins",
       "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> (or typing skins / skin <theme>) switches live."
+    },
+    {
+      "name": "toolbox",
+      "source": "./mods/toolbox",
+      "description": "A side bar listing every mod and skill, one boxed row each: click a switch (green on, red off) to flip it, pick a skin from a dropdown, or click any other row to put its command in the prompt box."
     }
   ]
 }

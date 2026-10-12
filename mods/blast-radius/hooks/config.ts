@@ -2,7 +2,15 @@ import type { PluginOptions } from 'claude-code'
 
 import { FALLBACK_RISKY } from './classify'
 
-export type BlastConfig = { maxListed: number; extraPatterns: RegExp[]; badPatterns: string[] }
+export type AskFrom = 'low' | 'medium' | 'high'
+export type BlastConfig = { maxListed: number; extraPatterns: RegExp[]; badPatterns: string[]; askFrom: AskFrom }
+
+/** Rank of a risk level for the `askFrom` bar. Unknown (not checked) ranks with high: it is never skipped. */
+export const RANK = { low: 0, medium: 1, high: 2, unknown: 2 } as const
+
+/** True when nothing needs a dialog: every part is below the `askFrom` bar and none went unchecked (`unlisted`). */
+export const isBelowBar = (levels: ('low' | 'medium' | 'high' | 'unknown')[], unlisted: number, askFrom: AskFrom): boolean =>
+  unlisted === 0 && levels.every(l => RANK[l] < RANK[askFrom])
 
 /** Options from plugin.json userConfig. A pattern that is not a valid regex is reported, never silently dropped. */
 export function readConfig(options: PluginOptions): BlastConfig {
@@ -18,7 +26,8 @@ export function readConfig(options: PluginOptions): BlastConfig {
       badPatterns.push(p)
     }
   }
-  return { maxListed, extraPatterns, badPatterns }
+  const askFrom: AskFrom = options.askFrom === 'low' || options.askFrom === 'high' ? options.askFrom : 'medium'
+  return { maxListed, extraPatterns, badPatterns, askFrom }
 }
 
 /**

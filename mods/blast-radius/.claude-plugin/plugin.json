@@ -1,6 +1,6 @@
 {
   "name": "blast-radius",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system.",
   "author": { "name": "Samuel Fernandes" },
   "userConfig": {
@@ -9,6 +9,12 @@
       "title": "Rows to list",
       "description": "Most files, commits or paths listed in the confirmation (the rest is counted as +N more).",
       "default": 5
+    },
+    "askFrom": {
+      "type": "string",
+      "title": "Ask from risk level",
+      "description": "The lowest risk level that opens the dialog. medium (default): low-risk commands run without a dialog. high: only high and unknown. low: ask about everything. A command that could not be checked (unknown) always asks.",
+      "default": "medium"
     },
     "extraPatterns": {
       "type": "string",

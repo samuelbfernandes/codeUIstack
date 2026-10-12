@@ -16,7 +16,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 
 import { classify } from './classify'
-import { failClosedReason, readConfig } from './config'
+import { failClosedReason, isBelowBar, readConfig } from './config'
 import { denyText, dialogText, toastText } from './format'
 import { measureAll } from './measure'
 import type { Run } from './measure'
@@ -41,6 +41,9 @@ export const register: Register = (on, options) => {
     const win = await isWindows($, cwd, home)
     const { reports, unlisted } = win ? unmeasured(found) : await measureAll(run, found, { maxListed: cfg.maxListed, home, cwd })
     if (reports.length === 0 && unlisted === 0) return next(e) // conditions not met, e.g. `> new-file`
+    // Below the `askFrom` bar nothing is shown: a command whose every part is lower risk goes through. A part that
+    // was not checked (unlisted) or whose level is unknown always asks.
+    if (isBelowBar(reports.map(r => r.risk?.level ?? 'unknown'), unlisted, cfg.askFrom)) return next(e)
 
     const verdict = await confirm($, dialogText(e.command, reports, unlisted, cwd, cfg.maxListed))
     if (verdict.isYes) {

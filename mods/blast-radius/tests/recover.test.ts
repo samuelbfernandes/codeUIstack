@@ -153,10 +153,10 @@ test('rm -rf: the confirmation text leads with the RISK line, and the refusal th
   expect(rep.risk?.level).toBe('high')
   const text = dialogText('rm -rf R', [rep], 0, '/w')
   const at = (s: string) => text.indexOf(s)
-  expect(text.split('\n')[0]).toBe('High risk · deletes R/') // the level and the action come first
+  expect(text.split('\n')[0]).toBe('🔴 High risk · deletes R/') // the level and the action come first
   expect(at('modified  R/a.R')).toBeGreaterThan(-1)
   expect(at('modified  R/a.R')).toBeLessThan(at('Deletes')) // the data-loss facts come before the file list
-  expect(summaryLines([rep]).join('\n')).toContain('High risk · deletes R/')
+  expect(summaryLines([rep]).join('\n')).toContain('🔴 High risk · deletes R/')
 })
 
 test('git clean and git reset --hard state what is lost forever', async () => {

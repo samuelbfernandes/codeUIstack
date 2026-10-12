@@ -515,7 +515,7 @@ test('rm -rf of a data folder: headline first, then the folder rows, then at mos
   expect(rep.risk?.level).toBe('high')
   const t = dialogText('rm -rf data', [rep], 0, '/w')
   const lines = t.split('\n')
-  expect(lines[0]).toBe('High risk · deletes data/')
+  expect(lines[0]).toBe('🔴 High risk · deletes data/')
   expect(lines[1]).toBe('rm -rf data')
   expect(lines[2]).toBe('')
   expect(t).toContain('Recoverable  No · untracked files cannot be restored')
@@ -533,7 +533,7 @@ test('chmod -R: the folder block provides the impact (the file-level check does 
   const rep = await measure(run, only('chmod -R 755 src'), { maxListed: 40, home: '/home/sam', cwd: '/w' })
   expect(rep.risk?.level).toBe('low')
   const t = dialogText('chmod -R 755 src', [rep], 0, '/w')
-  expect(t.split('\n')[0]).toBe('Low risk · changes permissions of src/')
+  expect(t.split('\n')[0]).toBe('🟢 Low risk · changes permissions of src/')
   expect(t).toContain('old permissions and owners are not recorded')
 })
 
@@ -624,7 +624,7 @@ test('no dialog shouts: no ALL-CAPS words for critical, symlink, data, chmod and
     const rep = { finding: only('rm -rf x'), groups: [], folders: [f], risk: { level: f.level, headline: f.headline }, summary: [], notes: [] }
     const t = dialogText('rm -rf x', [rep], 0, '/w')
     expect(t, f.title).not.toMatch(/\b[A-Z]{4,}\b/)
-    expect(t.split('\n')[0]).toMatch(/^(High|Medium|Low|Unknown) risk · /)
+    expect(t.split('\n')[0]).toMatch(/^(🔴|🟠|🟢) (High|Medium|Low|Unknown) risk · /)
     expect(t.trimEnd().endsWith('Run this command?')).toBe(true)
   }
 })
@@ -659,7 +659,7 @@ test(`the dialog on ${surfaces[0]} shows the folder rows and still opens on Canc
   const w = world(on, { answer: 'Cancel', probe, surfaces: [...surfaces] })
   const r = await $.tool.call({ tool: 'Bash', command: 'rm -rf data' })
   const q = w.asks[0]!.question
-  expect(q.split('\n')[0]).toBe('High risk · deletes data/')
+  expect(q.split('\n')[0]).toBe('🔴 High risk · deletes data/')
   expect(q).toContain('Contains     1 data file (88 KB)')
   expect(q).toContain('Recoverable  No')
   expect(q).toContain('Estimated from file names and your last fetch.')

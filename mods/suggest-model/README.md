@@ -24,18 +24,15 @@ Opus is the cheapest model that should handle it. Costlier and slower.
 Options: Keep Sonnet · Switch session to Opus · Run this task as a subagent on Opus · Keep and don't suggest again.
 
 ## Use
-A small coloured pill (green `suggest on`, red `suggest off`) sits just above the prompt box (terminal and desktop; hide it with the `showButton` setting). Click it to switch checking on or off; it is the same switch as the words below and is remembered across sessions.
+The on/off switch is in the toolbox side bar (green `suggest on`, red `suggest off`; click it to flip). It is the same switch as the words below and is remembered across sessions.
 
 Type `suggest-model` (status and last 5 checks), `suggest-model off`, `suggest-model on`. Only that exact text is handled; a prompt that merely mentions it goes to the model. `/suggest-model [status|on|off|explain <text>]` also works; `explain` is a free dry run that prints the cues, the per-model ratings, costs and what it would do.
-
-## No button?
-The green (on) or red (off) chip, which is itself the button, is drawn by Claude Code in the band just above the prompt, on the terminal and in the desktop app (not VS Code or mobile). If it is missing: (1) run `sh install.sh status` and check suggest-model is 0.3.1 or later, then `sh install.sh update`; (2) restart Claude Code or run `/reload-plugins`; (3) check `showButton` and `enabled` in `/config`; (4) the row hides while a dialog or survey is up and while another plugin's row is drawn there first; (5) run `claude --debug` and search the log for `ui.render (AbovePrompt)`, which names any refusal. The typed words `suggest-model on` and `suggest-model off` and the `suggest-model: off` status line work without the band.
 
 ## Turn off
 `suggest-model off`, `enabled` = false in `/config`, or `/plugin disable suggest-model`.
 
 ## Settings
-`minConfidence` (0.6; a mismatch needs at least this much confidence to block), `askOnStandard` (false), `showButton` (true), `onDismiss` (`hold` or `send`), `minWords` (3; shorter prompts are ignored unless a strong rule matches), `statusLine` (true), `enabled`, `useClassifier` (false; when on, an unplaced prompt is sent once to haiku, which costs a small call). `costRatios` (`haiku=1,sonnet=3,opus=5`, `fable=` optional) is a rough ratio of list prices; it goes stale, so edit it. Bad pieces are ignored.
+`minConfidence` (0.6; a mismatch needs at least this much confidence to block), `askOnStandard` (false), `onDismiss` (`hold` or `send`), `minWords` (3; shorter prompts are ignored unless a strong rule matches), `statusLine` (true), `enabled`, `useClassifier` (false; when on, an unplaced prompt is sent once to haiku, which costs a small call). `costRatios` (`haiku=1,sonnet=3,opus=5`, `fable=` optional) is a rough ratio of list prices; it goes stale, so edit it. Bad pieces are ignored.
 
 ## Limits
 - Ratings and verdicts are predictions from hand-written rules, not measured accuracy. Costs are rough ratios you maintain, not real prices. It is wrong sometimes; the tests only guard against regressions.

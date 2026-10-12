@@ -91,7 +91,7 @@ async function main() {
   {
     const { rep, text } = await ask('rm -rf src', proj, home)
     check(folder(rep)?.level === 'low', 'pushed folder is LOW', JSON.stringify(folder(rep)))
-    has(text, 'Low risk · deletes src/', 'headline')
+    has(text, '🟢 Low risk · deletes src/', 'headline')
     check(folder(rep)?.title === 'src/ · Low', 'title', folder(rep)?.title)
     has(text, 'Inside repository', 'what it is')
     has(text, '2 source files', 'content class')
@@ -203,7 +203,7 @@ async function main() {
   console.log('chmod -R: contents stay')
   {
     const { rep, text } = await ask(`chmod -R u+w ${join(proj, 'src')}`, proj, home)
-    has(text, 'Low risk · changes permissions of', 'chmod low')
+    has(text, '🟢 Low risk · changes permissions of', 'chmod low')
     has(text, 'old permissions and owners are not recorded', 'chmod wording')
     check(rep.risk?.level === 'low', 'chmod risk set from the folder')
   }

@@ -12,6 +12,8 @@ type Dollar = Parameters<Hook<'prompt.submit'>>[0]
 const proposal = atom({ plugin: 'reflect', key: 'proposal' } as const, null)
 const isEditing = atom({ plugin: 'reflect', key: 'isEditing' } as const, false)
 const seq = atom({ plugin: 'reflect', key: 'seq' } as const, 0)
+/** Mirror of the persisted on/off switch (`$.store` 'off'), so a side bar can show it and redraw when it flips. */
+const isOff = atom({ plugin: 'reflect', key: 'isOff' } as const, false)
 
 const DEFAULT_MODEL = 'haiku'
 const PROJECT_FILE = './CLAUDE.md'
@@ -136,13 +138,17 @@ async function runCommand($: Dollar, args: string, options: PluginOptions): Prom
   const arg = args.trim().toLowerCase()
   if (arg === 'off') {
     await $.store.set('off', true)
+    await update($, isOff, () => true)
     await hide($)
     return 'Reflect · off\nNothing is sent to a model.'
   }
   if (arg === 'on' && options.enabled === false) {
     return 'Reflect · off\nTurned off in the plugin settings (/config).'
   }
-  if (arg === 'on') await $.store.delete('off')
+  if (arg === 'on') {
+    await $.store.delete('off')
+    await update($, isOff, () => false)
+  }
   const on = await isOn($, options)
   const pending = await read($, proposal)
   const lines = [
@@ -176,6 +182,12 @@ async function drawnBelow<E>(next: (e: E) => unknown, e: E): Promise<object | un
 
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
+    try {
+      const stored = (await $.store.get('off')) === true // the switch outlives the session
+      await update($, isOff, () => stored)
+    } catch {
+      // the mirror then says on, as the default does
+    }
     try {
       await $.command.register({
         name: 'reflect',

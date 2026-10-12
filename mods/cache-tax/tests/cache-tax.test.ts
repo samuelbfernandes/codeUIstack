@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import { bestMove } from '../hooks/suggest'
 import type { On } from 'claude-code'
 
 import { dropWith } from '../hooks/reply'
@@ -20,6 +21,7 @@ type World = {
   modelThrows: boolean
   asks: { question: string; options: string[]; header: string }[]
   answer: string
+  filled: string[]
 }
 
 const usage = (read: number, creation: number) => ({
@@ -41,6 +43,7 @@ function world(on: On, tokens = 150_000): World {
     modelThrows: false,
     asks: [],
     answer: 'Send anyway',
+    filled: [],
     tokens,
     forkResult: () => ({ isAnswered: true, text: 'ok', usage: usage(150_000, 0) }),
   }
@@ -65,6 +68,7 @@ function world(on: On, tokens = 150_000): World {
   on('ui.log', (_, e) => (w.logs.push(e.text), { value: undefined }))
   on('ui.toast', (_, e) => (w.toasts.push(e.text), { value: undefined }))
   on('model.fork', () => (w.forks += 1, { value: w.forkResult() as never }))
+  on('prompt.fill', (_, e) => (w.filled.push((e as { text: string }).text), { isFilled: true } as never))
   on('prompt.submit', (_, e) => ({ text: e.text }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
@@ -458,7 +462,7 @@ test('cold cache: one small dialog, Send anyway passes the same message at once'
   expect(r.text).toBe('summarise the repo')
   expect(w.asks).toHaveLength(1)
   expect(w.asks[0]!.header).toBe('Cache cold')
-  expect(w.asks[0]!.options).toEqual(['Send anyway', 'Hold it'])
+  expect(w.asks[0]!.options).toEqual(['Compact first (suggested)', 'Send anyway', 'Start fresh', 'Hold it'])
   expect(w.asks[0]!.question).toContain('this message ~$1.50 (warm: ~$0.07)')
   expect(w.asks[0]!.question).toContain('Idle 1h 1m')
   expect(w.logs).toEqual([]) // nothing left in the transcript
@@ -563,7 +567,8 @@ test('the cold-cache dialog mentions /keepwarm 90m once per session and keeps it
   await w.clock.advance(61 * MIN)
   await submit($, 'first')
   expect(w.asks[0]!.question.split('\n').at(-1)).toBe('Keep it warm next time: /keepwarm 90m')
-  expect(w.asks[0]!.options).toEqual(['Send anyway', 'Hold it'])
+  expect(w.asks[0]!.question).toContain('Suggested: compact first')
+  expect(w.asks[0]!.options).toEqual(['Compact first (suggested)', 'Send anyway', 'Start fresh', 'Hold it'])
 
   await turn($, 't2', 150_000)
   await w.clock.advance(61 * MIN)
@@ -594,4 +599,43 @@ test('the hint never starts keep-warm or a ping', async ($, on) => {
   await w.clock.advance(3 * 60 * MIN)
   expect(w.forks).toBe(0)
   expect(await slash($, 'keepwarm')).toContain('Keep-warm is off')
+})
+
+// ---- the suggested way forward --------------------------------------------------------------
+
+test('bestMove: long away starts fresh, a big context compacts, a small one just sends', () => {
+  expect(bestMove(500_000, 7 * 60 * MIN).move).toBe('clear')
+  expect(bestMove(150_000, 61 * MIN).move).toBe('compact')
+  expect(bestMove(40_000, 61 * MIN).move).toBe('send')
+})
+
+test('a small context suggests sending, first in the list', async ($, on) => {
+  const w = world(on, 60_000)
+  await start($)
+  await turn($, 't1', 60_000)
+  await w.clock.advance(61 * MIN)
+  await submit($, 'next step')
+  expect(w.asks[0]?.options[0]).toBe('Send anyway (suggested)')
+})
+
+test('picking the suggested Compact first holds the message and puts /compact in the prompt box', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1')
+  await w.clock.advance(61 * MIN)
+  w.answer = 'Compact first (suggested)'
+  const r = await submit($, 'summarise the repo')
+  expect(r.drop).toBe('cache-tax blocked your prompt · press Enter to run /compact, then send your message again')
+  expect(w.filled).toEqual(['/compact'])
+  expect(w.logs).toEqual(['summarise the repo'])
+})
+
+test('Start fresh puts /clear in the prompt box', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1')
+  await w.clock.advance(61 * MIN)
+  w.answer = 'Start fresh'
+  expect((await submit($, 'new task')).drop).toBe('cache-tax blocked your prompt · press Enter to run /clear, then send your message again')
+  expect(w.filled).toEqual(['/clear'])
 })

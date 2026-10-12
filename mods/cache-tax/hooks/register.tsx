@@ -21,6 +21,8 @@ import {
 } from './lib'
 import type { Usage } from './lib'
 import { dropWith } from './reply'
+import { bestMove } from './suggest'
+import type { Move } from './suggest'
 import { plainWord } from './words'
 
 type Dollar = EngineInterface
@@ -156,7 +158,22 @@ async function judge(cfg: Cfg, $: Dollar, text: string): Promise<Cold | undefine
 }
 
 const SEND = 'Send anyway'
+const COMPACT = 'Compact first'
+const CLEAR = 'Start fresh'
 const HOLD = 'Hold it'
+const SUGGESTED = ' (suggested)'
+const LABEL: Record<Move, string> = { send: SEND, compact: COMPACT, clear: CLEAR }
+const COMMAND: Record<Move, string> = { send: '', compact: '/compact', clear: '/clear' }
+
+/** Put a command in the prompt box so one Enter runs it; false when the box could not take it. */
+async function fillPrompt($: Dollar, text: string): Promise<boolean> {
+  try {
+    const out = (await $.prompt.fill({ text } as never)) as { isFilled?: boolean } | undefined
+    return out?.isFilled !== false
+  } catch {
+    return false
+  }
+}
 
 /**
  * `ask` (default): one small dialog, answered in place, so there is no second send. Esc holds the message.
@@ -169,17 +186,28 @@ async function guard(cfg: Cfg, $: Dollar, text: string): Promise<{ drop: string 
   if (cfg.onCold === 'stop') return dropWith(note => $.ui.log(note), `cache-tax blocked your prompt · ${c.headline} · send the same text again to continue\n${c.detail}`)
   let answer: string
   const hint = await keepwarmHint(cfg, $, c.idleMs).catch(() => undefined)
+  const best = bestMove(c.tokens, c.idleMs)
+  const first = LABEL[best.move]
+  const options = [first, ...[SEND, COMPACT, CLEAR].filter(x => x !== first), HOLD].map(x => (x === first ? `${x}${SUGGESTED}` : x))
+  const advice = `Suggested: ${first.toLowerCase()} · ${best.why}`
   try {
-    answer = await $.ui.ask([c.headline, c.detail, hint].filter(Boolean).join('\n'), { options: [SEND, HOLD], header: 'Cache cold' })
+    answer = await $.ui.ask([c.headline, c.detail, advice, hint].filter(Boolean).join('\n'), { options, header: 'Cache cold' })
   } catch {
     answer = HOLD // Esc or an interrupt: nothing is sent
   }
-  if (answer === SEND) {
+  const picked = answer.endsWith(SUGGESTED) ? answer.slice(0, -SUGGESTED.length) : answer
+  if (picked === SEND) {
     await update($, held, () => null)
     await update($, cold, () => ({ tokens: c.tokens }))
     return undefined
   }
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
+  if (picked === COMPACT || picked === CLEAR) {
+    const command = COMMAND[picked === COMPACT ? 'compact' : 'clear']
+    const isFilled = await fillPrompt($, command)
+    const how = isFilled ? `press Enter to run ${command}` : `type ${command}`
+    return dropWith(note => $.ui.log(note), `cache-tax blocked your prompt · ${how}, then send your message again\n${shown}`)
+  }
   return dropWith(note => $.ui.log(note), `cache-tax blocked your prompt · nothing was sent. Send it again to choose.\n${shown}`)
 }
 

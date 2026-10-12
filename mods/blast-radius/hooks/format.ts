@@ -17,7 +17,8 @@ const LABEL_WIDTH = 13
 const DEFAULT_ROWS = 5 // rows shown under a list heading; the rest is "+N more"
 const MAX_NOTES = 2
 const FOOTNOTE = 'Estimated from file names and your last fetch.'
-const WORD: Record<RiskLevel, string> = { high: 'High', medium: 'Medium', low: 'Low', unknown: 'Unknown' }
+// The dialog takes plain text only, so the level is coloured with a dot. Unknown counts as red: it was not checked.
+const WORD: Record<RiskLevel, string> = { high: '🔴 High', medium: '🟠 Medium', low: '🟢 Low', unknown: '🔴 Unknown' }
 const WORST_FIRST: RiskLevel[] = ['high', 'unknown', 'medium', 'low']
 
 const row = (label: string, value: string) => `${label.padEnd(LABEL_WIDTH)}${value}`
@@ -93,7 +94,7 @@ export function dialogText(command: string, reports: Report[], unlisted: number,
   if (many) lines.push(`${WORD[worst(reports)]} risk · ${reports.length + unlisted} risky commands`, '')
   else lines.push(`${WORD[worst(reports)]} risk · ${reports[0] ? clip(actionOf(reports[0]), 90) : 'risky command'}`, clip(oneLine(command), 200), '')
   reports.forEach(r => {
-    if (many) lines.push(`● ${WORD[levelOf(r)]} · ${clip(actionOf(r), 80)}`, `  ${clip(oneLine(r.finding.command || r.finding.kind), 120)}`)
+    if (many) lines.push(`${WORD[levelOf(r)]} · ${clip(actionOf(r), 80)}`, `  ${clip(oneLine(r.finding.command || r.finding.kind), 120)}`)
     const d = details(r, sessionCwd, maxRows)
     lines.push(...(many ? d.map(x => `  ${x}`) : d), '')
   })

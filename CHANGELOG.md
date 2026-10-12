@@ -1,6 +1,10 @@
 # Changelog
 
 ## [0.4.1] - unreleased
+- New mod **toolbox**: a side bar with every mod and skill. Switches (green on, red off) flip at once, a dropdown picks the skin, other items fill the prompt box. aside's and suggest-model's on/off moved there from the band above the prompt (suggest-model no longer draws anything above it); reflect now mirrors its switch so the side bar can show it.
+- blast-radius: the risk level carries a coloured dot (🔴 high and unknown, 🟠 medium, 🟢 low).
+- blast-radius: new `askFrom` setting (low, medium, high). The default, medium, runs low-risk commands without a dialog; unknown and unchecked commands always ask.
+- cache-tax: the cold-cache dialog suggests the cheapest way forward (compact, start fresh, or send) and can put /compact or /clear in the prompt box.
 - Renamed the mod model-fit to suggest-model (plugin id, command, plain words `suggest-model` / `suggest model`, settings key). Reinstall with `codeuistack install`.
 - aside: a green/red on/off chip above the prompt (click it), plus `aside on` / `aside off` and `/aside on|off`; the choice is remembered.
 - `install --standard` and `install --all`: one-line, no-questions installs (the recommended set, or every mod, rule, skill and git guard). suggest-model: the green/red chip is itself the button; the separate Turn on/off button is gone.
