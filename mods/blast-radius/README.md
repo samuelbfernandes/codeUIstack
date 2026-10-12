@@ -6,7 +6,7 @@ Install (Claude Code 2.1.287 or later): `/plugin install blast-radius --marketpl
 Holds risky Bash commands and shows what they would destroy before they run. The question opens with one line, the risk as a plain word and what is about to happen, then the command, a few short rows and two answers: **Cancel** (first, so Enter means no) and **Proceed**. Cancel, Esc, free text, a dismissed dialog or a headless run all refuse, and the model is told why. **A safety net, not a permission system:** it only adds a question and never approves anything; keep your normal permissions on.
 
 ```
-High risk · deletes data/
+🔴 High risk · deletes data/
 rm -rf data
 
 Where        Inside repository /Users/sam/thesis
@@ -24,7 +24,7 @@ Run this command?
 Other commands read the same way:
 
 ```
-High risk · discards uncommitted changes in 3 files
+🔴 High risk · discards uncommitted changes in 3 files
 git reset --hard origin/main
 
 Impact       Uncommitted changes to 3 tracked files, gone for good (not in the reflog)
@@ -54,6 +54,8 @@ For a folder a held command would delete, overwrite or change recursively, the d
 
 ## Settings and turning off
 `/plugin` > blast-radius: `maxListed` (rows shown under a list, default 5), `extraPatterns` (regexes; a matching command is held, nothing measured). Turn off: `/plugin disable blast-radius`.
+
+The level carries a coloured dot, since the dialog takes plain text only: 🔴 high, 🟠 medium, 🟢 low, and 🔴 unknown (a folder that could not be checked counts as red).
 
 ## Limits
 - Read-only probes (`git`, `find`, `du`; no shell, no network), each with a timeout; a folder scan classifies at most 3,000 files ("sampled" is said) and stops at the first timeout. If a probe fails the command is still held and a **Not checked** row says why.

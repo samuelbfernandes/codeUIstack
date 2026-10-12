@@ -14,15 +14,14 @@ main thread does not read it and your context does not grow.
 - Type `aside` alone (any case, optional final `.`) for a short how-to; it is local, free and never sent to the model.
   If asides are kept, it also brings the pane back. `/aside` with no question does the same.
 - `Close` closes the pane. It works while Claude is busy with a turn.
-- A green `aside on` / red `aside off` chip sits above the prompt box (terminal and desktop); clicking it switches aside off or on. Typing `aside off` / `aside on`, or `/aside off` / `/aside on`, does the same. The choice is remembered across sessions. Hide the chip with `showButton`.
+- Switch it off or on from the toolbox side bar (green on, red off), or type `aside off` / `aside on` (`/aside off|on` too). The choice is remembered across sessions.
 - Asking costs model credit, so there is deliberately no plain-word way to ask: only `/aside <question>`.
 
 ## Turn off
-Click the chip, type `aside off`, `/plugin disable aside`, or set `enabled` to off in the plugin settings.
+Click it in the toolbox, type `aside off`, `/plugin disable aside`, or set `enabled` to off in the plugin settings.
 
 ## Settings
 - `enabled` (default on).
-- `showButton` (default on): the on/off chip above the prompt.
 - `maxAnswerChars` (default 4000): a longer answer is cut and says so.
 - There is no model setting: Claude Code's side-question call always uses the session's own model and cache, and
   offers no way to pick another one.

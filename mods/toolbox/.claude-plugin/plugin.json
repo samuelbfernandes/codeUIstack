@@ -1,0 +1,15 @@
+{
+  "name": "toolbox",
+  "version": "0.1.0",
+  "description": "A side bar listing the toolkit's mods and skills: click a switch (green on, red off) to flip it, pick a skin from a dropdown, or click any other item to put its command in the prompt box.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open automatically",
+      "description": "Open the side bar at session start where the screen can dock it beside the chat (fullscreen terminal, desktop app). Never reopens it after you close it; /toolbox and typing toolbox toggle it.",
+      "default": true
+    }
+  }
+}

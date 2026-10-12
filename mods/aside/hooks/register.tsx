@@ -25,16 +25,16 @@ const PANE = 'aside'
 const COMMAND = 'aside'
 /** Typed alone, this shows how /aside works. It never asks anything: asking costs model credit, so it needs /aside + a question. */
 const PLAIN_WORD = 'aside'
-const OFF = 'Aside is off · click the red aside chip, or type aside on'
+const OFF = 'Aside is off · click aside in the toolbox side bar, or type aside on'
 const HELP_FAILED = "Aside · couldn't show the help"
 
 const asides = atom({ plugin: 'aside', key: 'asides' } as const, [])
-/** Mirror of the persisted on/off switch (`$.store` 'off'), so the band's chip redraws when ANY path flips it. */
+/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the toolbox side bar so it redraws when ANY path flips it. */
 const isOff = atom({ plugin: 'aside', key: 'isOff' } as const, false)
 
-type Cfg = { isEnabled: boolean; maxChars: number; showButton: boolean }
+type Cfg = { isEnabled: boolean; maxChars: number }
 
-/** The one place the switch changes, for the chip, the plain words and `/aside on|off` alike. */
+/** The one place the switch changes, for the toolbox side bar, the plain words and `/aside on|off` alike. */
 async function setSwitch($: Dollar, off: boolean): Promise<void> {
   if (off) await $.store.set('off', true)
   else await $.store.delete('off')
@@ -64,17 +64,7 @@ async function flip($: Dollar, cfg: Cfg, to: 'on' | 'off'): Promise<string> {
   } catch {
     return 'Aside · that did not work, nothing changed'
   }
-  return to === 'on' ? 'Aside · on' : 'Aside · off · type aside on, or click the chip, to turn it back on'
-}
-
-/** What the hooks below this one drew in the band; the chip is stacked on top of it, never instead of it. */
-async function drawnBelow<E>(next: (e: E) => unknown, e: E): Promise<object | undefined> {
-  try {
-    const tree = await next(e)
-    return tree !== null && typeof tree === 'object' ? tree : undefined
-  } catch {
-    return undefined
-  }
+  return to === 'on' ? 'Aside · on' : 'Aside · off · type aside on, or click it in the toolbox, to turn it back on'
 }
 
 /** The pane opens for the person's own command, so it is placed at any width; focus and Esc are requests only. */
@@ -141,14 +131,14 @@ async function runAside($: Dollar, cfg: Cfg, args: string): Promise<string> {
 }
 
 export const register: Register = (on, options) => {
-  const cfg: Cfg = { isEnabled: options.enabled !== false, maxChars: maxCharsOf(options.maxAnswerChars), showButton: options.showButton !== false }
+  const cfg: Cfg = { isEnabled: options.enabled !== false, maxChars: maxCharsOf(options.maxAnswerChars) }
 
   on('session.start', async ($, e, next) => {
     try {
       const stored = (await $.store.get('off')) === true // the switch outlives the session
       await update($, isOff, () => stored)
     } catch {
-      // the chip then starts green
+      // the switch then reads as on
     }
     try {
       await $.command.register({
@@ -187,32 +177,6 @@ export const register: Register = (on, options) => {
     }
     if (typedWord !== PLAIN_WORD) return next(e)
     return dropWith(note => $.ui.log(note), await help($, cfg).catch(() => HELP_FAILED))
-  }).catch(($, e, next) => next(e))
-
-  // The on/off chip sits in the band above the prompt: green when on, red when off, and the chip itself is the
-  // button. It steps aside for a survey, and stacks on top of whatever another mod drew there.
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!cfg.isEnabled || !cfg.showButton || e.props.hasSurvey) return next(e)
-    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
-    const off = await read($, isOff)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const press = async () => {
-      const now = await read($, isOff)
-      await setSwitch($, !now)
-      $.ui.toast(now ? 'aside · on' : 'aside · off')
-    }
-    const bg = off ? 'error' : 'success'
-    const row = (
-      <Box key="aside-pill" backgroundColor={bg} paddingX={1}>
-        <Button key="toggle" plain onPress={press}>
-          <Text bold color="inverseText" backgroundColor={bg}>
-            {`aside ${off ? 'off' : 'on'}`}
-          </Text>
-        </Button>
-      </Box>
-    )
-    const below = await drawnBelow(next, e)
-    return below === undefined ? row : <Box key="aside-band" flexDirection="row" gap={1}>{row}{below as never}</Box>
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {

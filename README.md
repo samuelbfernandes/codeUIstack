@@ -1,7 +1,7 @@
 # codeUIstack
 
 **Safety and productivity mods for Claude Code, built for scientists.**
-Fourteen small add-ons (mods), two skills and a set of git guards that protect your work, keep your token bill visible, and stay quiet until
+Fifteen small add-ons (mods), two skills and a set of git guards that protect your work, keep your token bill visible, and stay quiet until
 they have something useful to say. Install everywhere or in a single project, tick only what you want, and undo it exactly.
 
 > Status: first release, not yet used by anyone but its author. Written and tested without a live Claude Code session; see
@@ -62,10 +62,11 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
 
-## The fourteen mods
+## The fifteen mods
 
 | Mod | One line |
 |---|---|
+| `toolbox` | A side bar with every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
 | `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
@@ -95,12 +96,13 @@ their own line are your whole prompt; they are answered on your computer and nev
 
 | Item | Try this | You should see |
 |---|---|---|
+| **toolbox** | Type `toolbox` (wide window or desktop app), click a green switch, then click `branch-janitor` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent |
 | **blast-radius** | Ask Claude: `create a folder build with a file a.txt, then delete the build folder` | Before `rm -rf build`: a box with the risk level, what is in the folder, what git could restore, "Recoverable: yes / partly / no", and **Cancel** as the first answer |
 | **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
 | **suggest-model** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **suggest-model on** chip above the prompt; `suggest-model off` / `suggest-model on` / `suggest-model explain <text>` |
 | **branch-janitor** | `git checkout -b demo`, commit a file, then in another terminal `git checkout main && git merge demo`. Send any prompt in Claude Code | "Delete 1 finished branch?" with the command to restore it. Type `branch-janitor` for the list (with `gh`: open pull requests and their checks) |
 | **review-cost** | Needs Codex. In a repo with a `docs/THEORY_REVIEW.md` file, change a method file and ask Claude to `git push` | A green / amber / red estimate of the review's tokens with **Review / Skip** |
-| **reflect** | Tell Claude: `no, in this repo we always use tabs, never spaces` | A small band "Reflect" with the rule and **Save / Global / Edit / Skip** (saves to `CLAUDE.md`) |
+| $ **reflect** | Tell Claude: `no, in this repo we always use tabs, never spaces` | A small band "Reflect" with the rule and **Save / Global / Edit / Skip** (saves to `CLAUDE.md`) |
 | **savvy-progress** | Ask: `use two subagents to list the files in src/ and in tests/ in parallel`. Then type `agents-info` and `agents tree` | A band with a task bar `▰▰▱ 2/3 tasks` and the running helpers with a **Stop** button; the words print a report and the nested helper tree |
 | **filetree** | Type `filetree` (wide window), then ask Claude to edit a file | A folder tree beside the chat, the touched file highlighted. `filetree` again closes it |
 | **replay-theater** | Ask Claude to change three files in one turn, then type `replay` | A one-line hint after the turn; the word opens a pane that steps through each edit as a diff |
@@ -108,7 +110,7 @@ their own line are your whole prompt; they are answered on your computer and nev
 | **secret-guard** | Type: `my token is ghp_0123456789abcdefghijklmnopqrstuvwxyz, remember it` (a made-up token). Then type `secret-guard` | A dialog "Send redacted / Send as typed / Hold it". The word shows how many secrets were hidden, by kind, never the secrets |
 | **budget-guard** | Type `budget 0.50`, chat until about 35 cents are spent, then type `usage` | A usage line appears above the prompt only when cost, context or your plan window gets high; at the limit one dialog asks **Continue (+50%) / Continue without limit / Hold it**. The word prints cost, tokens, cache hits and turn times |
 | **diagram** | Ask: `explain the steps of a GBLUP analysis as a mermaid flowchart`, then type `diagram` | A toast "type diagram to see it"; the word opens a pane with the flowchart drawn as boxes and arrows. `diagram close` closes it |
-| **aside** | Type: `/aside what does REML stand for?` (a little credit) | A pane with the answer; it is not added to the conversation. Off by default: tick it in the installer |
+| $ **aside** | Type: `/aside what does REML stand for?` (a little credit) | A pane with the answer; it is not added to the conversation. Off by default: tick it in the installer |
 
 ### Skills (Claude loads them by itself)
 

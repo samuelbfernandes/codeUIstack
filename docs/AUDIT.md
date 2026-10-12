@@ -21,6 +21,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
 | suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start, ui.render |
 | tool-skins | no | none | no | no | command.run, prompt.submit, session.start, ui.render |
+| toolbox | no | none | no | no | command.run, prompt.submit, session.start, ui.render |
 
 "Writes files" means the mod can write through Claude Code's file API (reflect does, only when you press Save).
 "Spends model tokens" means the mod can ask a model something itself (reflect: a small model once per correction; cache-tax: optional keep-warm pings; suggest-model: only if you pick the subagent option).

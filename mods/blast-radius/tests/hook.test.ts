@@ -28,7 +28,7 @@ test(`Proceed on ${surfaces.join('+')}: the question lists the blast radius, the
   expect(ask.options).toEqual(['Cancel', 'Proceed']) // Cancel first: it is the one the dialog opens on
   expect(ask.header).toBe('Blast radius')
   const lines = ask.question.split('\n')
-  expect(lines[0]).toBe('Unknown risk · deletes build/') // the probes here cannot scan the folder, so the level is not guessed
+  expect(lines[0]).toBe('🔴 Unknown risk · deletes build/') // the probes here cannot scan the folder, so the level is not guessed
   expect(lines[1]).toBe('rm -rf build')
   expect(ask.question).toContain('build/ · 3 files, 38 MB')
   expect(ask.question).not.toMatch(/[A-Z]{4,}/) // no shouting
@@ -92,7 +92,7 @@ test('measuring fails: still held, says "could not measure"', async ($, on) => {
   const r = await $.tool.call({ tool: 'Bash', command: 'git reset --hard' })
   expect(w.asks).toHaveLength(1)
   expect(w.asks[0]!.question).toContain('Not checked  git diff failed: boom')
-  expect(w.asks[0]!.question.split('\n')[0]).toBe('Unknown risk · discards uncommitted changes')
+  expect(w.asks[0]!.question.split('\n')[0]).toBe('🔴 Unknown risk · discards uncommitted changes')
   expect(r.deny).toBeDefined()
   expect(w.ran).toEqual([])
 })
@@ -132,7 +132,7 @@ test('> file on a non-empty file asks', async ($, on) => {
   })
   const r = await $.tool.call({ tool: 'Bash', command: 'echo hi > notes.txt' })
   expect(w.asks[0]!.question).toContain('notes.txt · 12 KB')
-  expect(w.asks[0]!.question.split('\n')[0]).toBe('High risk · overwrites notes.txt')
+  expect(w.asks[0]!.question.split('\n')[0]).toBe('🔴 High risk · overwrites notes.txt')
   expect(r.deny).toBeDefined()
 })
 
@@ -140,9 +140,9 @@ test('a line with several risky commands lists each one', async ($, on) => {
   const w = world(on, { answer: 'Cancel', probe: () => ({ stdout: '' }) })
   await $.tool.call({ tool: 'Bash', command: 'git stash clear; psql -c "DROP TABLE t"' })
   const q = w.asks[0]!.question
-  expect(q.split('\n')[0]).toBe('High risk · 2 risky commands')
-  expect(q).toContain('● High · deletes all stashes')
-  expect(q).toContain('● Unknown · runs destructive SQL')
+  expect(q.split('\n')[0]).toBe('🔴 High risk · 2 risky commands')
+  expect(q).toContain('🔴 High · deletes all stashes')
+  expect(q).toContain('🔴 Unknown · runs destructive SQL')
   expect(q).toContain('DROP TABLE t')
 })
 
@@ -212,7 +212,7 @@ test('Windows: a destructive command is still held, says nothing was measured, a
   const r = await $.tool.call({ tool: 'Bash', command: 'rm -rf build' })
   expect(w.probes).toHaveLength(0) // never the Unix find/du
   expect(w.asks).toHaveLength(1)
-  expect(w.asks[0]!.question.split('\n')[0]).toBe('Unknown risk · deletes build')
+  expect(w.asks[0]!.question.split('\n')[0]).toBe('🔴 Unknown risk · deletes build')
   expect(w.asks[0]!.question).toContain('Nothing can be listed on Windows')
   expect(w.asks[0]!.question).toContain('rm -rf build')
   expect(r.deny).toBeDefined()
@@ -270,5 +270,5 @@ test('the dialog stays short: a headline, the command, a few aligned rows, then 
   const q = w.asks[0]!.question
   expect(q.split('\n').length).toBeLessThanOrEqual(16)
   expect(q).toContain('+25 more') // the default shows 5 rows
-  expect(q.split('\n')[0]).toBe('Unknown risk · deletes 30 files')
+  expect(q.split('\n')[0]).toBe('🔴 Unknown risk · deletes 30 files')
 })
