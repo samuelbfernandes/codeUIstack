@@ -33,7 +33,14 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "budget-guard": set(),
     "diagram": set(),
     "aside": set(),
-    "moddeck": set(),
+    "moddeck": {"git"},                        # read-only git for the Session box (branch, dirty, ahead/behind, file counts, worktree)
+    "data-guard": {"git"},
+    "big-file-guard": set(),
+    "repro-log": {"git", "python3", "node"},          # only `--version` probes, for runtimes that appeared in the session
+    "auto-test": {"npm", "python3", "sh"},           # runs the project's own tests (pytest, npm test); `sh -c` only for a command the person set; off until switched on
+    "prompt-library": set(),
+    "checkpoint": {"git", "rm", "cmd"},          # rm / del only on a confirmed restore, only paths the dialog listed
+    "long-run-ping": set(),
 }
 ALLOW_NETWORK: set[str] = set()            # mods allowed to call $.http (none)
 NEVER_PROGRAMS = {"curl", "wget", "ssh", "scp", "nc", "ncat", "telnet", "sudo", "powershell", "pwsh", "bash", "sh", "zsh", "cmd", "python", "python3", "node", "npm", "npx", "pip", "rm", "mv", "chmod"}

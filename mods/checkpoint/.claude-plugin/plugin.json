@@ -1,0 +1,29 @@
+{
+  "name": "checkpoint",
+  "version": "0.1.0",
+  "description": "One-click safety snapshots of your working tree (untracked files too) that never touch your branch, index or stash. /checkpoint, list, diff, restore, drop. Restore shows what would be lost and asks first.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable /checkpoint",
+      "description": "Turn off to make /checkpoint do nothing.",
+      "default": true
+    },
+    "autoBeforePrompt": {
+      "type": "boolean",
+      "title": "Snapshot automatically",
+      "description": "When on, a snapshot named auto-<time> is made at the first prompt of a turn that follows file changes.",
+      "default": false
+    },
+    "maxAuto": {
+      "type": "number",
+      "title": "Automatic snapshots kept",
+      "description": "How many auto-<time> snapshots to keep. Older automatic ones are deleted. Your own named snapshots are never deleted by this.",
+      "default": 10,
+      "min": 1,
+      "max": 100
+    }
+  }
+}

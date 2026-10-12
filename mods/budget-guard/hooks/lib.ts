@@ -1,5 +1,9 @@
 // Pure helpers: rough prices, formatting, the band's parts and the report. No engine access.
 import type { BudgetSnap, BudgetTally, BudgetTurn, BudgetWindow } from '../types'
+import type { Ledger, LedgerAtom } from './ledger'
+import { lastDays } from './ledger'
+import { paceOf, runOutMs } from './pace'
+import type { Pace } from './pace'
 
 // ---- prices (an estimate only, used where the engine keeps no cost ledger) -----------------
 
@@ -146,19 +150,45 @@ export const overLimit = (windows: readonly BudgetWindow[], limitPct: number): B
  * window at 80% (or 90% of your limit), or session cost at 90% of a dollar limit. When one matters, cost
  * and context are shown too, so the line reads as a whole; plan windows only when they themselves are high.
  */
-export function bandParts(snap: BudgetSnap, tally: BudgetTally, t: Thresholds): Part[] | undefined {
+export type BandExtras = {
+  /** Show the pace arrow (needs `now`). */
+  pace?: boolean
+  now?: number
+  /** The cost ledger mirror; Today / Week parts are added (when above zero) once the line is showing. */
+  ledger?: LedgerAtom
+  showDaily?: boolean
+  showWeekly?: boolean
+}
+
+const paceLevel = (p: Pace): Level => (p === 'red' ? 'error' : p === 'amber' ? 'warn' : 'ok')
+const worse = (a: Level, b: Level): Level => (a === 'error' || b === 'error' ? 'error' : a === 'warn' || b === 'warn' ? 'warn' : 'ok')
+
+export function bandParts(snap: BudgetSnap, tally: BudgetTally, t: Thresholds, x: BandExtras = {}): Part[] | undefined {
   const { usd, isEst } = costOf(snap, tally)
   const ctxLevel: Level = snap.ctxPct === null ? 'ok' : levelAt(snap.ctxPct, t.contextWarnPct, Math.max(90, t.contextWarnPct + 5))
   const warnAt = t.limitPct > 0 ? Math.min(PLAN_WARN_PCT, t.limitPct * 0.9) : PLAN_WARN_PCT
   const errorAt = t.limitPct > 0 ? t.limitPct : PLAN_ERROR_PCT
-  const high = snap.windows.filter(w => w.pct >= warnAt)
+  const paceOn = x.pace === true && x.now !== undefined
+  const paceFor = (w: BudgetWindow): Pace => (paceOn ? paceOf(w, x.now!) : 'none')
+  const hot = (p: Pace): boolean => p === 'amber' || p === 'red'
+  const high = snap.windows.filter(w => w.pct >= warnAt || hot(paceFor(w)))
   const costLevel: Level = t.limitUsd > 0 ? levelAt(usd, t.limitUsd * USD_WARN_FRACTION, t.limitUsd) : 'ok'
   if (ctxLevel === 'ok' && high.length === 0 && costLevel === 'ok') return undefined
 
   const parts: Part[] = [{ text: `Session ~${fmtUsd(usd)}${isEst ? ' est.' : ''}${t.limitUsd > 0 ? ` · limit ${fmtUsdLimit(t.limitUsd)}` : ''}`, level: costLevel }]
   if (snap.ctxPct !== null) parts.push({ text: `context ${fmtPct(snap.ctxPct)}`, level: ctxLevel })
-  for (const w of high) parts.push({ text: windowText(w, t.limitPct), level: levelAt(w.pct, warnAt, errorAt) })
-  return parts.map(p => ({ ...p, text: p.text + MARK[p.level] }))
+  const marks: Part[] = []
+  for (const w of high) {
+    const p = paceFor(w)
+    const level = worse(levelAt(w.pct, warnAt, errorAt), paceLevel(p))
+    parts.push({ text: windowText(w, t.limitPct) + (hot(p) ? ' ▲' : ''), level })
+  }
+  const out = parts.map(p => ({ ...p, text: p.text + MARK[p.level] }))
+  if (x.ledger !== undefined) {
+    if (x.showDaily !== false && x.ledger.today > 0) marks.push({ text: `Today ${fmtUsd(x.ledger.today)}`, level: 'ok' })
+    if (x.showWeekly !== false && x.ledger.week !== null && x.ledger.week > 0) marks.push({ text: `Week ${fmtUsd(x.ledger.week)}`, level: 'ok' })
+  }
+  return [...out, ...marks]
 }
 
 // ---- the report ----------------------------------------------------------------------------
@@ -170,14 +200,29 @@ type ReportInput = {
   limitPct: number
   limitUsd: number
   now: number
+  /** Optional extras: pace words, and the cost ledger (omitted = old report). */
+  pace?: boolean
+  ledger?: LedgerAtom
+  showDaily?: boolean
+  showWeekly?: boolean
 }
 
 /** One aligned row of the report. */
 const row = (label: string, value: string): string => `${label.padEnd(10)}${value}`
 
-function windowRow(w: BudgetWindow, limitPct: number, now: number): string {
+/** One clear phrase for a window that is not on a safe pace; empty otherwise. */
+export function paceWords(w: BudgetWindow, now: number): string {
+  const p = paceOf(w, now)
+  if (p !== 'red' && p !== 'amber') return ''
+  const left = runOutMs(w, now)
+  const t = left === undefined ? undefined : fmtReset(new Date(now + left).toISOString(), now)
+  return p === 'red' ? `▲ on pace to run out${t === undefined ? '' : ` in ~${t}`}` : '▲ running close to the cap by the reset'
+}
+
+function windowRow(w: BudgetWindow, limitPct: number, now: number, pace: boolean): string {
   const reset = fmtReset(w.resetsAt, now)
-  return row(windowLabel(w.kind), `${fmtUsed(w.pct)} · ${limitPct > 0 ? `limit ${fmtLimit(limitPct)}` : 'no limit'}${reset === undefined ? '' : ` · resets in ${reset}`}`)
+  const words = pace ? paceWords(w, now) : ''
+  return row(windowLabel(w.kind), `${fmtUsed(w.pct)} · ${limitPct > 0 ? `limit ${fmtLimit(limitPct)}` : 'no limit'}${reset === undefined ? '' : ` · resets in ${reset}`}${words === '' ? '' : ` · ${words}`}`)
 }
 
 /** The first line is the headline (it becomes the one-line answer); the rest is the aligned box. */
@@ -198,14 +243,16 @@ export function buildReport(r: ReportInput): string {
     row('Longest', r.tally.turns === 0 ? 'none yet' : fmtDuration(r.tally.longestMs)),
     ...(r.snap.windows.length === 0
       ? [row('Plan', `API-key use: the limit is in dollars${r.limitPct > 0 ? `; the ${fmtLimit(r.limitPct)} plan limit is idle` : ''}`)]
-      : r.snap.windows.map(w => windowRow(w, r.limitPct, r.now))),
+      : r.snap.windows.map(w => windowRow(w, r.limitPct, r.now, r.pace === true))),
+    ...(r.ledger !== undefined && r.showDaily !== false ? [row('Today', fmtUsd(r.ledger.today))] : []),
+    ...(r.ledger !== undefined && r.showWeekly !== false && r.ledger.week !== null ? [row('Week', fmtUsd(r.ledger.week))] : []),
     `Counts start when the mod loads${isEst ? '; cost is estimated from tokens at rough list prices' : ''}.`,
   ].join('\n')
 }
 
 // ---- the /budget-guard argument -----------------------------------------------------------
 
-export type Word = { kind: 'report' } | { kind: 'set'; pct: number } | { kind: 'setUsd'; usd: number }
+export type Word = { kind: 'report' } | { kind: 'ledger' } | { kind: 'ledgerClear' } | { kind: 'set'; pct: number } | { kind: 'setUsd'; usd: number }
 
 /**
  * The text after `/budget-guard`: nothing for the report; `80` (or `80%`, decimals allowed, above 100
@@ -215,6 +262,8 @@ export type Word = { kind: 'report' } | { kind: 'set'; pct: number } | { kind: '
 export function parseArgs(args: string): Word {
   const a = args.trim().toLowerCase()
   if (a === 'off') return { kind: 'set', pct: 0 }
+  if (a === 'ledger') return { kind: 'ledger' }
+  if (a === 'ledger clear') return { kind: 'ledgerClear' }
   const d = /^\$(\d+(?:\.\d+)?)$/.exec(a)
   if (d?.[1] !== undefined) return { kind: 'setUsd', usd: Number(d[1]) }
   const m = /^(\d+(?:\.\d+)?)%?$/.exec(a)
@@ -226,3 +275,10 @@ export const raisedUsd = (limit: number): number => limit * 1.5
 
 /** What "Continue (+10 points)" raises the limit to: ten points more, never above 100. */
 export const raisedLimit = (limit: number): number => Math.min(100, limit + 10)
+
+/** `/budget-guard ledger`: the last 7 days, newest first. */
+export function ledgerReport(l: Ledger, now: number): string {
+  const days = lastDays(l, now, 7)
+  const total = days.reduce((a, d) => a + d.usd, 0)
+  return ['budget-guard · cost ledger, last 7 days', ...days.map((d, i) => i === 0 ? row('Today', `${fmtUsd(d.usd)}  (${d.date})`) : `${d.date}  ${fmtUsd(d.usd)}`), row('Total', fmtUsd(total))].join('\n')
+}

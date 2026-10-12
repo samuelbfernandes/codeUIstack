@@ -1,8 +1,9 @@
 {
   "name": "review-cost",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Before a git push triggers the automatic second-model review, shows its estimated token cost (green / amber / red) and lets you choose Review or Skip.",
   "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
   "userConfig": {
     "greenMaxTokens": {
       "type": "number",

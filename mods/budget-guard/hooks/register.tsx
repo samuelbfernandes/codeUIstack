@@ -15,13 +15,15 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { EMPTY_SNAP, EMPTY_TALLY, addTurn, addUsage, bandParts, buildReport, costOf, fmtLimit, fmtReset, fmtUsd, fmtUsdLimit, fmtUsed, overLimit, parseArgs, raisedLimit, raisedUsd, usdReached, windowLabel } from './lib'
+import { EMPTY_SNAP, EMPTY_TALLY, addTurn, addUsage, bandParts, buildReport, costOf, fmtLimit, ledgerReport, fmtReset, fmtUsd, fmtUsdLimit, fmtUsed, overLimit, parseArgs, raisedLimit, raisedUsd, usdReached, windowLabel } from './lib'
 import type { Level, TokenCounts, Word } from './lib'
+import { addSpend, atomOf, cleanLedger, deltaOf } from './ledger'
+import type { Ledger, LedgerAtom, LedgerLast } from './ledger'
 import { dropWith } from './reply'
 import type { BudgetSnap } from '../types'
 
 type Dollar = EngineInterface
-type Cfg = { isEnabled: boolean; limitPct: number; limitUsd: number; contextWarnPct: number; showLine: boolean }
+type Cfg = { isEnabled: boolean; limitPct: number; limitUsd: number; contextWarnPct: number; showLine: boolean; showPace: boolean; showDailyCost: boolean; showWeeklyCost: boolean }
 
 const tally = atom({ plugin: 'budget-guard', key: 'tally' } as const, EMPTY_TALLY)
 const turns = atom({ plugin: 'budget-guard', key: 'turns' } as const, [])
@@ -29,6 +31,12 @@ const turnStart = atom({ plugin: 'budget-guard', key: 'turnStart' } as const, nu
 const limit = atom({ plugin: 'budget-guard', key: 'limit' } as const, null)
 const limitUsdAtom = atom({ plugin: 'budget-guard', key: 'limitUsd' } as const, null)
 const snapshot = atom({ plugin: 'budget-guard', key: 'snap' } as const, EMPTY_SNAP)
+/** The ledger mirror the moddeck side bar reads: today's spend, and the week since the weekly window opened (null without one). */
+const ledgerAtom = atom({ plugin: 'budget-guard', key: 'ledger' } as const, { today: 0, week: null } as LedgerAtom)
+/** The last cost reading of this session, so only growth is added to the ledger. */
+const lastCost = atom({ plugin: 'budget-guard', key: 'lastCost' } as const, null)
+
+const LEDGER_KEY = 'ledger'
 
 const COLOUR: Record<Level, 'warning' | 'error' | undefined> = { ok: undefined, warn: 'warning', error: 'error' }
 
@@ -48,6 +56,9 @@ export function readConfig(o: Readonly<Record<string, unknown>>): Cfg {
     limitUsd: numberOf(o.limitUsd, 0, 0, 1_000_000),
     contextWarnPct: numberOf(o.contextWarnPct, 75, 10, 99),
     showLine: o.showLine !== false,
+    showPace: o.showPace !== false,
+    showDailyCost: o.showDailyCost !== false,
+    showWeeklyCost: o.showWeeklyCost !== false,
   }
 }
 
@@ -90,12 +101,64 @@ async function refresh($: Dollar): Promise<BudgetSnap | undefined> {
   return snap
 }
 
+// ------------------------------------------------------------------ the cost ledger
+
+const readLedger = async ($: Dollar): Promise<Ledger> => cleanLedger(await quietly(() => $.store.get(LEDGER_KEY)))
+
+async function mirror($: Dollar, l: Ledger, snap: BudgetSnap): Promise<LedgerAtom> {
+  const a = atomOf(l, await $.clock.now(), snap.windows)
+  await quietly(() => update($, ledgerAtom, () => a))
+  return a
+}
+
+/** Adds the growth of the session cost since the last reading to today's total, and mirrors the atom. Observe only: never throws. */
+async function trackCost($: Dollar, usd: number | undefined, snap: BudgetSnap): Promise<void> {
+  await quietly(async () => {
+    let l = await readLedger($)
+    if (usd !== undefined && Number.isFinite(usd)) {
+      const prev = ((await read($, lastCost)) as LedgerLast | null) ?? null
+      const startedAt = prev !== null ? (await quietly(() => $.session.usage()))?.startedAt ?? prev.startedAt : (await quietly(() => $.session.usage()))?.startedAt
+      if (startedAt !== undefined) {
+        const now = await $.clock.now()
+        const { delta, last } = deltaOf(prev, startedAt, usd, now)
+        await update($, lastCost, () => last)
+        if (delta > 0) {
+          l = addSpend(l, now, delta)
+          await $.store.set(LEDGER_KEY, l)
+        }
+      }
+    }
+    await mirror($, l, snap)
+  })
+}
+
+async function ledgerNow($: Dollar, snap: BudgetSnap): Promise<LedgerAtom> {
+  return (await quietly(async () => mirror($, await readLedger($), snap))) ?? (await read($, ledgerAtom))
+}
+
+async function ledgerCmd($: Dollar, clear: boolean): Promise<string> {
+  const now = await $.clock.now()
+  if (clear) {
+    await $.store.set(LEDGER_KEY, {})
+    await quietly(() => update($, ledgerAtom, () => ({ today: 0, week: null })))
+    await ledgerNow($, await read($, snapshot))
+    return 'budget-guard · cost ledger cleared (it only forgets the daily totals)'
+  }
+  return ledgerReport(await readLedger($), now)
+}
+
 // ------------------------------------------------------------------ the report and the limit
 
 async function report($: Dollar, cfg: Cfg): Promise<string> {
   const snap = (await refresh($)) ?? (await read($, snapshot))
+  if (snap.usd !== null) await trackCost($, snap.usd, snap)
+  const ledger = await ledgerNow($, snap)
   return buildReport({
     snap,
+    pace: cfg.showPace,
+    ledger,
+    showDaily: cfg.showDailyCost,
+    showWeekly: cfg.showWeeklyCost,
     tally: await read($, tally),
     turns: await read($, turns),
     limitPct: await effectiveLimit($, cfg),
@@ -121,6 +184,7 @@ async function setUsd($: Dollar, usd: number): Promise<string> {
 }
 
 async function run($: Dollar, cfg: Cfg, word: Word): Promise<string> {
+  if (word.kind === 'ledger' || word.kind === 'ledgerClear') return ledgerCmd($, word.kind === 'ledgerClear')
   return word.kind === 'set' ? setLimit($, word.pct) : word.kind === 'setUsd' ? setUsd($, word.usd) : report($, cfg)
 }
 
@@ -183,9 +247,10 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     if (cfg.isEnabled) {
-      await refresh($)
+      const snap = await refresh($)
+      if (snap !== undefined) await trackCost($, snap.usd ?? undefined, snap)
       await quietly(() =>
-        $.command.register({ name: 'budget-guard', description: 'Usage report, or a limit for this session: 0-100 plan points, or $10 dollars; 0 or off clears both', argumentHint: '[0-100|$usd|off]' }),
+        $.command.register({ name: 'budget-guard', description: 'Usage report, or a limit for this session: 0-100 plan points, or $10 dollars; 0 or off clears both', argumentHint: '[0-100|$usd|off|ledger|ledger clear]' }),
       )
     }
     return next(e)
@@ -200,6 +265,7 @@ export const register: Register = (on, options) => {
         await update($, limit, () => null)
         await update($, limitUsdAtom, () => null)
         await update($, snapshot, () => EMPTY_SNAP)
+        await update($, lastCost, () => null)
       })
     }
     return next(e)
@@ -207,7 +273,11 @@ export const register: Register = (on, options) => {
 
   // The engine pushes a reading after each turn and when a plan window moves a whole point.
   on('session.measure', async ($, e, next) => {
-    if (cfg.isEnabled) await quietly(() => update($, snapshot, () => toSnap(e)))
+    if (cfg.isEnabled) {
+      const snap = toSnap(e)
+      await quietly(() => update($, snapshot, () => snap))
+      await trackCost($, e.cost?.usd, snap)
+    }
     return next(e)
   }).catch(($, e, next) => next(e))
 
@@ -236,11 +306,12 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (!cfg.isEnabled || !cfg.showLine || e.props.hasSurvey) return next(e)
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
-    const parts = bandParts(await read($, snapshot), await read($, tally), {
-      limitPct: await effectiveLimit($, cfg),
-      limitUsd: await effectiveUsd($, cfg),
-      contextWarnPct: cfg.contextWarnPct,
-    })
+    const parts = bandParts(
+      await read($, snapshot),
+      await read($, tally),
+      { limitPct: await effectiveLimit($, cfg), limitUsd: await effectiveUsd($, cfg), contextWarnPct: cfg.contextWarnPct },
+      { pace: cfg.showPace, now: await $.clock.now(), ledger: await read($, ledgerAtom), showDaily: cfg.showDailyCost, showWeekly: cfg.showWeeklyCost },
+    )
     if (parts === undefined) return next(e)
     const { Box, Text } = $.ui.resolve(e)
     const row = (

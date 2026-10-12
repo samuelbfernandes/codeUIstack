@@ -1,8 +1,10 @@
 {
   "name": "moddeck",
-  "version": "0.2.5",
-  "description": "A side bar listing every mod and skill, one boxed row each: the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text).",
-  "author": { "name": "Samuel Fernandes" },
+  "version": "0.4.0",
+  "description": "A side bar listing every mod and skill, one boxed row each, topped by a live Session box (model, context, usage pace, cost, cache, git, tokens, activity, environment); the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text).",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
     "autoOpen": {
@@ -16,6 +18,48 @@
       "title": "Skills shown at once",
       "description": "How many skills the side bar shows before the list scrolls (▲ up / ▼ down).",
       "default": 4
+    },
+    "showSession": {
+      "type": "boolean",
+      "title": "Show the Session box",
+      "description": "The live Session box at the top of the side bar: model, context, usage, cost, cache, git, tokens, activity and environment, each row hidden when the engine gives no figure for it.",
+      "default": true
+    },
+    "sessionLayout": {
+      "type": "string",
+      "title": "Session box layout",
+      "description": "expanded (one row per line) or compact (rows joined with │ on as few lines as fit). /moddeck rows compact|expanded changes and keeps it.",
+      "default": "expanded"
+    },
+    "sessionRows": {
+      "type": "string",
+      "title": "Session box rows",
+      "description": "Comma list of row ids in display order; an id left out is hidden. /moddeck rows hide|show <id> changes and keeps it.",
+      "default": "model,context,usage,cost,cache,git,tokens,activity,environment"
+    },
+    "usageSevenDayAt": {
+      "type": "number",
+      "title": "Show the 7-day window from (%)",
+      "description": "The 7-day usage bar shows only once the window is this much used.",
+      "default": 80
+    },
+    "toolsMaxVisible": {
+      "type": "number",
+      "title": "Tool calls shown",
+      "description": "How many recent tool-call groups the activity row shows.",
+      "default": 4
+    },
+    "pushWarn": {
+      "type": "number",
+      "title": "Unpushed commits warning",
+      "description": "The git row's ahead count turns to the warning colour from this many unpushed commits.",
+      "default": 5
+    },
+    "envThreshold": {
+      "type": "number",
+      "title": "Environment row from (count)",
+      "description": "The environment row shows only when its counts add up to at least this many; 0 = always.",
+      "default": 0
     }
   }
 }

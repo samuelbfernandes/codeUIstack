@@ -1,0 +1,35 @@
+{
+  "name": "data-guard",
+  "version": "0.1.0",
+  "description": "Asks before a git commit or git add takes in large files, data files, personal-looking table columns or Jupyter notebooks with outputs. Only names are ever shown, never file contents.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Master switch. /data-guard off or /data-guard on switches it in a session (remembered).",
+      "default": true
+    },
+    "maxFileMb": {
+      "type": "number",
+      "title": "Large file limit (MB)",
+      "description": "A file bigger than this is flagged.",
+      "default": 5,
+      "min": 0.1,
+      "max": 1000
+    },
+    "checkNotebooks": {
+      "type": "boolean",
+      "title": "Check notebooks",
+      "description": "Flag .ipynb files that still hold outputs or execution counts, and offer to strip them.",
+      "default": true
+    },
+    "checkColumns": {
+      "type": "boolean",
+      "title": "Check table columns",
+      "description": "Flag csv/tsv files whose first line has column names that look like personal data (names only are ever shown).",
+      "default": true
+    }
+  }
+}

@@ -13,6 +13,16 @@
       "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation."
     },
     {
+      "name": "auto-test",
+      "source": "./mods/auto-test",
+      "description": "Runs the project's tests once at the end of a turn in which Claude edited files, and shows a green or red result. Off until you type /auto-test on."
+    },
+    {
+      "name": "big-file-guard",
+      "source": "./mods/big-file-guard",
+      "description": "Saves tokens: when the model reads a large data or log file whole, it gets the first lines and a note, unless it asks for a range itself."
+    },
+    {
       "name": "blast-radius",
       "source": "./mods/blast-radius",
       "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system."
@@ -33,6 +43,16 @@
       "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm."
     },
     {
+      "name": "checkpoint",
+      "source": "./mods/checkpoint",
+      "description": "One-click safety snapshots of your working tree (untracked files too) that never touch your branch, index or stash. /checkpoint, list, diff, restore, drop. Restore shows what would be lost and asks first."
+    },
+    {
+      "name": "data-guard",
+      "source": "./mods/data-guard",
+      "description": "Asks before a git commit or git add takes in large files, data files, personal-looking table columns or Jupyter notebooks with outputs. Only names are ever shown, never file contents."
+    },
+    {
       "name": "diagram",
       "source": "./mods/diagram",
       "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: run /diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
@@ -43,9 +63,19 @@
       "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only."
     },
     {
+      "name": "long-run-ping",
+      "source": "./mods/long-run-ping",
+      "description": "Pings you when a long model turn or a long Bash command ends, so you can look away: /long-run-ping [on|off|status|test]."
+    },
+    {
       "name": "moddeck",
       "source": "./mods/moddeck",
-      "description": "A side bar listing every mod and skill, one boxed row each: the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
+      "description": "A side bar listing every mod and skill, one boxed row each, topped by a live Session box (model, context, usage pace, cost, cache, git, tokens, activity, environment); the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
+    },
+    {
+      "name": "prompt-library",
+      "source": "./mods/prompt-library",
+      "description": "Keeps your saved prompts, per project: /prompts add, use, rename, remove. The moddeck side bar shows them."
     },
     {
       "name": "reflect",
@@ -56,6 +86,11 @@
       "name": "replay-theater",
       "source": "./mods/replay-theater",
       "description": "/replay steps through every file edit Claude made in the last turn (or the session), one diff at a time."
+    },
+    {
+      "name": "repro-log",
+      "source": "./mods/repro-log",
+      "description": "Keeps a reproducibility recipe for data work: the analysis commands that succeeded and the files you changed. /repro writes it to .moddeck/repro/ with git commit, versions, lock files, seeds and a runnable command list. Secrets are never written."
     },
     {
       "name": "review-cost",

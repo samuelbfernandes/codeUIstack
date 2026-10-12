@@ -27,13 +27,24 @@ ends with `Keep it warm next time: /keepwarm 90m` (once; shown as plain text, th
   no argument = status. None runs during a turn or onto an already cold cache; three failures stop it.
 - `onCold = stop` gives the older one-line stop (send the same text again to pay); `off` never stops.
 
+## Expiry clock and hit rate
+`/cache-tax` ends its last line with `Cache until 14:30 · hit 87%` (local time; `expired` once past; `unknown` when not
+known) once a turn has reported cache tokens; set `showCacheClock` off to drop it, `hourCycle24` off for `2:30 pm`.
+The same numbers are mirrored for other mods in the state atom `{ plugin: 'cache-tax', key: 'cache' }`:
+`{ expiresAt: number | null, hitRate: number | null }`. `expiresAt` is the last response (or keep-warm ping) plus the
+cache TTL, in `$.clock.now()` milliseconds; `hitRate` is cache-read / (cache-read + cache-written + uncached input)
+over the session, 0-100 with one decimal. Both are null before the first response and after `/clear`.
+**Why a clock time, not a countdown:** the screen does not repaint between turns, which is exactly when the cache
+drains, so a clock time stays correct however old the drawing is; a "58 min left" would be stale.
+
 ## Turn off
 `/plugin disable cache-tax`
 ## Settings (`/config`)
 `cacheTtlMinutes` (60; API-key sessions use 5 unless `promptCacheTtl` is changed), `minContextTokens` (20000),
-`minExtraUsd` (0.25), `onCold` (`ask`, `stop`, `off`).
+`minExtraUsd` (0.25), `onCold` (`ask`, `stop`, `off`), `showCacheClock` (true), `hourCycle24` (true).
 
 ## Limits
+- Clock times use the machine's local zone through JavaScript `Date`; the plugin API has no timezone call, so a sandbox without a zone shows UTC. A resumed session shows no expiry until its first response.
 - Prices are a built-in table (`hooks/lib.ts`), est. only; unknown models use Sonnet rates; the 1M-context surcharge is not modelled.
 - Hit ratio and last-turn figures start at zero in a resumed session and ignore subagents and keep-warm pings.
 - Keep-warm runs only while Claude Code is open and is not restored after a restart. Context size can be stale right after a compaction.

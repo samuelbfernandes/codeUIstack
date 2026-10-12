@@ -3,6 +3,7 @@ import { bestMove } from '../hooks/suggest'
 import type { On } from 'claude-code'
 
 import { dropWith } from '../hooks/reply'
+import { cacheClockLine, expiryAt, fmtClock, fmtExpiry, hitRate } from '../hooks/lib'
 
 const MIN = 60_000
 /** The one-line stop mode (the dialog is the default). */
@@ -22,6 +23,7 @@ type World = {
   asks: { question: string; options: string[]; header: string }[]
   answer: string
   filled: string[]
+  state: Map<string, unknown>
 }
 
 const usage = (read: number, creation: number) => ({
@@ -44,11 +46,14 @@ function world(on: On, tokens = 150_000): World {
     asks: [],
     answer: 'Send anyway',
     filled: [],
+    state: new Map(),
     tokens,
     forkResult: () => ({ isAnswered: true, text: 'ok', usage: usage(150_000, 0) }),
   }
   on('store.get', (_, e) => ({ value: w.store.get(e.key) }))
   on('store.set', (_, e) => (w.store.set(e.key, e.value), { value: undefined }))
+  on('state.get', (_, e) => ({ value: { value: w.state.get(`${e.plugin}.${e.key}`), version: w.state.has(`${e.plugin}.${e.key}`) ? 1 : 0 } as never }))
+  on('state.set', (_, e) => (w.state.set(`${e.plugin}.${e.key}`, e.value), { value: { isSet: true, version: 1 } as never }))
   on('session.id', () => ({ value: 'sid-1' }))
   on('session.model', () => {
     if (w.modelThrows) throw new Error('boom')
@@ -572,4 +577,122 @@ test('Start fresh puts /clear in the prompt box', async ($, on) => {
   w.answer = 'Start fresh'
   expect((await submit($, 'new task')).drop).toBe('cache-tax blocked your prompt · press Enter to run /clear, then send your message again')
   expect(w.filled).toEqual(['/clear'])
+})
+
+// ---- 0.6.0: cache expiry clock time and hit rate --------------------------------------------------
+
+type CacheMirror = { expiresAt: number | null; hitRate: number | null }
+/** The mirrored atom as the engine stored it; the untouched default is null/null. */
+const readCache = (w: World): CacheMirror =>
+  (w.state.get('cache-tax.cache') as CacheMirror | undefined) ?? { expiresAt: null, hitRate: null }
+const NO_USAGE_TURN = async ($: any, id: string) => {
+  await $.turn.start({ text: 'go', turnId: id })
+  await $.turn.complete({ answer: '', durationMs: 5, isAborted: true, turnId: id, reason: 'aborted' })
+}
+
+test('the cache atom is null before the first turn and after session.start', async ($, on) => {
+  const w = world(on)
+  await start($)
+  expect(readCache(w)).toEqual({ expiresAt: null, hitRate: null })
+  await turn($, 't1', 0, 1000)
+  expect(readCache(w).expiresAt).not.toBeNull()
+  await start($) // a new session.start resets the mirror
+  expect(readCache(w)).toEqual({ expiresAt: null, hitRate: null })
+})
+
+test('the cache atom after a turn: expiry = response time + ttl, hit rate over read+write+input', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 80_000, 0)
+  await w.clock.advance(MIN)
+  await turn($, 't2', 5_000, 95_000)
+  const now = w.clock.now()
+  // input 10 + 10, read 95000, written 85000: 95000 / 180020 = 52.77% -> 52.8
+  expect(readCache(w)).toEqual({ expiresAt: now + 60 * MIN, hitRate: 52.8 })
+})
+
+test('the expiry follows cacheTtlMinutes', { options: { cacheTtlMinutes: 5 } }, async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 1000)
+  expect(readCache(w).expiresAt).toBe(w.clock.now() + 5 * MIN)
+})
+
+test('an interrupted first turn without usage leaves the hit rate null and never throws', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await NO_USAGE_TURN($, 't1')
+  expect(readCache(w).hitRate).toBeNull()
+  await turn($, 't2', 0, 1000)
+  expect(readCache(w).hitRate).toBeGreaterThan(98)
+})
+
+test('a /clear resets the cache atom', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 1000)
+  await $.session.end({ reason: 'clear', sessionId: 'sid-1', resume: { id: 'sid-1' } as never })
+  expect(readCache(w)).toEqual({ expiresAt: null, hitRate: null })
+})
+
+test('/cache-tax shows "Cache until HH:MM" and the hit rate once cache tokens were counted', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 90_000)
+  const lines = (await slash($, 'cache-tax')).split('\n')
+  const at = fmtClock(readCache(w).expiresAt!, true)
+  expect(lines.length).toBeLessThanOrEqual(6)
+  expect(lines.at(-1)).toBe(`Estimates · Opus · 60 min cache · Cache until ${at} · hit 100%`)
+})
+
+test('showCacheClock off and hourCycle24 off', { options: { showCacheClock: false } }, async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 90_000)
+  expect(await slash($, 'cache-tax')).not.toContain('Cache until')
+  expect(readCache(w).expiresAt).not.toBeNull() // the mirror is unaffected
+})
+
+test('hourCycle24 off gives am/pm', { options: { hourCycle24: false } }, async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 90_000)
+  expect(await slash($, 'cache-tax')).toMatch(/Cache until \d{1,2}:\d{2} (am|pm) · hit/)
+})
+
+test('expired: the report line says expired once past', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 90_000)
+  await w.clock.advance(90 * MIN)
+  expect((await slash($, 'cache-tax')).split('\n').at(-1)).toContain('Cache expired · hit 100%')
+})
+
+test('hit rate math: zero denominators, rounding, decimals', async () => {
+  expect(hitRate(0, 0, 0)).toBeNull()
+  expect(hitRate(0, 0, 10)).toBe(0)
+  expect(hitRate(50, 0, 0)).toBe(100)
+  expect(hitRate(1, 1, 1)).toBe(33.3)
+  expect(hitRate(2, 1, 0)).toBe(66.7)
+  expect(hitRate(Number.NaN, 0, 0)).toBeNull()
+})
+
+test('clock formatting: expiry, past, null, 12 hour, bad input', async () => {
+  const noon = new Date(2026, 0, 5, 14, 30, 0).getTime() // local 14:30
+  const now = noon - MIN
+  expect(expiryAt(0, 60 * MIN)).toBeNull()
+  expect(expiryAt(1000, 0)).toBeNull()
+  expect(expiryAt(1000, 500)).toBe(1500)
+  expect(fmtClock(noon, true)).toBe('14:30')
+  expect(fmtClock(noon, false)).toBe('2:30 pm')
+  expect(fmtClock(new Date(2026, 0, 5, 0, 5).getTime(), false)).toBe('12:05 am')
+  expect(fmtClock(new Date(2026, 0, 5, 9, 5).getTime(), true)).toBe('09:05')
+  expect(fmtClock(Number.NaN)).toBe('unknown')
+  expect(fmtExpiry(noon, now)).toBe('14:30')
+  expect(fmtExpiry(noon, noon)).toBe('expired')
+  expect(fmtExpiry(null, now)).toBe('unknown')
+  expect(cacheClockLine(noon, 87, now)).toBe('Cache until 14:30 · hit 87%')
+  expect(cacheClockLine(noon, 87.5, now)).toBe('Cache until 14:30 · hit 87.5%')
+  expect(cacheClockLine(noon - 2 * MIN, null, now)).toBe('Cache expired')
+  expect(cacheClockLine(null, null, now)).toBe('Cache until unknown')
 })

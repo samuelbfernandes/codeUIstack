@@ -1,0 +1,45 @@
+{
+  "name": "long-run-ping",
+  "version": "0.1.0",
+  "description": "Pings you when a long model turn or a long Bash command ends, so you can look away: /long-run-ping [on|off|status|test].",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable long-run-ping",
+      "description": "Turn off to make the mod do nothing.",
+      "default": true
+    },
+    "afterSec": {
+      "type": "number",
+      "title": "Turn length that earns a ping (seconds)",
+      "description": "A model turn that takes longer than this gets a ping when it ends.",
+      "default": 60,
+      "min": 1,
+      "max": 86400
+    },
+    "commandSec": {
+      "type": "number",
+      "title": "Bash command length that earns a ping (seconds)",
+      "description": "A single Bash command that takes longer than this gets a ping when it ends.",
+      "default": 120,
+      "min": 1,
+      "max": 86400
+    },
+    "minGapSec": {
+      "type": "number",
+      "title": "Least time between pings (seconds)",
+      "description": "No second ping inside this time.",
+      "default": 30,
+      "min": 0,
+      "max": 86400
+    },
+    "sound": {
+      "type": "boolean",
+      "title": "Play a sound and send a notification",
+      "description": "On: a short sound and a terminal notification come with the toast. Off: the toast only.",
+      "default": true
+    }
+  }
+}

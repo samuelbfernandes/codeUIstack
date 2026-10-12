@@ -1,9 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import type { CacheTaxActivity, CacheTaxKeepwarm, CacheTaxTotals } from '../types'
+import type { CacheTaxActivity, CacheTaxCache, CacheTaxKeepwarm, CacheTaxTotals } from '../types'
 import {
   DEFAULT_KEEPWARM_MS,
+  cacheClockLine,
+  expiryAt,
+  hitRate,
   MAX_KEEPWARM_MS,
   coldUsd,
   fmtApprox,
@@ -26,7 +29,7 @@ import type { Move } from './suggest'
 
 type Dollar = EngineInterface
 /** The user's tunables, resolved once in register(). */
-type Cfg = { ttlMinutes: number; ttlMs: number; minTokens: number; minExtraUsd: number; onCold: 'ask' | 'stop' | 'off' }
+type Cfg = { ttlMinutes: number; ttlMs: number; minTokens: number; minExtraUsd: number; onCold: 'ask' | 'stop' | 'off'; showCacheClock: boolean; hourCycle24: boolean }
 
 const MINUTE = 60_000
 const MAX_STORED_SESSIONS = 50
@@ -38,8 +41,10 @@ const isBusy = atom({ plugin: 'cache-tax', key: 'isBusy' } as const, false)
 const held = atom({ plugin: 'cache-tax', key: 'held' } as const, null)
 const cold = atom({ plugin: 'cache-tax', key: 'cold' } as const, null)
 const paid = atom({ plugin: 'cache-tax', key: 'paid' } as const, { count: 0, usd: 0 })
-const NO_TOTALS: CacheTaxTotals = { read: 0, write: 0, lastTokens: 0, lastOut: 0 }
+const NO_TOTALS: CacheTaxTotals = { read: 0, write: 0, lastTokens: 0, lastOut: 0, input: 0 }
 const totals = atom({ plugin: 'cache-tax', key: 'totals' } as const, NO_TOTALS)
+const NO_CACHE: CacheTaxCache = { expiresAt: null, hitRate: null }
+const cacheAtom = atom({ plugin: 'cache-tax', key: 'cache' } as const, NO_CACHE)
 const hinted = atom({ plugin: 'cache-tax', key: 'hinted' } as const, false)
 const keepwarm = atom({ plugin: 'cache-tax', key: 'keepwarm' } as const, null)
 
@@ -218,7 +223,21 @@ async function recordUsage($: Dollar, usage: Usage | undefined): Promise<void> {
     write: t.write + usage.cache_creation_input_tokens,
     lastTokens: usage.input_tokens + usage.output_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens,
     lastOut: usage.output_tokens,
+    input: (t.input ?? 0) + usage.input_tokens,
   }))
+}
+
+/** Mirror the expiry clock time and session hit rate for display; observe-only, never throws. */
+async function publishCache(cfg: Cfg, $: Dollar, clear = false): Promise<void> {
+  await quietly(async () => {
+    if (clear) return void (await update($, cacheAtom, () => NO_CACHE))
+    const t = await read($, totals)
+    const next: CacheTaxCache = {
+      expiresAt: expiryAt(lastTouch(await read($, activity)), cfg.ttlMs),
+      hitRate: hitRate(t.read, t.write, t.input ?? 0),
+    }
+    await update($, cacheAtom, () => next)
+  })
 }
 
 /** A prompt passed after the TTL: price the write the turn actually made. */
@@ -277,6 +296,7 @@ async function recordPing(cfg: Cfg, $: Dollar, usage: Usage): Promise<void> {
   if (usage.cache_read_input_tokens + usage.cache_creation_input_tokens > 0) await touch($, { pingAt: now })
   const k = await read($, keepwarm)
   if (k) $.ui.status(statusLine(k, now))
+  await publishCache(cfg, $)
 }
 
 /** One keepalive: a cache-read fork, only while idle, never during a turn, never onto a cold cache. */
@@ -373,6 +393,20 @@ async function runKeepwarm(cfg: Cfg, $: Dollar, args: string): Promise<string> {
 
 // ---- /cache-tax ------------------------------------------------------------
 
+/**
+ * ' · Cache until 14:30 · hit 87%': only once a turn has reported cache tokens (no cache, no expiry to show),
+ * and only with showCacheClock on. Rides the last line so the report stays at six lines.
+ */
+async function clockSuffix(cfg: Cfg, $: Dollar, now: number, hit: number | null): Promise<string> {
+  try {
+    if (!cfg.showCacheClock || hit === null) return ''
+    const c = await read($, cacheAtom)
+    return ` · ${cacheClockLine(c.expiresAt, c.hitRate, now, cfg.hourCycle24)}`
+  } catch {
+    return ''
+  }
+}
+
 /** Headline first, then a few plain lines, then one dim line of estimates. */
 async function report(cfg: Cfg, $: Dollar): Promise<string> {
   const now = await $.clock.now()
@@ -401,7 +435,7 @@ async function report(cfg: Cfg, $: Dollar): Promise<string> {
     await keepwarmLine($),
     `Cold writes this session  ${total.count} · ${fmtApprox(total.usd)}` +
       ((await read($, held)) ? ' · on hold: send the same text again to continue' : ''),
-    `Estimates · ${label} · ${cfg.ttlMinutes} min cache`,
+    `Estimates · ${label} · ${cfg.ttlMinutes} min cache` + (await clockSuffix(cfg, $, now, hit)),
   ]
     .filter(line => line !== '')
     .join('\n')
@@ -418,6 +452,8 @@ export const register: Register = (on, options) => {
     minTokens: Number(options.minContextTokens ?? 20_000),
     minExtraUsd: Math.max(Number(options.minExtraUsd ?? 0.25) || 0, 0),
     onCold,
+    showCacheClock: options.showCacheClock !== false,
+    hourCycle24: options.hourCycle24 !== false,
   }
 
   // Fail-open: a cost guard must never block work. A throw before the verdict lets the prompt through.
@@ -454,6 +490,7 @@ export const register: Register = (on, options) => {
       await recordUsage($, e.usage)
       await ensureTimers(cfg, $)
     })
+    await publishCache(cfg, $)
     return next(e)
   })
 
@@ -473,6 +510,7 @@ export const register: Register = (on, options) => {
         immediate: true,
       }),
     )
+    await publishCache(cfg, $, true)
     await quietly(async () => {
       if ((await read($, activity)).at !== 0) return
       const all = ((await $.store.get('sessions')) ?? {}) as Record<string, CacheTaxActivity>
@@ -509,6 +547,7 @@ export const register: Register = (on, options) => {
         $.ui.status(undefined)
       }
     })
+    await publishCache(cfg, $, true)
     return next(e)
   })
 

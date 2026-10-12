@@ -57,6 +57,15 @@ For a folder a held command would delete, overwrite or change recursively, the d
 
 The level carries a coloured dot, since the dialog takes plain text only: 🔴 high, 🟠 medium, 🟢 low, and 🔴 unknown (a folder that could not be checked counts as red).
 
+## Changing the level while you work
+`/blast-radius` reports the current level; `/blast-radius off|low|medium|high` changes it, takes effect on the next command and is remembered across sessions. An unknown word changes nothing.
+- `off`: never ask (every Bash command runs, nothing is classified or measured)
+- `low`: ask for everything, even low risk
+- `medium`: ask from medium risk up (the default)
+- `high`: ask only for high risk (unknown always asks)
+
+The `askFrom` setting stays the default; a level you choose with the command overrides it. The choice is mirrored into the state value `{ plugin: 'blast-radius', key: 'level' }` (a string, `off`, `low`, `medium` or `high`), which other mods, such as the moddeck side bar, read with `$.state.get`.
+
 ## Limits
 - Read-only probes (`git`, `find`, `du`; no shell, no network), each with a timeout; a folder scan classifies at most 3,000 files ("sampled" is said) and stops at the first timeout. If a probe fails the command is still held and a **Not checked** row says why.
 - The folder rows are a name-based guess: it cannot know about Time Machine or other backups, what a sync service or a remote still holds, or whether a "build" folder really is disposable. "Pushed" is as of your last fetch. A mount point is only noticed when it sits inside the folder.
