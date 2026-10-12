@@ -1,0 +1,7 @@
+{
+  "name": "tool-skins",
+  "version": "0.3.0",
+  "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> (or typing skins / skin <theme>) switches live.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

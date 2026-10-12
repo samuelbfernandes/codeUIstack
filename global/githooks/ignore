@@ -1,0 +1,4 @@
+# Installed by this toolkit as git's global excludesFile: agent files are never tracked by accident.
+CLAUDE.md
+CLAUDE.local.md
+.claude/

@@ -1,0 +1,15 @@
+{
+  "name": "savvy-progress",
+  "version": "0.4.0",
+  "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "priceOverrides": {
+      "type": "string",
+      "title": "Price overrides (USD per million tokens)",
+      "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts.",
+      "default": ""
+    }
+  }
+}

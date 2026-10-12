@@ -1,0 +1,29 @@
+{
+  "name": "reflect",
+  "version": "0.3.1",
+  "description": "Turns your corrections (\"no, use pnpm\", \"never do X\") into rules you can save to CLAUDE.md with one click.",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Send prompts that look like corrections to a small model to propose a rule. /reflect on|off toggles it too.",
+      "default": true
+    },
+    "model": {
+      "type": "string",
+      "title": "Model",
+      "description": "Alias or id of the small model that reads those prompts (default haiku).",
+      "default": "haiku"
+    },
+    "includeLastReply": {
+      "type": "boolean",
+      "title": "Send last reply",
+      "description": "Also send the end of the assistant's previous message (up to 800 characters) as context for the correction.",
+      "default": true
+    }
+  }
+}

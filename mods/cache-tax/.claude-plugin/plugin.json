@@ -1,0 +1,39 @@
+{
+  "name": "cache-tax",
+  "version": "0.5.0",
+  "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm.",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "cacheTtlMinutes": {
+      "type": "number",
+      "title": "Prompt cache TTL (minutes)",
+      "description": "How long the prompt cache stays warm after the last model request. 60 for subscription sessions; API-key sessions use 5 unless Claude Code's promptCacheTtl is changed.",
+      "default": 60,
+      "min": 1,
+      "max": 1440
+    },
+    "minContextTokens": {
+      "type": "number",
+      "title": "Guard threshold (context tokens)",
+      "description": "Only stop a message when the estimated context is above this many tokens.",
+      "default": 20000,
+      "min": 0
+    },
+    "onCold": {
+      "type": "string",
+      "title": "When the cache is cold",
+      "description": "ask: one small dialog (Send anyway / Hold it). stop: stop the message and send the same text again to pay. off: never stop.",
+      "default": "ask"
+    },
+    "minExtraUsd": {
+      "type": "number",
+      "title": "Only stop above this extra cost (USD)",
+      "description": "A cold cache is only worth a question when it costs at least this much more than a warm one.",
+      "default": 0.25,
+      "min": 0
+    }
+  }
+}

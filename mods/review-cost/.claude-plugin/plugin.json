@@ -1,0 +1,45 @@
+{
+  "name": "review-cost",
+  "version": "0.3.0",
+  "description": "Before a git push triggers the automatic second-model review, shows its estimated token cost (green / amber / red) and lets you choose Review or Skip.",
+  "author": { "name": "Samuel Fernandes" },
+  "userConfig": {
+    "greenMaxTokens": {
+      "type": "number",
+      "title": "Green up to (tokens)",
+      "description": "Estimated reviews up to this many tokens are Green (small).",
+      "default": 25000
+    },
+    "redMinTokens": {
+      "type": "number",
+      "title": "Red from (tokens)",
+      "description": "Estimated reviews of at least this many tokens are Red (many); anything between is Amber.",
+      "default": 60000
+    },
+    "askWhen": {
+      "type": "string",
+      "title": "Ask when",
+      "description": "amber-red: green reviews only show a one-line note and go ahead; always: ask every time.",
+      "options": ["amber-red", "always"],
+      "default": "amber-red"
+    },
+    "inputUsdPerMTok": {
+      "type": "number",
+      "title": "Input USD per million tokens",
+      "description": "Optional. With the output price below, adds an API-equivalent dollar figure. 0 = show no dollars.",
+      "default": 0
+    },
+    "outputUsdPerMTok": {
+      "type": "number",
+      "title": "Output USD per million tokens",
+      "description": "Optional. See above. 0 = show no dollars.",
+      "default": 0
+    },
+    "coloredBanner": {
+      "type": "boolean",
+      "title": "Colored banner",
+      "description": "Draw the level line in green/amber/red above the question. Turn off if the dialog ever looks wrong; the level word is always in the text.",
+      "default": true
+    }
+  }
+}

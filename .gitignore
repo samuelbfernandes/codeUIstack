@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+# Node / TypeScript (mods are checked with tools run locally; nothing is committed from them)
+node_modules/
+# Types are written by Claude Code itself each time it loads a mod; they are not part of this repository
+**/claude-code.d.ts
+**/types/claude-code*.d.ts
+tsconfig*.json
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# Local agent files: never committed
+CLAUDE.md
+CLAUDE.local.md
+.claude/

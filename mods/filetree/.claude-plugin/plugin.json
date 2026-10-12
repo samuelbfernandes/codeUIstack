@@ -1,0 +1,33 @@
+{
+  "name": "filetree",
+  "version": "0.3.0",
+  "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "autoOpen": {
+      "type": "boolean",
+      "title": "Open automatically",
+      "description": "Open the pane at session start where the screen can dock it beside the chat (fullscreen terminal, desktop app) and there is room. Never reopens it after you close it; /filetree and typing tree still toggle it.",
+      "default": true
+    },
+    "maxDepth": {
+      "type": "number",
+      "title": "Maximum depth",
+      "description": "How many directory levels the tree scans below the working directory.",
+      "default": 4
+    },
+    "maxEntries": {
+      "type": "number",
+      "title": "Maximum entries",
+      "description": "The most files and folders the tree holds; the rest show as +N more.",
+      "default": 400
+    },
+    "extraIgnore": {
+      "type": "string",
+      "title": "Extra ignored names",
+      "description": "Comma-separated folder or file names to hide, besides .git, node_modules, target, renv, .Rproj.user, __pycache__, .venv, dist and build.",
+      "default": ""
+    }
+  }
+}

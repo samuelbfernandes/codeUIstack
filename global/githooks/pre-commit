@@ -1,0 +1,30 @@
+#!/bin/sh
+# Refuses to commit agent-instruction files (rule #2). AGENTS.md is fine: it is the committed canonical file.
+# Opt out for a repo that really tracks them:  git config --local toolkit.allowAgentFiles true
+# One-off:                                      ALLOW_AGENT_FILES=1 git commit ...
+. "$(dirname "$0")/_lib.sh"
+# Both profiles: never commit secrets by accident (.env files, private keys). Opt out: ALLOW_SECRET_FILES=1 or
+#   git config --local toolkit.allowSecretFiles true
+if [ "${ALLOW_SECRET_FILES:-}" != "1" ] && [ "$(git config --get toolkit.allowSecretFiles 2>/dev/null)" != "true" ]; then
+  secrets=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '(^|/)\.env($|\.[^/]*$)|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|\.(pem|p12|pfx)$|(^|/)credentials\.json$' | grep -vE '\.env\.(example|sample|template)$' || true)
+  if [ -n "$secrets" ]; then
+    fail "commit rejected: this looks like a secret file (keys, .env, credentials):"
+    printf '%s\n' "$secrets" | sed 's/^/    /' >&2
+    fail "Unstage with: git restore --staged <path>, add it to .gitignore, and rotate it if it was ever pushed."
+    exit 1
+  fi
+fi
+# "lab" profile only: agent-instruction files are never committed.
+if ! is_lab; then chain_repo_hook pre-commit "$@"; exit 0; fi
+if [ "${ALLOW_AGENT_FILES:-}" != "1" ] && [ "$(git config --get toolkit.allowAgentFiles 2>/dev/null)" != "true" ]; then
+  staged=$(git diff --cached --name-only --diff-filter=ACMR)
+  bad=$(printf '%s\n' "$staged" | grep -E '(^|/)CLAUDE\.md$|(^|/)\.claude/|(^|/)CLAUDE\.local\.md$' || true)
+  if [ -n "$bad" ]; then
+    fail "commit rejected: agent files must never be committed (CLAUDE.md, .claude/):"
+    printf '%s\n' "$bad" | sed 's/^/    /' >&2
+    fail "Unstage with: git restore --staged <path>   (and add them to .gitignore)."
+    exit 1
+  fi
+fi
+chain_repo_hook pre-commit "$@"
+exit 0

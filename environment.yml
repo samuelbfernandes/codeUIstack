@@ -1,0 +1,9 @@
+# Conda route:   conda env create -f environment.yml && conda activate codeuistack-installer && codeuistack --plan
+# The installer is a plain Python package with no dependencies; conda only provides Python and pip here.
+name: codeuistack-installer
+channels: [conda-forge]
+dependencies:
+  - python>=3.9
+  - pip
+  - pip:
+      - .

@@ -1,0 +1,38 @@
+{
+  "name": "branch-janitor",
+  "version": "0.4.0",
+  "description": "Watches your git branches by itself (nothing to type) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question.",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "minMinutes": {
+      "type": "number",
+      "title": "Minutes between looks",
+      "description": "Quiet looks (after Claude pulls, pushes or switches branch, or at session start) happen at most once per repository per this many minutes. A merge, a pull request merged, or any change to your branches always gets a look at once.",
+      "default": 30
+    },
+    "protectedBranches": {
+      "type": "string",
+      "multiple": true,
+      "title": "Protected branches",
+      "description": "Never offered for deletion; * matches any text. Leave empty for the built-in list: main, master, develop, dev, trunk, release/*, gh-pages. Setting any value replaces that list.",
+      "default": [
+        "main",
+        "master",
+        "develop",
+        "dev",
+        "trunk",
+        "release/*",
+        "gh-pages"
+      ]
+    },
+    "staleDays": {
+      "type": "number",
+      "title": "Quiet days to list as stale",
+      "description": "'branch-janitor' lists unmerged branches untouched for more than this many days (information only).",
+      "default": 60
+    }
+  }
+}

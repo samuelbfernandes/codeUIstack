@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "findings"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["pass", "fail", "unverifiable"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "status", "evidence", "source"],
+        "properties": {
+          "item": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASS", "FAIL", "UNVERIFIABLE"] },
+          "evidence": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      }
+    }
+  }
+}

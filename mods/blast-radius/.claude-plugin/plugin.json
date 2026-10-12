@@ -1,0 +1,20 @@
+{
+  "name": "blast-radius",
+  "version": "0.3.0",
+  "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system.",
+  "author": { "name": "Samuel Fernandes" },
+  "userConfig": {
+    "maxListed": {
+      "type": "number",
+      "title": "Rows to list",
+      "description": "Most files, commits or paths listed in the confirmation (the rest is counted as +N more).",
+      "default": 5
+    },
+    "extraPatterns": {
+      "type": "string",
+      "multiple": true,
+      "title": "Extra patterns",
+      "description": "Regular expressions; a Bash command matching any of them is held too (nothing is measured for these)."
+    }
+  }
+}

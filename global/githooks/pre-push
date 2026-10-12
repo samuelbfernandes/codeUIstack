@@ -1,0 +1,50 @@
+#!/bin/sh
+# Rule #3/#4 backstop: refuse force-pushes and branch deletions; run the project's test gate before pushing.
+#   Allow a deliberate force/delete once:   ALLOW_FORCE_PUSH=1 git push ...
+#   Turn the test gate off everywhere:      git config --global toolkit.prepushTests false
+#   Turn it off for one repo:               git config --local toolkit.prepushTests false
+. "$(dirname "$0")/_lib.sh"
+zero=0000000000000000000000000000000000000000
+refs=$(mktemp "${TMPDIR:-/tmp}/prepush.XXXXXX") || exit 0
+trap 'rm -f "$refs"' EXIT INT TERM
+cat > "$refs"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  if [ "${ALLOW_FORCE_PUSH:-}" != "1" ]; then
+    if [ "$local_sha" = "$zero" ]; then
+      fail "push rejected: deleting remote ref $remote_ref needs explicit authorization (ALLOW_FORCE_PUSH=1)."; exit 1
+    fi
+    if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null \
+       && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+      fail "push rejected: $local_ref is not a fast-forward of $remote_ref (a force-push). Needs explicit authorization (ALLOW_FORCE_PUSH=1)."; exit 1
+    fi
+  fi
+done < "$refs"
+gate=$(git config --get toolkit.prepushTests 2>/dev/null)
+if [ "$gate" != "false" ]; then
+  root=$(git rev-parse --show-toplevel)
+  if [ -f "$root/DESCRIPTION" ] && [ -d "$root/tests" ] && command -v Rscript >/dev/null 2>&1; then
+    printf '[toolkit] pre-push gate: devtools::test() ...\n' >&2
+    (cd "$root" && Rscript -e 'if (!requireNamespace("devtools", quietly=TRUE)) quit(status=0); res <- as.data.frame(devtools::test(reporter="silent")); if (any(res$failed > 0 | res$error)) quit(status=1)') \
+      || { fail "push rejected: devtools::test() failed. Fix it, or disable with: git config --local toolkit.prepushTests false"; exit 1; }
+  elif [ -f "$root/Cargo.toml" ] && [ ! -f "$root/DESCRIPTION" ] && command -v cargo >/dev/null 2>&1; then
+    printf '[toolkit] pre-push gate: cargo test ...\n' >&2
+    (cd "$root" && cargo test --quiet) \
+      || { fail "push rejected: cargo test failed. Fix it, or disable with: git config --local toolkit.prepushTests false"; exit 1; }
+  fi
+fi
+# Automatic second-model theory review (see theory-review.sh): once per push, only where theory paths changed.
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_ref" ] && continue
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" != "$zero" ] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    base=$(git merge-base "$remote_sha" "$local_sha" 2>/dev/null)
+  else
+    oldest=$(git rev-list --reverse "$local_sha" --not --remotes 2>/dev/null | head -n 1)
+    [ -z "$oldest" ] && continue
+    base=$(git rev-parse --verify -q "$oldest^" 2>/dev/null)
+  fi
+  "$(dirname "$0")/theory-review.sh" "$base" "$local_sha" || exit 1
+done < "$refs"
+chain_repo_hook pre-push "$@" < "$refs"
+exit 0

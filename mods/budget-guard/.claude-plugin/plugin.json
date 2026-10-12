@@ -1,0 +1,39 @@
+{
+  "name": "budget-guard",
+  "version": "0.1.0",
+  "description": "A quiet usage line above the prompt that appears only when cost, context or your plan window needs a look, and an optional spending limit that asks before the next prompt instead of refusing. Type usage for a short report.",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Track usage, show the line and apply the spending limit. Off: the mod does nothing at all.",
+      "default": true
+    },
+    "limitUsd": {
+      "type": "number",
+      "title": "Spending limit (USD per session)",
+      "description": "0 = no limit. When the session estimate reaches it, the next prompt you type asks once: continue (+50%), continue without a limit, or hold it. Tool calls in a running turn are never stopped. Typing budget 10 sets it for the current session only.",
+      "default": 0,
+      "min": 0,
+      "max": 1000000
+    },
+    "contextWarnPct": {
+      "type": "number",
+      "title": "Context warning (%)",
+      "description": "Show the usage line when the context window is at least this full.",
+      "default": 75,
+      "min": 10,
+      "max": 99
+    },
+    "showLine": {
+      "type": "boolean",
+      "title": "Usage line",
+      "description": "Show the quiet usage line above the prompt box (terminal and desktop). It stays hidden until something matters.",
+      "default": true
+    }
+  }
+}

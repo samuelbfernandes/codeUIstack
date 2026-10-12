@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "codeuistack"
+version = "0.4.1"
+description = "Safety and productivity mods for Claude Code, built for scientists."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Samuel Fernandes" }]
+keywords = ["claude-code", "science", "productivity", "git-hooks", "research"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+]
+dependencies = []   # standard library only, on purpose: nothing for the installer to fetch or to audit
+
+[project.urls]
+Homepage = "https://github.com/samuelbfernandes/codeUIstack"
+Issues = "https://github.com/samuelbfernandes/codeUIstack/issues"
+
+[project.scripts]
+codeuistack = "cctk.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cctk"]
+
+# The mods, rules and skills travel inside the wheel, so `pip install` gives exactly the bytes you can audit.
+[tool.hatch.build.targets.wheel.force-include]
+"mods" = "cctk/data/mods"
+"global" = "cctk/data/global"
+"skills" = "cctk/data/skills"
+"docs" = "cctk/data/docs"
+".claude-plugin" = "cctk/data/.claude-plugin"
+"identity.json" = "cctk/data/identity.json"
+"LICENSE" = "cctk/data/LICENSE"
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/mods", "/global", "/skills", "/docs", "/.claude-plugin", "/tests", "/scripts", "/identity.json", "/LICENSE", "/README.md", "/SECURITY.md", "/CHANGELOG.md"]

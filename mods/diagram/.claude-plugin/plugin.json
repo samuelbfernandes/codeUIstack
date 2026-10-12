@@ -1,0 +1,15 @@
+{
+  "name": "diagram",
+  "version": "0.1.0",
+  "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: type diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "hint": {
+      "type": "boolean",
+      "title": "Hint after an answer with a diagram",
+      "description": "After an answer that contains a mermaid diagram, show one short line (at most once per turn) saying you can type diagram to see it.",
+      "default": true
+    }
+  }
+}

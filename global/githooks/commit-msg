@@ -1,0 +1,19 @@
+#!/bin/sh
+# Rejects AI/assistant attribution in commit messages (non-negotiable rule #1).
+# Human co-authors are fine; only AI names and tool footers are refused.
+. "$(dirname "$0")/_lib.sh"
+msg_file="$1"
+# Only the "lab" profile forbids AI attribution; the neutral student profile leaves commit messages alone.
+if ! is_lab; then chain_repo_hook commit-msg "$@"; exit 0; fi
+# Strip comment lines the way git does, then scan.
+body=$(grep -v '^#' "$msg_file")
+bad=$(printf '%s\n' "$body" | grep -inE \
+  'co-authored-by:.*(claude|anthropic|codex|openai|chatgpt|gpt-?[0-9]|copilot|gemini|cursor|aider|devin|windsurf|(^|[^a-z])bot([^a-z]|$)|(^|[^a-z])ai([^a-z]|$))|generated (with|by) .*(claude|codex|gpt|copilot|gemini|cursor|(^|[^a-z])ai([^a-z]|$))|noreply@anthropic\.com|^claude-session:|claude\.ai/code|🤖' || true)
+if [ -n "$bad" ]; then
+  fail "commit rejected: AI/assistant attribution is not allowed in commit messages."
+  printf '%s\n' "$bad" | sed 's/^/    line /' >&2
+  fail "Remove those lines and commit again. Do not use --no-verify."
+  exit 1
+fi
+chain_repo_hook commit-msg "$@"
+exit 0

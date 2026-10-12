@@ -1,0 +1,23 @@
+{
+  "name": "aside",
+  "version": "0.1.0",
+  "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable /aside",
+      "description": "Turn off to make /aside and the word aside do nothing (no side question is ever sent).",
+      "default": true
+    },
+    "maxAnswerChars": {
+      "type": "number",
+      "title": "Longest answer kept (characters)",
+      "description": "An answer longer than this is cut and says so.",
+      "default": 4000,
+      "min": 200,
+      "max": 20000
+    }
+  }
+}

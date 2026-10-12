@@ -1,0 +1,81 @@
+{
+  "name": "codeuistack",
+  "owner": {
+    "name": "Samuel Fernandes"
+  },
+  "metadata": {
+    "description": "Safety and productivity mods for Claude Code, built for scientists."
+  },
+  "plugins": [
+    {
+      "name": "aside",
+      "source": "./mods/aside",
+      "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation."
+    },
+    {
+      "name": "blast-radius",
+      "source": "./mods/blast-radius",
+      "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system."
+    },
+    {
+      "name": "branch-janitor",
+      "source": "./mods/branch-janitor",
+      "description": "Watches your git branches by itself (nothing to type) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question."
+    },
+    {
+      "name": "budget-guard",
+      "source": "./mods/budget-guard",
+      "description": "A quiet usage line above the prompt that appears only when cost, context or your plan window needs a look, and an optional spending limit that asks before the next prompt instead of refusing. Type usage for a short report."
+    },
+    {
+      "name": "cache-tax",
+      "source": "./mods/cache-tax",
+      "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm."
+    },
+    {
+      "name": "diagram",
+      "source": "./mods/diagram",
+      "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: type diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
+    },
+    {
+      "name": "filetree",
+      "source": "./mods/filetree",
+      "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only."
+    },
+    {
+      "name": "model-fit",
+      "source": "./mods/model-fit",
+      "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
+    },
+    {
+      "name": "reflect",
+      "source": "./mods/reflect",
+      "description": "Turns your corrections (\"no, use pnpm\", \"never do X\") into rules you can save to CLAUDE.md with one click."
+    },
+    {
+      "name": "replay-theater",
+      "source": "./mods/replay-theater",
+      "description": "/replay (or just typing replay) steps through every file edit Claude made in the last turn (or the session), one diff at a time."
+    },
+    {
+      "name": "review-cost",
+      "source": "./mods/review-cost",
+      "description": "Before a git push triggers the automatic second-model review, shows its estimated token cost (green / amber / red) and lets you choose Review or Skip."
+    },
+    {
+      "name": "savvy-progress",
+      "source": "./mods/savvy-progress",
+      "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts."
+    },
+    {
+      "name": "secret-guard",
+      "source": "./mods/secret-guard",
+      "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent."
+    },
+    {
+      "name": "tool-skins",
+      "source": "./mods/tool-skins",
+      "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> (or typing skins / skin <theme>) switches live."
+    }
+  ]
+}

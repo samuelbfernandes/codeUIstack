@@ -1,0 +1,69 @@
+{
+  "name": "model-fit",
+  "version": "0.3.3",
+  "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost.",
+  "author": {
+    "name": "Samuel Fernandes"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Check every prompt and block with a dialog when the current model looks wrong for it. /model-fit on|off (or typing model-fit on|off) toggles it too.",
+      "default": true
+    },
+    "minConfidence": {
+      "type": "number",
+      "title": "Minimum confidence",
+      "description": "How sure the local rules must be (0.5 to 0.95) before a mismatch blocks the prompt and opens a dialog. Fixed: dismissing dialogs never raises it.",
+      "default": 0.6,
+      "min": 0.5,
+      "max": 0.95
+    },
+    "askOnStandard": {
+      "type": "boolean",
+      "title": "Also ask for ordinary tasks",
+      "description": "Off by default: an ordinary task (not light, not deep) on a borderline or roomy model only gets a status-line hint. On: those also block and open the dialog.",
+      "default": false
+    },
+    "onDismiss": {
+      "type": "string",
+      "title": "When the dialog is dismissed (Esc)",
+      "description": "hold (default): the prompt is NOT sent; it is shown back so you can resend it and pick an option. send: the prompt is sent as typed.",
+      "default": "hold"
+    },
+    "minWords": {
+      "type": "number",
+      "title": "Minimum words",
+      "description": "Shorter prompts are ignored unless they match a strong rule.",
+      "default": 3,
+      "min": 1,
+      "max": 50
+    },
+    "useClassifier": {
+      "type": "boolean",
+      "title": "Use a small model for unclear prompts",
+      "description": "Off by default (no token cost). When on, a prompt the local rules cannot place is sent to the haiku model once to pick light, standard or deep.",
+      "default": false
+    },
+    "statusLine": {
+      "type": "boolean",
+      "title": "Status line",
+      "description": "Show a one-line, non-blocking verdict after each checked prompt, for example \"model-fit: Opus fits\" or \"model-fit: overkill, Haiku would do (~5x cheaper)\".",
+      "default": true
+    },
+    "showButton": {
+      "type": "boolean",
+      "title": "On/off button",
+      "description": "Show a small ON/OFF button in the band above the prompt box (terminal and desktop) that turns model-fit on or off. It never replaces another band.",
+      "default": true
+    },
+    "costRatios": {
+      "type": "string",
+      "title": "Relative model costs",
+      "description": "A ROUGH ratio of list prices, comma separated, for example haiku=1,sonnet=3,opus=5 (fable=8 is optional). It goes stale when prices change: edit it. Used only to pick the cheapest model predicted to be good enough. Bad pieces are ignored.",
+      "default": "haiku=1,sonnet=3,opus=5"
+    }
+  }
+}
