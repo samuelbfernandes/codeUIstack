@@ -1,6 +1,6 @@
 # filetree
 
-Install (Claude Code 2.1.287 or later): `/plugin install filetree --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install filetree --marketplace samuelbfernandes/moddeck`
 The project's file tree in a pane beside the chat, lit up as Claude works. Read-only: it never writes a file
 and never runs a git command that writes.
 
@@ -8,8 +8,7 @@ and never runs a git command that writes.
 - It opens by itself at session start (setting `autoOpen`, default on) where the screen can dock a pane: the
   fullscreen terminal (`/tui fullscreen`, at least 144 columns) or the desktop app. Elsewhere it does nothing and
   says nothing. It opens once per session: after you close it, it stays closed.
-- Toggle it any time: type `filetree`, `file tree` or `tree` alone (any case, optional final `.`), or `/filetree`.
-  The typed words are handled locally, never sent to the model, no tokens. A sentence containing them is a normal prompt.
+- Toggle it any time with `/filetree`. It runs locally, never sent to the model, no tokens.
   The reply is one line (`Filetree · open`, `Filetree · closed`); a second dim line appears only when it needs one.
 - It lists the working directory, 4 levels deep, at most 400 entries, folders collapsed (press a folder to open it).
   Hidden: `.git`, `node_modules`, `target`, `renv`, `.Rproj.user`, `__pycache__`, `.venv`, `dist`, `build`.
@@ -35,5 +34,5 @@ has no room for an unasked pane); a pane you open yourself with `/filetree` or `
   a gitignored or discarded file turns green too. Outside a git repository nothing turns green.
 - Not verified in a live session: **auto-open** (tests use a mocked engine: whether the real engine docks the pane at
   session start, and the inline close on the main screen), the 500 ms shimmer and 5 s poll timers, how the dock
-  scrolls 400 rows, the colours in the desktop app, and typing `tree` in the real prompt box. Not run on Windows.
+  scrolls 400 rows, the colours in the desktop app, and `/filetree` in the real prompt box. Not run on Windows.
 - Symbolic links are listed, never followed. Directories at the depth limit show `(not scanned)`.

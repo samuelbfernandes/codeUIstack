@@ -36,8 +36,10 @@ declare module 'claude-code' {
       turns: BudgetTurn[]
       /** When the running main-loop turn began, ms; null between turns. */
       turnStart: number | null
-      /** The limit set by `budget N` for this session; null = use the setting. */
+      /** The plan-window limit (percent used) set by `/budget-guard N` for this session; null = use the setting. */
       limit: number | null
+      /** The dollar limit set by `/budget-guard $N` for this session; null = use the setting. */
+      limitUsd: number | null
       snap: BudgetSnap
     }
   }

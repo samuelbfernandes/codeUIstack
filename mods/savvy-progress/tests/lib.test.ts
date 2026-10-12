@@ -5,6 +5,8 @@ import {
   addStep,
   applyTaskTool,
   countTool,
+  isStalled,
+  stallMsOf,
   indentOf,
   progressBar,
   taskText,
@@ -157,7 +159,20 @@ test('tree: children sit under their parent, orphans and parent loops are still 
 })
 
 test('tree lines carry elapsed time and tool count; countTool never invents a row', () => {
-  const rows = countTool(countTool([row('a', { since: null, busyMs: 65_000, status: 'finished' })], 'a'), 'a')
+  const rows = countTool(countTool([row('a', { since: null, busyMs: 65_000, status: 'finished' })], 'a', 0), 'a', 0)
   expect(countTool(rows, 'nobody')).toHaveLength(1)
   expect(treeLines(rows, 99_999)).toEqual(['✓ a · finished · 1m05s · 2 tools'])
+})
+
+test('stall detection: only a running helper that has been silent for the setting counts; 0 turns it off', () => {
+  const min = 60_000
+  const quiet = row('a', { status: 'running', startedAt: 0, lastAt: 0 })
+  expect(stallMsOf(undefined)).toBe(5 * min)
+  expect(stallMsOf(0)).toBe(0)
+  expect(stallMsOf(2)).toBe(2 * min)
+  expect(isStalled(quiet, 4 * min, 5 * min)).toBe(false)
+  expect(isStalled(quiet, 5 * min, 5 * min)).toBe(true)
+  expect(isStalled(quiet, 99 * min, 0)).toBe(false)
+  expect(isStalled({ ...quiet, status: 'finished' }, 99 * min, 5 * min)).toBe(false)
+  expect(isStalled({ ...quiet, lastAt: 4 * min }, 6 * min, 5 * min)).toBe(false) // a request or tool call resets the clock
 })

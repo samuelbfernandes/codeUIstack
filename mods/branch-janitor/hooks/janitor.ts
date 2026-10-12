@@ -177,7 +177,7 @@ export async function cleanNow(d: Deps, cwd: string): Promise<string> {
     if (!scanned) return UNREADABLE
     const res = await withOpenPrs(d, root, scanned)
     const offers = res.verdicts.filter(v => v.status === 'offer')
-    if (offers.length === 0) return ['Branches · nothing to delete right now', 'Type branch-janitor to see why each branch stays.'].join('\n')
+    if (offers.length === 0) return ['Branches · nothing to delete right now', 'Run /branch-janitor to see why each branch stays.'].join('\n')
     const out = await offer(d, res, offers, { auto: false })
     return out.text || 'Branches · nothing deleted'
   } finally {
@@ -185,7 +185,7 @@ export async function cleanNow(d: Deps, cwd: string): Promise<string> {
   }
 }
 
-/** The slash command and its plain-word twins: `arg` is '' (list), `clean`, `on`, `off`; anything else is the usage text. */
+/** The slash command: `arg` is '' (list), `clean`, `on`, `off`; anything else is the usage text. */
 export async function runCommand(d: Deps, cwd: string, arg: string): Promise<string> {
   if (arg === '') return report(d, cwd)
   if (arg === 'clean') return cleanNow(d, cwd)
@@ -198,10 +198,10 @@ const UNREADABLE = "Branches · couldn't read this repository (is git installed?
 
 const USAGE = [
   'Branches · commands',
-  'branch-janitor · list branches, delete nothing',
-  'branch-janitor clean · review and delete finished ones',
-  'branch-janitor off · stop looking here',
-  'branch-janitor on · look again',
+  '/branch-janitor · list branches, delete nothing',
+  '/branch-janitor clean · review and delete finished ones',
+  '/branch-janitor off · stop looking here',
+  '/branch-janitor on · look again',
 ].join('\n')
 
 /** `/branch-janitor`: the full table, no questions, no deletion. */

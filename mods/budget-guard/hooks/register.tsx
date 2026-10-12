@@ -1,37 +1,40 @@
 // budget-guard: a quiet usage line and a spending limit that asks instead of refusing.
 //
-//  - The band above the prompt is HIDDEN until something matters (session cost near the limit, a full
-//    context window, a plan window near its cap). Then it shows "Session ~$1.20 of $5 · context 78% !".
-//  - With a limit set, the NEXT prompt the person types after the estimate reaches it opens one dialog:
-//    continue (+50%), continue without a limit, or hold. It never touches tool calls in a running turn
-//    and never stops a scheduled, queued or plugin prompt.
-//  - The plain words `usage`, `budget` and `budget-guard` print a short report; `budget 10` sets the
-//    limit for this session. All of it is local: no model call, no network, zero tokens.
+//  - The band above the prompt is HIDDEN until something matters (a full context window, a plan window
+//    near its cap or your limit). Then it shows "Session ~$1.20 · context 78% ! · 5h window 82/100 · limit 80 !".
+//  - The limit is in plan points (percent of a plan window used, out of 100). With a limit set, the NEXT
+//    prompt the person types once ANY plan window is at or above it opens one dialog: continue (+10 points),
+//    continue without a limit, or hold. It never touches tool calls in a running turn and never stops a
+//    scheduled, queued or plugin prompt. With no plan window reported (API-key use), a dollar limit
+//    (`limitUsd`, `/budget-guard $10`) on the session cost estimate does the same job, with continue (+50%).
+//  - `/budget-guard` prints a short report; `/budget-guard 80` sets the limit for this session (`0` or
+//    `off` removes it). All of it is local: no model call, no network, zero tokens.
 //
 // FAIL OPEN everywhere: if reading the usage, the state or the dialog throws, the prompt goes through
-// exactly as typed. The only deliberate drops are a plain word answered here and a prompt the person
-// chose to hold (Esc or "Hold it").
+// exactly as typed. The only deliberate drop is a prompt the person chose to hold (Esc or "Hold it").
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { EMPTY_SNAP, EMPTY_TALLY, addTurn, addUsage, bandParts, buildReport, costOf, fmtLimit, fmtUsd, parseWord, raisedLimit } from './lib'
+import { EMPTY_SNAP, EMPTY_TALLY, addTurn, addUsage, bandParts, buildReport, costOf, fmtLimit, fmtReset, fmtUsd, fmtUsdLimit, fmtUsed, overLimit, parseArgs, raisedLimit, raisedUsd, usdReached, windowLabel } from './lib'
 import type { Level, TokenCounts, Word } from './lib'
 import { dropWith } from './reply'
-import { plainWord } from './words'
 import type { BudgetSnap } from '../types'
 
 type Dollar = EngineInterface
-type Cfg = { isEnabled: boolean; limitUsd: number; contextWarnPct: number; showLine: boolean }
+type Cfg = { isEnabled: boolean; limitPct: number; limitUsd: number; contextWarnPct: number; showLine: boolean }
 
 const tally = atom({ plugin: 'budget-guard', key: 'tally' } as const, EMPTY_TALLY)
 const turns = atom({ plugin: 'budget-guard', key: 'turns' } as const, [])
 const turnStart = atom({ plugin: 'budget-guard', key: 'turnStart' } as const, null)
 const limit = atom({ plugin: 'budget-guard', key: 'limit' } as const, null)
+const limitUsdAtom = atom({ plugin: 'budget-guard', key: 'limitUsd' } as const, null)
 const snapshot = atom({ plugin: 'budget-guard', key: 'snap' } as const, EMPTY_SNAP)
 
 const COLOUR: Record<Level, 'warning' | 'error' | undefined> = { ok: undefined, warn: 'warning', error: 'error' }
 
-const CONTINUE_MORE = 'Continue (+50%)'
+const MORE_POINTS = 'Continue (+10 points)'
+const MORE_USD = 'Continue (+50%)'
+const MORE_BOTH = 'Continue (+10 points / +50%)'
 const CONTINUE_FREE = 'Continue without limit'
 const HOLD = 'Hold it'
 
@@ -41,6 +44,7 @@ const numberOf = (v: unknown, fallback: number, lo: number, hi: number): number 
 export function readConfig(o: Readonly<Record<string, unknown>>): Cfg {
   return {
     isEnabled: o.enabled !== false,
+    limitPct: numberOf(o.limitPct, 0, 0, 100),
     limitUsd: numberOf(o.limitUsd, 0, 0, 1_000_000),
     contextWarnPct: numberOf(o.contextWarnPct, 75, 10, 99),
     showLine: o.showLine !== false,
@@ -74,7 +78,8 @@ function toSnap(r: Reading): BudgetSnap {
   }
 }
 
-const effectiveLimit = async ($: Dollar, cfg: Cfg): Promise<number> => (await read($, limit)) ?? cfg.limitUsd
+const effectiveLimit = async ($: Dollar, cfg: Cfg): Promise<number> => (await read($, limit)) ?? cfg.limitPct
+const effectiveUsd = async ($: Dollar, cfg: Cfg): Promise<number> => (await read($, limitUsdAtom)) ?? cfg.limitUsd
 
 /** A fresh reading, also stored so the band and the report see it. Undefined when the engine has none. */
 async function refresh($: Dollar): Promise<BudgetSnap | undefined> {
@@ -93,18 +98,30 @@ async function report($: Dollar, cfg: Cfg): Promise<string> {
     snap,
     tally: await read($, tally),
     turns: await read($, turns),
-    limitUsd: await effectiveLimit($, cfg),
+    limitPct: await effectiveLimit($, cfg),
+    limitUsd: await effectiveUsd($, cfg),
     now: await $.clock.now(),
   })
 }
 
-async function setLimit($: Dollar, usd: number): Promise<string> {
-  await update($, limit, () => usd)
-  return usd === 0 ? 'budget-guard · no limit for this session' : `budget-guard · limit ${fmtLimit(usd)} for this session`
+async function setLimit($: Dollar, pct: number): Promise<string> {
+  await update($, limit, () => pct)
+  if (pct === 0) {
+    await update($, limitUsdAtom, () => 0) // 0 or off clears both limits
+    return 'budget-guard · no limit for this session'
+  }
+  const snap = (await refresh($)) ?? (await read($, snapshot))
+  const idle = snap.windows.length === 0 ? '\nNo plan window is reported (API-key use), so this limit cannot be enforced; use a dollar limit like /budget-guard $10.' : ''
+  return `budget-guard · limit ${fmtLimit(pct)}/100 for this session${idle}`
+}
+
+async function setUsd($: Dollar, usd: number): Promise<string> {
+  await update($, limitUsdAtom, () => usd)
+  return usd === 0 ? 'budget-guard · no dollar limit for this session' : `budget-guard · limit ${fmtUsdLimit(usd)} for this session`
 }
 
 async function run($: Dollar, cfg: Cfg, word: Word): Promise<string> {
-  return word.kind === 'set' ? setLimit($, word.usd) : report($, cfg)
+  return word.kind === 'set' ? setLimit($, word.pct) : word.kind === 'setUsd' ? setUsd($, word.usd) : report($, cfg)
 }
 
 // -------------------------------------------------------------------------------- the guard
@@ -113,34 +130,36 @@ async function run($: Dollar, cfg: Cfg, word: Word): Promise<string> {
 const isGuarded = (e: { text: string; origin: { kind: string }; turnId?: string }): boolean =>
   (e.origin.kind === 'composer' || e.origin.kind === 'bridge') && e.turnId === undefined && e.text.trim() !== '' && !e.text.trimStart().startsWith('/')
 
-/** The session cost now, as a number: the engine's ledger, else the token estimate. */
-async function spentNow($: Dollar): Promise<number> {
-  const snap = (await refresh($)) ?? (await read($, snapshot))
-  return costOf(snap, await read($, tally)).usd
-}
-
-/** Asks once if the limit is reached; returns a drop when the person holds the prompt, else undefined. */
+/** Asks once if a plan window is at or above the percent limit OR the cost is at or above the dollar limit; returns a drop when the person holds the prompt, else undefined. */
 async function guard($: Dollar, cfg: Cfg, text: string): Promise<{ drop: string } | undefined> {
-  const max = await effectiveLimit($, cfg)
-  if (max <= 0) return undefined
-  const spent = await spentNow($)
-  if (spent < max) return undefined
+  const maxPct = await effectiveLimit($, cfg)
+  const maxUsd = await effectiveUsd($, cfg)
+  if (maxPct <= 0 && maxUsd <= 0) return undefined
+  const snap = (await refresh($)) ?? (await read($, snapshot))
+  const hit = overLimit(snap.windows, maxPct)
+  const spent = costOf(snap, await read($, tally)).usd
+  const usdHit = usdReached(spent, maxUsd)
+  if (hit === undefined && !usdHit) return undefined
 
+  const reset = hit === undefined ? undefined : fmtReset(hit.resetsAt, await $.clock.now())
+  const win = hit === undefined ? '' : `${windowLabel(hit.kind)} is at ${fmtUsed(hit.pct)}${reset === undefined ? '' : ` (resets in ${reset})`}, at or above your limit of ${fmtLimit(maxPct)}`
+  const cost = `${hit === undefined ? 'Session cost' : 'session cost'} is ~${fmtUsd(spent)}, at or above your limit of ${fmtUsdLimit(maxUsd)}`
+  const question = `${win}${hit !== undefined && usdHit ? ', and ' : ''}${usdHit ? cost : ''}. Continue?`
+  const more = hit !== undefined && usdHit ? MORE_BOTH : usdHit ? MORE_USD : MORE_POINTS
   let answer: string
   try {
-    answer = await $.ui.ask(`Session ~${fmtUsd(spent)} has reached your ${fmtLimit(max)} limit. Continue?`, {
-      options: [CONTINUE_MORE, CONTINUE_FREE, HOLD],
-      header: 'Budget',
-    })
+    answer = await $.ui.ask(question, { options: [more, CONTINUE_FREE, HOLD], header: 'Budget' })
   } catch {
     answer = HOLD // Esc or an interrupt: nothing is sent
   }
-  if (answer === CONTINUE_MORE) {
-    await update($, limit, () => raisedLimit(max, spent))
+  if (answer === more) {
+    if (hit !== undefined) await update($, limit, () => raisedLimit(maxPct))
+    if (usdHit) await update($, limitUsdAtom, () => raisedUsd(maxUsd))
     return undefined
   }
   if (answer === CONTINUE_FREE) {
     await update($, limit, () => 0)
+    await update($, limitUsdAtom, () => 0)
     return undefined
   }
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
@@ -166,7 +185,7 @@ export const register: Register = (on, options) => {
     if (cfg.isEnabled) {
       await refresh($)
       await quietly(() =>
-        $.command.register({ name: 'budget-guard', description: 'Usage report, or budget <usd> to set this session\'s limit (or just type usage)', argumentHint: '[usd]' }),
+        $.command.register({ name: 'budget-guard', description: 'Usage report, or a limit for this session: 0-100 plan points, or $10 dollars; 0 or off clears both', argumentHint: '[0-100|$usd|off]' }),
       )
     }
     return next(e)
@@ -179,6 +198,7 @@ export const register: Register = (on, options) => {
         await update($, tally, () => EMPTY_TALLY)
         await update($, turns, () => [])
         await update($, limit, () => null)
+        await update($, limitUsdAtom, () => null)
         await update($, snapshot, () => EMPTY_SNAP)
       })
     }
@@ -208,8 +228,7 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'budget-guard' }, async ($, e) => {
     if (!cfg.isEnabled) return { text: 'budget-guard · disabled\nThe enabled setting is false. Change it in /config.' }
-    const word = parseWord(e.args.trim() === '' ? 'budget' : `budget ${e.args.trim().toLowerCase()}`)
-    return { text: await run($, cfg, word ?? { kind: 'report' }) }
+    return { text: await run($, cfg, parseArgs(e.args)) }
   }).catch(() => ({ text: 'budget-guard · that did not work, nothing changed' }))
 
   // The band: its own small tree like every other band here, hidden until something matters, and it
@@ -218,7 +237,8 @@ export const register: Register = (on, options) => {
     if (!cfg.isEnabled || !cfg.showLine || e.props.hasSurvey) return next(e)
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     const parts = bandParts(await read($, snapshot), await read($, tally), {
-      limitUsd: await effectiveLimit($, cfg),
+      limitPct: await effectiveLimit($, cfg),
+      limitUsd: await effectiveUsd($, cfg),
       contextWarnPct: cfg.contextWarnPct,
     })
     if (parts === undefined) return next(e)
@@ -235,15 +255,9 @@ export const register: Register = (on, options) => {
     return below === undefined ? row : <Box key="budget-guard-band" flexDirection="column">{row}{below as never}</Box>
   }).catch(($, e, next) => next(e))
 
-  // Exactly one `next` per path. A plain word is answered here and dropped (never sent to the model).
+  // Exactly one `next` per path. Only a held prompt is dropped; typed words like `usage` are ordinary prompts.
   on('prompt.submit', async ($, e, next) => {
     if (!cfg.isEnabled) return next(e)
-    const word = plainWord(e)
-    const command = word === undefined ? undefined : parseWord(word)
-    if (command !== undefined) {
-      const reply = await run($, cfg, command).catch(() => 'budget-guard · that did not work, nothing changed')
-      return dropWith(note => $.ui.log(note), reply)
-    }
     if (isGuarded(e)) {
       const stop = await guard($, cfg, e.text).catch(() => undefined) // fail open
       if (stop !== undefined) return stop

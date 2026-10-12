@@ -9,8 +9,6 @@ import type { Elements, EngineInterface, Register, RenderPropsOf } from 'claude-
 import { diffCardOf, displayName, elapsedMs, formatMs, lookOf, summarize } from './rows'
 import { DEFAULT_THEME, THEME_NAMES, isThemeName, matchTheme, paletteOf, titleOf } from './themes'
 import type { Palette, ThemeName } from './themes'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 const themeAtom = atom({ plugin: 'tool-skins', key: 'theme' } as const, DEFAULT_THEME as string)
 const STORE_KEY = 'theme'
@@ -67,11 +65,11 @@ function diffCard(t: Table, p: Palette, card: NonNullable<ReturnType<typeof diff
 /** The headline for a theme, as a person reads it. */
 const headline = (name: string): string => `Skin · ${isThemeName(name) ? titleOf(name) : name}`
 
-/** The names as they are typed, the current one marked. */
+/** The theme names, the current one marked. */
 const choices = (current: string): string => THEME_NAMES.map(n => (n === current ? `● ${n}` : n)).join(' · ')
 
 function listing(current: string): string {
-  return `${headline(current)}\n${choices(current)}\nType skin followed by a name to switch.`
+  return `${headline(current)}\n${choices(current)}\nRun /skin followed by a name to switch.`
 }
 
 /** What `/skin <args>` does: list, or switch to a theme; the reply is one text. */
@@ -89,14 +87,6 @@ async function runSkin($: EngineInterface, args: string): Promise<{ text: string
   return { text: headline(name) }
 }
 
-/** The `/skin` argument a plain word stands for: '' for `skins`, a theme name for `skin <theme>`, else undefined. */
-function skinArgs(word: string | undefined): string | undefined {
-  if (word === 'skins') return ''
-  const theme = word?.startsWith('skin ') ? word.slice(5) : undefined
-
-  return theme !== undefined && isThemeName(theme) ? theme : undefined
-}
-
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     // Fail-open: a store that cannot be read leaves the default skin.
@@ -104,26 +94,14 @@ export const register: Register = on => {
     if (isThemeName(saved)) await update($, themeAtom, () => saved)
     await $.command.register({
       name: 'skin',
-      description: 'Change the colour theme of tool rows (typing skins or skin <theme> does the same)',
+      description: 'Change the colour theme of tool rows',
       argumentHint: '[theme]',
     })
     return next(e)
   })
 
-  // Answers its own command and reads no `next`: a failure only skips /skin.
-  on('command.run', { command: 'skin' }, ($, e) => runSkin($, e.args))
-
-  // Plain words, dropped so they never reach the model: `skins` lists, `skin <theme>` switches. The theme must be
-  // spelled exactly as listed (the slash command's loose prefix matching stays slash-only). Anything else, including
-  // `skin` alone or a sentence containing the word, passes on. A store that fails still drops, with a short notice.
-  on('prompt.submit', async ($, e, next) => {
-    const args = skinArgs(plainWord(e))
-    if (args === undefined) return next(e)
-
-    const reply = await runSkin($, args).catch(() => ({ text: 'Skin · could not change it' }))
-
-    return dropWith({ log: text => $.ui.log(text) }, reply.text)
-  }).catch(($, e, next) => next(e))
+  // Answers its own command and reads no `next`: a failure only skips /skin, with a short notice.
+  on('command.run', { command: 'skin' }, ($, e) => runSkin($, e.args)).catch(() => ({ text: 'Skin · could not change it' }))
 
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)

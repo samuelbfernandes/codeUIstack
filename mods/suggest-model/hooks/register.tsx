@@ -12,10 +12,9 @@
 // simply awaits the question; the person may take minutes at no cost.
 //
 // FAIL OPEN for everything except the question itself: an error in the predictor, state, switch,
-// spawn or Codex sends the prompt exactly as typed. The deliberate drops are: a prompt that is exactly
-// a suggest-model plain word (handled here), a prompt sent to a subagent the person asked for, and a prompt
+// spawn or Codex sends the prompt exactly as typed. The deliberate drops are: a prompt sent to a subagent the person asked for, and a prompt
 // HELD because the person dismissed the dialog (Esc) with `onDismiss` = hold, the default. A held
-// prompt is echoed back in full so nothing typed is lost; `suggest-model off` ends any trap.
+// prompt is echoed back in full so nothing typed is lost; `/suggest-model off` ends any trap.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
@@ -28,7 +27,7 @@ import { cheaperBy, judge, nameOf, parseCosts, ratingTable, recommend, statusTex
 import type { Costs, Fit } from './fit'
 import { canRunAlone, familyOf, pushHistory, snippet } from './gate'
 import type { Alias, Family } from './gate'
-import { isNotATask, plainWord } from './input'
+import { isNotATask } from './input'
 import { TIER_WORD, isStrong, predict, wordCount } from './predict'
 import type { Prediction } from './predict'
 import type { SuggestModelEntry } from '../types'
@@ -37,7 +36,7 @@ type Dollar = EngineInterface
 
 const seen = atom({ plugin: 'suggest-model', key: 'seen' } as const, 0)
 const isMuted = atom({ plugin: 'suggest-model', key: 'isMuted' } as const, false)
-/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the toolbox side bar so it redraws when ANY path flips it. */
+/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the moddeck side bar so it redraws when ANY path flips it. */
 const isOff = atom({ plugin: 'suggest-model', key: 'isOff' } as const, false)
 const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
 const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
@@ -113,9 +112,9 @@ async function tally($: Dollar, kind: 'a' | 'd'): Promise<void> {
   })
 }
 
-const OFF_STATUS = 'suggest-model: off · type suggest-model on'
+const OFF_STATUS = 'suggest-model: off · type /suggest-model on'
 
-/** The one place the switch changes, for the toolbox side bar, the plain words and /suggest-model alike. */
+/** The one place the switch changes, for the moddeck side bar and /suggest-model alike. */
 async function setSwitch($: Dollar, cfg: Cfg, off: boolean): Promise<void> {
   if (off) {
     await $.store.set('off', true)
@@ -251,7 +250,7 @@ async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, c
 /** After Esc: a one-line reason (the drop box); the prompt text goes to the transcript so nothing typed is lost. */
 export function heldMessage(text: string): string {
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
-  return ['suggest-model blocked your prompt · nothing was sent. Send it again to choose, or type suggest-model off.', shown].join('\n')
+  return ['suggest-model blocked your prompt · nothing was sent. Send it again to choose, or type /suggest-model off.', shown].join('\n')
 }
 
 async function act($: Dollar, cfg: Cfg, choice: Choice, text: string, alias: Alias | undefined): Promise<Outcome> {
@@ -304,7 +303,7 @@ function verdictText(fit: Fit, current: Family | undefined): string {
 }
 
 async function explain($: Dollar, text: string, cfg: Cfg): Promise<string> {
-  if (text.trim() === '') return 'Usage: suggest-model explain <text to test>'
+  if (text.trim() === '') return 'Usage: /suggest-model explain <text to test>'
   const p = predict(text)
   const current = familyOf((await quietly(() => $.session.model())) ?? '')
   const fit = judge(p, current, cfg.minConfidence, cfg.costs, cfg.askOnStandard)
@@ -332,10 +331,10 @@ async function status($: Dollar, cfg: Cfg): Promise<string> {
     `suggest-model · ${on ? 'on' : 'off'} · ${model === undefined ? 'unrecognised model' : nameOf(model)}`,
     on
       ? `Blocks and asks on a mismatch (confidence ≥ ${cfg.minConfidence.toFixed(2)})${cfg.askOnStandard ? ', ordinary tasks too' : ''}. Esc ${cfg.onDismiss === 'hold' ? 'holds the prompt' : 'sends it'}.`
-      : 'Not checking prompts. Type suggest-model on to resume.',
+      : 'Not checking prompts. Type /suggest-model on to resume.',
     `${costs} (rough, set in costRatios)`,
     total === 0 ? 'No answers yet' : `${c.accepted} accepted · ${c.dismissed} dismissed`,
-    ...((await read($, isMuted)) ? ['Questions muted this session. Type suggest-model on to lift it.'] : []),
+    ...((await read($, isMuted)) ? ['Questions muted this session. Type /suggest-model on to lift it.'] : []),
     ...(cfg.costProblems.length > 0 ? [`Ignored in costRatios: ${cfg.costProblems.join(', ')}.`] : []),
     ...(rows.length > 0 ? ['Recent', ...rows.map(r => `  ${r}`)] : []),
   ].join('\n')
@@ -347,14 +346,14 @@ async function runCommand($: Dollar, args: string, cfg: Cfg): Promise<string> {
   if (arg === 'explain') return explain($, rest.join(' '), cfg)
   if (arg === 'off') {
     await setSwitch($, cfg, true)
-    return 'suggest-model · off\nNo prompt is checked. Type suggest-model on to resume.'
+    return 'suggest-model · off\nNo prompt is checked. Type /suggest-model on to resume.'
   }
   if (arg === 'on') {
     if (!cfg.isEnabled) return 'suggest-model · disabled\nThe enabled setting is false. Change it in /config.'
     await setSwitch($, cfg, false)
   }
   const text = await status($, cfg)
-  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: suggest-model · suggest-model on · suggest-model off · suggest-model explain <text>`
+  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: /suggest-model · /suggest-model on · /suggest-model off · /suggest-model explain <text>`
 }
 
 // --------------------------------------------------------------------- register
@@ -371,7 +370,7 @@ export const register: Register = (on, options) => {
     await quietly(() =>
       $.command.register({
         name: 'suggest-model',
-        description: 'Suggest model: status, on, off, or explain <text> (or just type suggest-model)',
+        description: 'Suggest model: status, on, off, or explain <text>',
         argumentHint: 'status|on|off|explain <text>',
       }),
     )
@@ -383,13 +382,8 @@ export const register: Register = (on, options) => {
   }))
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started
-  // (the current model must not also answer), or for a plain-word command handled right here.
+  // (the current model must not also answer).
   on('prompt.submit', async ($, e, next) => {
-    const word = PERSON.has(e.origin.kind) ? plainWord(e.text) : undefined
-    if (word !== undefined) {
-      const reply = await runCommand($, word === 'status' ? '' : word, cfg).catch(() => 'suggest-model · that did not work, nothing changed')
-      return dropWith(note => $.ui.log(note), reply)
-    }
     const out = await review($, e, cfg).catch((): Outcome => PASS)
     if (out.kind === 'drop') return dropWith(note => $.ui.log(note), out.reason)
     return next(out.kind === 'context' ? { ...e, context: [...(e.context ?? []), ...out.context] } : e)

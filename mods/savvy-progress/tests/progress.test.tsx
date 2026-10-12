@@ -163,7 +163,7 @@ for (const surface of SURFACES) {
   })
 }
 
-test('/agents-info tree prints the nested list; the plain words give one line and are dropped', async ($, on) => {
+test('/agents-info tree prints the nested list', async ($, on) => {
   const clock = mock.clock(on, { now: 1_000 })
   mock.store(on)
   engineBeneath(on)
@@ -174,21 +174,12 @@ test('/agents-info tree prints the nested list; the plain words give one line an
 
   const slash = await $.command.run({ command: 'agents-info', args: 'tree', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
   expect(slash.text).toBe('▶ parent · running · 3s · 0 tools\n└ ▶ child · running · 3s · 1 tool')
-
-  for (const word of ['agents tree', 'Agents-Info Tree.']) {
-    const out = await $.prompt.submit({ text: word, origin: { kind: 'composer' }, wait: false } as never)
-    expect(out.text).toBeUndefined()
-    expect(out.drop).toBe('▶ parent · running · 3s · 0 tools | └ ▶ child · running · 3s · 1 tool')
-    expect(out.drop).not.toContain('\n')
-  }
-  const sentence = await $.prompt.submit({ text: 'agents tree please', origin: { kind: 'composer' }, wait: false } as never)
-  expect(sentence.drop).toBeUndefined()
 })
 
 test('/agents-info tree with no helpers says so', async ($, on) => {
   mock.clock(on)
   mock.store(on)
   engineBeneath(on)
-  const out = await $.prompt.submit({ text: 'agents tree', origin: { kind: 'composer' }, wait: false } as never)
-  expect(out.drop).toBe('No subagents have run in this session.')
+  const out = await $.command.run({ command: 'agents-info', args: 'tree', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
+  expect(out.text).toBe('No subagents have run in this session.')
 })

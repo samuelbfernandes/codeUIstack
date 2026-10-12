@@ -1,6 +1,6 @@
 # review-cost
 
-Install (Claude Code 2.1.287 or later): `/plugin install review-cost --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install review-cost --marketplace samuelbfernandes/moddeck`
 
 The toolkit's git pre-push hook runs an automatic second-model review (Codex by default) of your pushed
 diff. This mod shows the **estimated token cost first** and lets you choose **Review** or **Skip**. The level

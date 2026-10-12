@@ -6,7 +6,7 @@ in a few minutes.
 ## 1. Look before you run
 
 ```
-codeuistack install --plan
+moddeck install --plan
 ```
 
 prints every file it would edit, every setting it would add, every git setting it would change and every `claude`
@@ -36,14 +36,14 @@ command it would run, then stops. Nothing is changed. (From a checkout: `sh inst
   (`src/cctk/proc.py`) as an argument list with a timeout.
 - **No reading of your code, keys or history.** It reads only the files it edits, and the git settings it changes.
 - **No telemetry** of its own.
-- **No silent changes.** With `--yes` it uses the defaults you can see with `codeuistack list`; without it, it asks and
+- **No silent changes.** With `--yes` it uses the defaults you can see with `moddeck list`; without it, it asks and
   shows the plan before applying.
 
 ## 4. Check that what you run is what is published
 
 - The installer is about 1,300 lines of Python in `src/cctk/`, the git guards about 330 lines of shell in `global/githooks/`.
   Both are short enough to read in an afternoon.
-- The wheel (`pip`, `pipx`, `uvx`) contains the same `mods/`, `global/` and `skills/` as the repository. `codeuistack verify`
+- The wheel (`pip`, `pipx`, `uvx`) contains the same `mods/`, `global/` and `skills/` as the repository. `moddeck verify`
   compares your installed copy to the package and lists any changed, missing or extra file.
 - Each release publishes `SHA256SUMS` for its files; build your own with `scripts/release.sh` and compare.
 - Install a **tagged version**, not the moving `main` branch (`@v0.1.0` in the commands in `docs/INSTALL.md`).

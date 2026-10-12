@@ -1,6 +1,6 @@
 # suggest-model
 
-Install (Claude Code 2.1.287 or later): `/plugin install suggest-model --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install suggest-model --marketplace samuelbfernandes/moddeck`
 
 Checks every prompt you type and tells you when your current model looks wrong for it, and which model to use instead. Nothing changes unless you pick it.
 
@@ -24,12 +24,12 @@ Opus is the cheapest model that should handle it. Costlier and slower.
 Options: Keep Sonnet · Switch session to Opus · Run this task as a subagent on Opus · Keep and don't suggest again.
 
 ## Use
-The on/off switch is in the toolbox side bar (green `suggest on`, red `suggest off`; click it to flip). It is the same switch as the words below and is remembered across sessions.
+The on/off switch is in the moddeck side bar (green `suggest on`, red `suggest off`; click it to flip). It is the same switch as `/suggest-model on|off` and is remembered across sessions.
 
-Type `suggest-model` (status and last 5 checks), `suggest-model off`, `suggest-model on`. Only that exact text is handled; a prompt that merely mentions it goes to the model. `/suggest-model [status|on|off|explain <text>]` also works; `explain` is a free dry run that prints the cues, the per-model ratings, costs and what it would do.
+`/suggest-model [status|on|off|explain <text>]`: status with the last 5 checks, the switch, and `explain` (a free dry run that prints the cues, the per-model ratings, costs and what it would do).
 
 ## Turn off
-`suggest-model off`, `enabled` = false in `/config`, or `/plugin disable suggest-model`.
+`/suggest-model off`, `enabled` = false in `/config`, or `/plugin disable suggest-model`.
 
 ## Settings
 `minConfidence` (0.6; a mismatch needs at least this much confidence to block), `askOnStandard` (false), `onDismiss` (`hold` or `send`), `minWords` (3; shorter prompts are ignored unless a strong rule matches), `statusLine` (true), `enabled`, `useClassifier` (false; when on, an unplaced prompt is sent once to haiku, which costs a small call). `costRatios` (`haiku=1,sonnet=3,opus=5`, `fable=` optional) is a rough ratio of list prices; it goes stale, so edit it. Bad pieces are ignored.

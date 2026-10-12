@@ -1,11 +1,14 @@
 # Changelog
 
 ## [0.4.1] - unreleased
-- New mod **toolbox**: a side bar with every mod and skill. Switches (green on, red off) flip at once, a dropdown picks the skin, other items fill the prompt box. aside's and suggest-model's on/off moved there from the band above the prompt (suggest-model no longer draws anything above it); reflect now mirrors its switch so the side bar can show it.
+- New mod **moddeck**: a side bar with every mod and skill. Switches for suggest, reflect and secret-guard (green on, red off) flip at once, a dropdown picks the skin, other items fill the prompt box. aside's and suggest-model's on/off moved there from the band above the prompt (suggest-model no longer draws anything above it); reflect now mirrors its switch so the side bar can show it. The skills list scrolls on its own (▲ up / ▼ down, one row at a time, `skillRows` setting, default four) once there are more skills than fit.
 - blast-radius: the risk level carries a coloured dot (🔴 high and unknown, 🟠 medium, 🟢 low).
 - blast-radius: new `askFrom` setting (low, medium, high). The default, medium, runs low-risk commands without a dialog; unknown and unchecked commands always ask.
 - cache-tax: the cold-cache dialog suggests the cheapest way forward (compact, start fresh, or send) and can put /compact or /clear in the prompt box.
-- Renamed the mod model-fit to suggest-model (plugin id, command, plain words `suggest-model` / `suggest model`, settings key). Reinstall with `codeuistack install`.
+- Renamed the mod model-fit to suggest-model (plugin id, command, plain words `suggest-model` / `suggest model`, settings key). Reinstall with `moddeck install`.
+- Commands now always start with `/`: the typed plain words are gone from every mod (a bare word is an ordinary prompt). The moddeck rows run or fill the same `/commands`; a tool with a single task is just its row, and options show under their row (suggest-model only while its switch is on).
+- budget-guard: the limit is in plan-window terms (used/total), `/budget-guard 80` (setting `limitPct`), and in dollars for API-key use, `/budget-guard $10` (setting `limitUsd`). The dialog fires on either.
+- savvy-progress: a finished helper's bar is full, a failed or stopped one's stays where it stopped. A running helper that reports nothing for `stallMinutes` (default 5) shows as stalled with its Stop button and one toast.
 - aside: a green/red on/off chip above the prompt (click it), plus `aside on` / `aside off` and `/aside on|off`; the choice is remembered.
 - `install --standard` and `install --all`: one-line, no-questions installs (the recommended set, or every mod, rule, skill and git guard). suggest-model: the green/red chip is itself the button; the separate Turn on/off button is gone.
 - `update` now switches on, at their default, any item added since the install being updated.

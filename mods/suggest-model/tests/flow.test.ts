@@ -567,7 +567,7 @@ test('explain on fable lists Fable in the table', async ($, on) => {
 
 test('/suggest-model with an unknown word shows status plus usage', async ($, on) => {
   world(on)
-  expect(await command($, 'banana')).toContain('Try: suggest-model')
+  expect(await command($, 'banana')).toContain('Try: /suggest-model')
 })
 
 // -------------------------------------------------------------------------- fail-open
@@ -759,24 +759,16 @@ test('garbage in the cost setting is ignored and the defaults apply', { options:
   expect(w.asks[0]!.question).toContain('Haiku 1x weak · Sonnet 3x weak · Opus 5x best')
 })
 
-// ----------------------------------------------------------------------- plain words
+// ------------------------------------------------------------------- typed words need the slash
 
-test('plain words are handled locally and dropped: suggest-model, suggest model, on, off (exact only)', async ($, on) => {
+test('a bare typed suggest-model word is not a command: it is reviewed like any prompt and the switch is unchanged', async ($, on) => {
   const w = world(on)
-  for (const word of ['suggest-model', 'suggest-model', '  Suggest-Model.  ']) {
-    const out = await submit($, word)
-    expect(out).toEqual({ drop: 'suggest-model · on · Sonnet' })
-  }
-  const off = await submit($, 'suggest-model off')
-  expect(off).toEqual({ drop: 'suggest-model · off' })
+  const words = ['suggest-model', 'suggest model', 'suggest-model off', 'Suggest-Model on.']
+  for (const t of words) expect(await submit($, t), t).toEqual({ text: t })
+  expect(w.arrived.map(x => x.text)).toEqual(words)
+  expect(await command($, '')).toContain('suggest-model · on')
   await submit($, DEEP)
-  expect(w.asks).toEqual([])
-  expect(w.statuses.at(-1)).toContain('suggest-model: off') // turning it off replaces the verdict with an OFF notice
-  const back = await submit($, 'suggest-model on')
-  expect(back).toEqual({ drop: 'suggest-model · on · Sonnet' })
-  await submit($, DEEP)
-  expect(w.asks).toHaveLength(1)
-  expect(w.arrived.map(x => x.text)).toEqual([DEEP, DEEP]) // no plain word ever reached the model
+  expect(w.asks).toHaveLength(1) // still on
 })
 
 test('a prompt that merely contains the keyword is untouched and goes to the model', async ($, on) => {
@@ -789,17 +781,9 @@ test('a prompt that merely contains the keyword is untouched and goes to the mod
   expect(w.arrived.map(x => x.text)).toEqual(prompts)
 })
 
-test('plain words work from the phone bridge but not from plugin-originated prompts', async ($, on) => {
-  const w = world(on)
-  expect(await submit($, 'suggest-model', { kind: 'bridge' })).toEqual({ drop: 'suggest-model · on · Sonnet' })
-  const out = await submit($, 'suggest-model', { kind: 'plugin', name: 'other' })
-  expect(out.text).toBe('suggest-model')
-  expect(w.arrived).toHaveLength(1)
-})
-
-test('plain word "suggest-model on" respects enabled = false', { options: { enabled: false } }, async ($, on) => {
+test('/suggest-model on respects enabled = false', { options: { enabled: false } }, async ($, on) => {
   world(on)
-  expect(await submit($, 'suggest-model on')).toEqual({ drop: 'suggest-model · disabled' })
+  expect(await command($, 'on')).toContain('suggest-model · disabled')
 })
 
 test('the slash command still works with the same functions', async ($, on) => {
@@ -836,9 +820,7 @@ test('a failing status line never blocks the prompt or the dialog', async ($, on
   expect(w.arrived).toHaveLength(1)
 })
 
-test('a failing plain-word command still drops with a plain message and never reaches the model', async ($, on) => {
-  const w = world(on, { breaks: new Set(['storeSet']) })
-  const out = await submit($, 'suggest-model off')
-  expect(out).toEqual({ drop: 'suggest-model · that did not work, nothing changed' })
-  expect(w.arrived).toEqual([])
+test('a failing /suggest-model off says nothing changed', async ($, on) => {
+  world(on, { breaks: new Set(['storeSet']) })
+  expect(await command($, 'off')).toBe('suggest-model · that did not work, nothing changed')
 })

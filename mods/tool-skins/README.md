@@ -1,6 +1,6 @@
 # tool-skins
 
-Install (Claude Code 2.1.287 or later): `/plugin install tool-skins --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install tool-skins --marketplace samuelbfernandes/moddeck`
 
 Restyles what Claude Code draws for tool calls, live, in seven themes: `noir`, `tokyo-night`,
 `dracula`, `catppuccin` (Mocha), `gruvbox` (dark), `nord`, `solarized-dark`.
@@ -13,13 +13,10 @@ Restyles what Claude Code draws for tool calls, live, in seven themes: `noir`, `
   only thing it stores is your theme name in `$.store`.
 
 ## Commands
-    /skin              list themes, mark the current one      (or just type: skins)
-    /skin dracula      switch now; also tokyonight, sol, any unique prefix   (or type: skin dracula)
+    /skin              list themes, mark the current one
+    /skin dracula      switch now; also tokyonight, sol, any unique prefix
 Replies are short: `Skin · Dracula`; the list adds the theme names and one hint line, as a dim note.
 
-Plain words need no `/`: typing `skins` or `skin <theme>` alone (any case, optional final `.`) does the same,
-is handled locally, never reaches the model and costs no tokens. In the plain form the theme must be spelled
-exactly as listed; `skin` alone, `skin sol` or a sentence containing the word is an ordinary message.
 The choice persists across sessions and is applied at `session.start`. Default is `noir`.
 
 Turn off: `/plugin disable tool-skins` restores the engine's own drawing.
@@ -33,7 +30,7 @@ Turn off: `/plugin disable tool-skins` restores the engine's own drawing.
 - Timing appears only where the tool's result carries one (WebFetch, Grep, Agent...); Bash, Read and
   Edit show none, since the mod does not wrap `tool.call` to time them.
 - Collapsed tool groups (`Read 3 files, ran 2 commands`) are the engine's; only their expanded rows are skinned.
-- The `/skin` reply is a normal command output, so the model can read it; the plain words are dropped and it cannot.
+- The `/skin` reply is a normal command output, so the model can read it.
 - Not verified in a live session: how the icon glyphs align in your font, how the desktop app paints these
-  rows, and the plain words (tested with the engine's test kit only). The kit tests trees, not pixels.
+  rows (tested with the engine's test kit only). The kit tests trees, not pixels.
 - Name: `claude-skins` is rejected by the validator (reserved `claude-` prefix), hence `tool-skins`.

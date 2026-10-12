@@ -23,7 +23,6 @@ import type { Usage } from './lib'
 import { dropWith } from './reply'
 import { bestMove } from './suggest'
 import type { Move } from './suggest'
-import { plainWord } from './words'
 
 type Dollar = EngineInterface
 /** The user's tunables, resolved once in register(). */
@@ -422,12 +421,7 @@ export const register: Register = (on, options) => {
   }
 
   // Fail-open: a cost guard must never block work. A throw before the verdict lets the prompt through.
-  // The plain word `cache-tax` is answered first (read-only, free) and dropped, so it never reaches the model and
-  // is never held by the guard. `keepwarm` has no plain word: its pings cost tokens, so it stays /keepwarm.
   on('prompt.submit', async ($, e, next) => {
-    if (plainWord(e) === 'cache-tax') {
-      return dropWith(note => $.ui.log(note), await report(cfg, $).catch(() => "Couldn't read the cache state"))
-    }
     if (isGuarded(e)) {
       await ensureTimers(cfg, $)
       const stop = await guard(cfg, $, e.text)
@@ -475,7 +469,7 @@ export const register: Register = (on, options) => {
     await quietly(() =>
       $.command.register({
         name: 'cache-tax',
-        description: 'Show whether the cache is warm and what the next message costs (typing cache-tax does the same)',
+        description: 'Show whether the cache is warm and what the next message costs',
         immediate: true,
       }),
     )

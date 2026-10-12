@@ -219,12 +219,26 @@ export function newRow(id: string, init: Partial<AgentRow>, now: number): AgentR
     steps: 0,
     ...(init.parentId ? { parentId: init.parentId } : {}),
     tools: 0,
+    lastAt: now,
   }
 }
 
 /** Counts one tool call of the agent's own loop. Unknown agents are not created here (forks carry ids no list names). */
-export function countTool(rows: readonly AgentRow[], id: string): AgentRow[] {
-  return rows.map(r => (r.id === id ? { ...r, tools: (r.tools ?? 0) + 1 } : r))
+export function countTool(rows: readonly AgentRow[], id: string, now: number): AgentRow[] {
+  return rows.map(r => (r.id === id ? { ...r, tools: (r.tools ?? 0) + 1, lastAt: now, stallNoted: false } : r))
+}
+
+/** How long a running helper may say nothing before it counts as stalled (the `stallMinutes` setting; 0 turns it off). */
+export const DEFAULT_STALL_MINUTES = 5
+
+export function stallMsOf(value: unknown): number {
+  const n = typeof value === 'number' && Number.isFinite(value) ? value : DEFAULT_STALL_MINUTES
+  return Math.min(24 * 60, Math.max(0, n)) * 60_000
+}
+
+/** A running helper that has reported nothing for `stallMs` (0 = never). The engine's own status is not consulted: this is only silence. */
+export function isStalled(r: AgentRow, now: number, stallMs: number): boolean {
+  return stallMs > 0 && r.status === 'running' && now - (r.lastAt ?? r.startedAt) >= stallMs
 }
 
 /** Applies `fn` to the row `id`, creating it from `init` first when unknown; drops old rows past the cap. */
@@ -236,7 +250,8 @@ export function touch(
   fn: (r: AgentRow) => AgentRow,
 ): AgentRow[] {
   const found = rows.some(r => r.id === id)
-  const next = found ? rows.map(r => (r.id === id ? fn(r) : r)) : [...rows, fn(newRow(id, init, now))]
+  const stamp = (r: AgentRow): AgentRow => ({ ...r, lastAt: now, stallNoted: false })
+  const next = found ? rows.map(r => (r.id === id ? stamp(fn(r)) : r)) : [...rows, stamp(fn(newRow(id, init, now)))]
   if (next.length <= MAX_ROWS) return next
   const drop = next.findIndex(r => r.status !== 'running' && r.id !== id)
   return drop < 0 ? next : next.filter((_, i) => i !== drop)

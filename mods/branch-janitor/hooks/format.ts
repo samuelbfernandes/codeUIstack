@@ -1,12 +1,12 @@
 // Every sentence the person reads: the confirmation dialog, toasts, and the branch-janitor report.
 // Calm and short: a one-line headline, then a few plain lines. Quiet symbols (✓ ✗ · →), no banners, and
-// nothing relies on colour. A reply sent back as a `prompt.submit` drop starts with its headline (see reply.ts).
+// nothing relies on colour.
 import type { Verdict } from './decide'
 import { restoreCommand } from './remove'
 import { prSection } from './prs'
 import type { ScanResult } from './scan'
 
-export const UNDO_OFF = 'Turn it on again: branch-janitor on'
+export const UNDO_OFF = 'Turn it on again: /branch-janitor on'
 export const LOCAL_ONLY = 'Local branches only. Remote copies are asked separately.'
 
 const branches = (n: number) => `${n} branch${n === 1 ? '' : 'es'}`

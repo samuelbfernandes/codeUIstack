@@ -1,4 +1,4 @@
-# Working rules (codeuistack, neutral profile)
+# Working rules (moddeck, neutral profile)
 
 If the project has an `AGENTS.md` or `README`, read it first: it is that project's source of truth.
 

@@ -235,9 +235,9 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-// ---- plain word `replay` and the turn hint (v0.2.0) -------------------------------------------
+// ---- the turn hint (v0.2.0) -------------------------------------------
 
-const HINT = '3 files changed · type replay to review'
+const HINT = '3 files changed · /replay to review'
 const MIN = 60_000
 
 /** `bottom` plus what the hint needs: a clock, the surfaces a person looks at, and the toasts shown. */
@@ -317,71 +317,24 @@ test('a failing toast never touches the turn', WITH_PROBE, async ($, on) => {
   expect((await probe($)).ready).toEqual({ turn: 1, edits: 4, files: 3 })
 })
 
-test('typing replay with nothing recorded says so, opens no pane and is dropped', WITH_PROBE, async ($, on) => {
-  hintWorld(on)
-  const out = await submitTyped($, 'replay')
-  expect(out.drop).toBe('Replay · nothing to show yet')
-  expect(out.text).toBeUndefined()
-  expect((await probe($)).view).toBeNull()
-})
-
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`typing replay opens the pane on the last turn like /replay, and clears the band (${surface})`, WITH_PROBE, async ($, on) => {
-    hintWorld(on)
-    await bigTurn($, 't1', THREE)
-    expect((await probe($)).ready).not.toBeNull()
-
-    for (const word of ['replay', ' Replay. ']) {
-      const out = await submitTyped($, word)
-      expect(out.drop).toBe('Replay · 4 edits in the last turn')
-      expect(out.text).toBeUndefined()
-      expect((await probe($)).view).toMatchObject({ scope: 'turn', i: 0 })
-    }
-    expect((await probe($)).ready).toBeNull() // the existing "band goes on the next prompt" still holds
-    const ui = await $.ui.mount({
-      plugin: 'replay-theater',
-      surface,
-      component: 'Pane',
-      requestId: 'replay-theater',
-      props: { title: 'Replay Theater', isFocused: true, bodyColumns: 100, placement: 'inline', scroll: { offset: 0, bodyRows: 20 }, view: {} },
-    })
-    expect(await ui.find({ text: '1 of 4' })).toBeDefined()
-    await ui.unmount()
-  })
-}
-
-test('only the exact word replay is taken; `replay all`, sentences, other senders and attachments pass', WITH_PROBE, async ($, on) => {
+test('/replay opens the pane on the last turn and /replay all on the session', WITH_PROBE, async ($, on) => {
   hintWorld(on)
   await bigTurn($, 't1', THREE)
-  for (const text of ['replay all', 'replay it', 'please replay', 'replays', '/replay']) {
+  const run = (args: string) => $.command.run({ command: 'replay', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } })
+  expect((await run('')).text).toBe('Replay · 4 edits in the last turn')
+  expect((await probe($)).view).toMatchObject({ scope: 'turn', i: 0 })
+  expect((await run('all')).text).toContain('Replay')
+  expect((await probe($)).view).toMatchObject({ scope: 'all', i: 0 })
+})
+
+test('a bare typed replay is not a command: it reaches the model untouched', WITH_PROBE, async ($, on) => {
+  hintWorld(on)
+  await bigTurn($, 't1', THREE)
+  for (const text of ['replay', ' Replay. ', 'replay all', 'please replay']) {
     const out = await submitTyped($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await submitTyped($, 'replay', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await submitTyped($, 'replay', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
   expect((await probe($)).view).toBeNull()
-})
-
-// ---- one-line drop reasons (the engine draws a newline as a garbled character) ---------------
-
-test('no drop reason has a newline; the overflow line goes to ui.log once', WITH_PROBE, async ($, on) => {
-  hintWorld(on)
-  const logs: string[] = []
-  on('ui.log', ($, e) => {
-    logs.push(e.text)
-
-    return { value: undefined }
-  })
-  const empty = await submitTyped($, 'replay')
-  expect(empty.drop).toBe('Replay · nothing to show yet')
-  expect(empty.drop).not.toContain('\n')
-  expect(logs).toEqual(["Only Claude's file edits are recorded."])
-
-  await bigTurn($, 't1', THREE)
-  logs.length = 0
-  const opened = await submitTyped($, 'replay')
-  expect(opened.drop).toBe('Replay · 4 edits in the last turn')
-  expect(opened.drop).not.toContain('\n')
-  expect(logs).toEqual([]) // a one-line answer has nothing to log
+  expect((await probe($)).ready).toBeNull() // the band still goes on the next prompt
 })

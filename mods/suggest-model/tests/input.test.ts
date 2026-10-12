@@ -1,34 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { isConfirmation, isNotATask, looksLikeToolOutput, plainWord } from '../hooks/input'
-
-test('plain words: exactly suggest-model / suggest model with an optional on or off', () => {
-  expect(plainWord('suggest-model')).toBe('status')
-  expect(plainWord('suggest-model')).toBe('status')
-  expect(plainWord('  Suggest-Model  ')).toBe('status')
-  expect(plainWord('suggest-model.')).toBe('status')
-  expect(plainWord('suggest-model off')).toBe('off')
-  expect(plainWord('Suggest Model ON.')).toBe('on')
-  expect(plainWord('suggest-model   on')).toBe('on')
-})
-
-test('plain words: a prompt that merely contains the keyword is never one', () => {
-  for (const t of [
-    'suggest-model please',
-    'what does suggest-model do',
-    'turn suggest-model off for this session',
-    'suggest-model explain derive the BLUP',
-    'the model fit is poor, refit with REML',
-    'suggest-models',
-    'suggest-model off now',
-    'suggest-model on..',
-    '/suggest-model',
-    'suggest-model\nmore text',
-    '',
-  ]) {
-    expect(plainWord(t)).toBeUndefined()
-  }
-})
+import { isConfirmation, isNotATask, looksLikeToolOutput } from '../hooks/input'
 
 test('confirmations are bare replies, not tasks', () => {
   for (const t of ['yes', 'Yes.', 'ok', 'OK!', 'okay', 'y', 'thanks', 'go ahead', 'sounds good', 'lgtm', 'do it']) expect(isConfirmation(t)).toBe(true)

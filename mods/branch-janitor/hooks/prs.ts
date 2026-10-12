@@ -1,5 +1,5 @@
 // Open pull requests, read-only: ONE `gh pr list` (argv array, 8 s timeout) answers for every local branch.
-// Used for the plain-word report and to keep a branch with an open PR out of the "finished" offers.
+// Used for the /branch-janitor report and to keep a branch with an open PR out of the "finished" offers.
 // Fails soft everywhere: no gh, not signed in, no network, odd output -> undefined, and the caller says nothing.
 import type { Verdict } from './decide'
 import type { Run } from './git'

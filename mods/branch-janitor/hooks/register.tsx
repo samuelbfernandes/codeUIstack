@@ -18,24 +18,15 @@
 // HOW THE QUESTION IS HELD OPEN: `$.ui.ask` is a `$` call, and a hook's 10 s budget does not run while a `$`
 // call is in flight (HookBudget in the API types), so the dialog can wait as long as the person likes.
 //
-// PLAIN WORDS. A prompt that is exactly `branch-janitor`, `janitor clean`, ... (words.ts) is answered here with the
-// slash command's own function and dropped, so it never reaches the model: a model cannot run mod commands, and
-// the person should not have to type "/". A prompt that merely contains such a word is passed on untouched.
-// The answer goes back as `{ drop: reason }`, and a reason must be ONE line (a line break shows as "�" in the
-// desktop app): reply.ts sends the first line as the reason and the rest to the transcript with `ui.log`.
-//
 // FAIL-OPEN. Every failure here (a git probe, the dialog, a thrown error, the budget) ends in "pass the
 // Bash result / the prompt through unchanged": the `.catch` replays `next(e)`. This mod is a convenience, never
-// a gate. The one deliberate exception is a plain-word command that fails half way: the person asked for it, so
-// it is dropped with an apology (nothing was changed) rather than sent on to the model.
+// a gate.
 import type { EngineInterface, Register } from 'claude-code'
 
 import { readSettings } from './config'
 import { lookAndOffer, noteGhUse, runCommand, watchPrompt } from './janitor'
 import type { Deps, Look } from './janitor'
-import { dropWith } from './reply'
 import { triggerOf, usesGh } from './trigger'
-import { plainWord } from './words'
 
 const askingSince = { plugin: 'branch-janitor', key: 'askingSince' } as const
 const hasGhRef = { plugin: 'branch-janitor', key: 'hasGh' } as const
@@ -45,7 +36,7 @@ const watchingRef = { plugin: 'branch-janitor', key: 'watching' } as const
 const START_DELAY_MS = 3_000
 const PROMPT_DELAY_MS = 300 // the prompt is in and its turn started before the probe runs
 const STALE_LOCK_MS = 30 * 60_000 // a lock older than this is a dialog that died with a reload
-const WATCHING_NOTICE = 'Watching branches · type branch-janitor to list them'
+const WATCHING_NOTICE = 'Watching branches · /branch-janitor to list them'
 const FAILED = 'Branches · something went wrong. Nothing was changed.'
 
 export const register: Register = (on, options) => {
@@ -72,8 +63,6 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     // Only the person's own words: not a notification, a schedule, another plugin or a peer session.
     if (e.origin.kind !== 'composer' && e.origin.kind !== 'bridge') return next(e)
-    const arg = plainWord(e.text)
-    if (arg !== undefined && (await hasSurface($))) return dropWith({ log: text => $.ui.log(text) }, await plainCommand($, settings, arg))
     // Nothing is awaited here: the probe (and any look) runs from a timer after the prompt has gone in.
     $.clock.after(PROMPT_DELAY_MS, () => void watchIfPossible($, settings))
     return next(e)
@@ -83,16 +72,6 @@ export const register: Register = (on, options) => {
     const text = await runCommand(depsOf($, settings), await $.session.cwd(), e.args.trim().toLowerCase())
     return { text }
   }).catch(() => ({ text: FAILED }))
-}
-
-/** A plain-word command: the same function as the slash command; the answer is what the person sees. */
-async function plainCommand($: EngineInterface, settings: Deps['settings'], arg: string): Promise<string> {
-  try {
-    // The answer is written to the transcript by the caller, so the toast need not log its text a second time.
-    return await runCommand(depsOf($, settings, { logToast: false }), await $.session.cwd(), arg)
-  } catch {
-    return FAILED
-  }
 }
 
 const hasSurface = async ($: EngineInterface) => (await $.session.surfaces()).length > 0
@@ -109,7 +88,7 @@ async function watchIfPossible($: EngineInterface, settings: Deps['settings']): 
 function registerCommand($: EngineInterface) {
   return $.command.register({
     name: 'branch-janitor',
-    description: 'Tidies finished git branches. Runs by itself, or type: branch-janitor. You run this, not Claude.',
+    description: 'Tidies finished git branches. Runs by itself, or run /branch-janitor. You run this, not Claude.',
     argumentHint: '[clean|on|off]',
   })
 }
@@ -123,14 +102,14 @@ async function lookIfPossible($: EngineInterface, settings: Deps['settings'], lo
   })
 }
 
-function depsOf($: EngineInterface, settings: Deps['settings'], o: { logToast?: boolean } = {}): Deps {
+function depsOf($: EngineInterface, settings: Deps['settings']): Deps {
   return {
     settings,
     run: (argv, o) => $.process.run(argv, { cwd: o?.cwd, timeoutMs: o?.timeoutMs, stdin: o?.stdin }),
     ask: (question, o) => $.ui.ask(question, { options: o.options, header: o.header }),
     toast: text => {
       $.ui.toast(text, { timeoutMs: 20_000 })
-      if (o.logToast !== false) $.ui.log(text) // the toast fades; the restore commands should stay in the transcript
+      $.ui.log(text) // the toast fades; the restore commands should stay in the transcript
     },
     now: () => $.clock.now(),
     store: { get: key => $.store.get(key), set: (key, value) => $.store.set(key, value) },

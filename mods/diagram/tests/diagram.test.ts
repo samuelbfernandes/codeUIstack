@@ -4,7 +4,7 @@ import type { Engine } from 'claude-code/testing'
 import { FENCE, FLOW, answer, mountPane, slash, start, typed, world } from './world'
 
 const SURFACES = ['terminal', 'desktop'] as const
-const HINT = 'Diagram · type diagram to see it'
+const HINT = 'Diagram · /diagram to see it'
 const PIE = `${FENCE}mermaid\npie\n  "Dogs" : 3\n  "Cats" : 1\n${FENCE}`
 
 const names = (w: ReturnType<typeof world>) => w.panes.map(pane => pane.id)
@@ -36,7 +36,7 @@ test('an answer without a diagram is left alone: no hint, nothing remembered', a
   await start($)
   await answer($, 'Just words, and `code`.')
   expect(w.toasts).toEqual([])
-  expect((await typed($, 'diagram')).drop).toBe('Diagram · nothing to show yet')
+  expect((await slash($)).text).toContain('Diagram · nothing to show yet')
 })
 
 test('the hint is once per turn, however many diagrams the answer holds', async ($, on) => {
@@ -53,18 +53,18 @@ test('the setting hint = false silences the hint but still remembers the diagram
   await start($)
   await answer($, FLOW)
   expect(w.toasts).toEqual([])
-  expect((await typed($, 'diagram')).drop).toBe('Diagram · open')
+  expect((await slash($)).text).toBe('Diagram · open')
 })
 
 test('no hint while the pane is open, where nobody looks, and for subagents or turns that did not answer', async ($, on) => {
   const w = world(on)
   await start($)
   await answer($, FLOW)
-  await typed($, 'diagram')
+  await slash($)
   w.toasts.length = 0
   await answer($, PIE) // the open pane redraws by itself
   expect(w.toasts).toEqual([])
-  await typed($, 'diagram close')
+  await slash($, 'close')
 
   w.surfaces.list = []
   await answer($, FLOW) // a plain -p run
@@ -81,7 +81,7 @@ test('a subagent answer or an aborted turn does not replace the remembered diagr
   await start($)
   await answer($, FLOW)
   await answer($, PIE, { agentId: 'sub-1' })
-  await typed($, 'diagram')
+  await slash($)
   const ui = await mountPane($, 'terminal')
   expect((await rows(ui)).join('\n')).toContain('Start')
   expect((await rows(ui)).join('\n')).not.toContain('Dogs')
@@ -96,7 +96,7 @@ test('a failing toast or surfaces read never touches the turn', async ($, on) =>
   expect((await answer($, `ok\n${FLOW}`)).text).toContain('ok')
   expect(w.toasts).toEqual([])
   w.surfaces.list = ['terminal']
-  expect((await typed($, 'diagram')).drop).toBe('Diagram · open') // the diagram was remembered before the hint failed
+  expect((await slash($)).text).toBe('Diagram · open') // the diagram was remembered before the hint failed
 })
 
 test('a /clear forgets the diagram', async ($, on) => {
@@ -104,71 +104,42 @@ test('a /clear forgets the diagram', async ($, on) => {
   await start($)
   await answer($, FLOW)
   await $.session.end({ reason: 'clear', sessionId: 's1', resume: {} } as never)
-  expect((await typed($, 'diagram')).drop).toBe('Diagram · nothing to show yet')
+  expect((await slash($)).text).toContain('Diagram · nothing to show yet')
 })
 
-// ---- the words and the command ---------------------------------------------------------------------------------
+// ---- the command ------------------------------------------------------------------------------------------------
 
-test('diagram before any diagram says so, in one line plus a dim note, and opens nothing', async ($, on) => {
+test('/diagram before any diagram says so and opens nothing', async ($, on) => {
   const w = world(on)
   await start($)
-  const out = await typed($, 'diagram')
-  expect(out.drop).toBe('Diagram · nothing to show yet')
-  expect(out.text).toBeUndefined()
-  expect(w.logs).toEqual(['No mermaid diagram in an answer so far.'])
+  expect((await slash($)).text).toBe('Diagram · nothing to show yet\nNo mermaid diagram in an answer so far.')
   expect(names(w)).toEqual([])
 })
 
-test('diagram opens the pane and diagram close closes it, both dropped before the model', async ($, on) => {
+test('/diagram opens the pane and /diagram close closes it', async ($, on) => {
   const w = world(on)
   await start($)
   await answer($, FLOW)
-  const opened = await typed($, 'diagram')
-  expect(opened.drop).toBe('Diagram · open')
-  expect(opened.text).toBeUndefined()
+  expect((await slash($)).text).toBe('Diagram · open')
   expect(names(w)).toEqual(['diagram'])
   expect(w.opens).toEqual([{ id: 'diagram', title: 'Diagram', focus: true, closeOnEscape: true }])
-  expect((await typed($, 'diagram close')).drop).toBe('Diagram · closed')
+  expect((await slash($, ' CLOSE ')).text).toBe('Diagram · closed')
   expect(names(w)).toEqual([])
-  expect((await typed($, 'diagram close')).drop).toBe('Diagram · not open')
+  expect((await slash($, 'close')).text).toBe('Diagram · not open')
+  expect((await slash($, 'sideways')).text).toBe('Diagram · /diagram opens it, /diagram close hides it')
 })
 
-test('the words ignore case, spaces around them, one final full stop and doubled spaces', async ($, on) => {
+test('a bare typed diagram is not a command: it reaches the model untouched', async ($, on) => {
   const w = world(on)
   await start($)
   await answer($, FLOW)
-  for (const text of ['Diagram', '  DIAGRAM.  ', 'diagram.']) expect((await typed($, text)).drop).toBe('Diagram · open')
-  for (const text of ['Diagram Close', 'diagram  close.']) {
-    await typed($, 'diagram')
-    expect((await typed($, text)).drop).toBe('Diagram · closed')
-  }
-  expect(names(w)).toEqual([])
-})
-
-test('only the exact words are taken: sentences, other senders and attachments pass through', async ($, on) => {
-  const w = world(on)
-  await start($)
-  await answer($, FLOW)
-  for (const text of ['draw the diagram', 'diagram please', 'diagrams', 'diagram closed', 'close diagram', 'diagram?', '/diagram now', 'show diagram close']) {
+  for (const text of ['diagram', 'Diagram.', 'diagram close', 'draw the diagram']) {
     const out = await typed($, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
   }
-  expect((await typed($, 'diagram', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await typed($, 'diagram', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
   expect(names(w)).toEqual([])
-})
-
-test('/diagram does what the word does', async ($, on) => {
-  const w = world(on)
-  await start($)
-  expect((await slash($)).text).toBe('Diagram · nothing to show yet\nNo mermaid diagram in an answer so far.')
-  await answer($, FLOW)
-  expect((await slash($)).text).toBe('Diagram · open')
-  expect(names(w)).toEqual(['diagram'])
-  expect((await slash($, ' CLOSE ')).text).toBe('Diagram · closed')
-  expect(names(w)).toEqual([])
-  expect((await slash($, 'sideways')).text).toBe('Diagram · /diagram opens it, /diagram close hides it')
+  expect(w.opens).toEqual([])
 })
 
 test('a pane that has no room says so', async ($, on) => {
@@ -176,12 +147,10 @@ test('a pane that has no room says so', async ($, on) => {
   await start($)
   await answer($, FLOW)
   w.open.isPlaced = false
-  const out = await typed($, 'diagram')
-  expect(out.drop).toBe('Diagram · no room for the pane')
-  expect(w.logs).toEqual(['Try a wider window.'])
+  expect((await slash($)).text).toBe('Diagram · no room for the pane\nTry a wider window.')
 })
 
-test('a pane that cannot be opened still drops the word, with a notice', async ($, on) => {
+test('a pane that cannot be opened says so', async ($, on) => {
   const w = world(on)
   await start($)
   await answer($, FLOW)
@@ -190,17 +159,7 @@ test('a pane that cannot be opened still drops the word, with a notice', async (
       throw new Error('boom')
     },
   })
-  expect((await typed($, 'diagram')).drop).toBe('Diagram · could not open')
   expect((await slash($)).text).toBe('Diagram · could not open')
-})
-
-test('no drop reason has a newline', async ($, on) => {
-  const w = world(on)
-  await start($)
-  for (const text of ['diagram', 'diagram close']) expect((await typed($, text)).drop).not.toContain('\n')
-  await answer($, FLOW)
-  w.open.isPlaced = false
-  expect((await typed($, 'diagram')).drop).not.toContain('\n')
 })
 
 // ---- the pane ---------------------------------------------------------------------------------------------------
@@ -210,7 +169,7 @@ for (const surface of SURFACES) {
     world(on)
     await start($, surface)
     await answer($, FLOW)
-    await typed($, 'diagram')
+    await slash($)
     const ui = await mountPane($, surface)
     expect(await rows(ui)).toEqual([
       'Diagram · Flowchart',
@@ -232,7 +191,7 @@ for (const surface of SURFACES) {
     world(on)
     await start($, surface)
     await answer($, FLOW)
-    await typed($, 'diagram')
+    await slash($)
     const ui = await mountPane($, surface)
     expect((await rows(ui))[0]).toBe('Diagram · Flowchart')
     await answer($, PIE)
@@ -285,7 +244,7 @@ for (const surface of SURFACES) {
     const w = world(on)
     await start($, surface)
     await answer($, FLOW)
-    await typed($, 'diagram')
+    await slash($)
     const ui = await mountPane($, surface)
     await ui.press({ key: 'close' })
     expect(names(w)).toEqual([])

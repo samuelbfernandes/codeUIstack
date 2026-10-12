@@ -4,8 +4,6 @@ import type { Hook, PluginOptions, Register } from 'claude-code'
 import type { Scope } from '../types'
 import { looksLikeCorrection } from './prefilter'
 import { SYSTEM, appendRule, buildPrompt, parseReply, vetRule } from './rule'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 type Dollar = Parameters<Hook<'prompt.submit'>>[0]
 
@@ -133,7 +131,7 @@ async function saveRule($: Dollar, raw: string, scope: Scope): Promise<void> {
 
 // ------------------------------------------------------------------ command
 
-/** What `/reflect` and its plain words say: a headline, then at most three short lines. */
+/** What `/reflect` says: a headline, then at most three short lines. */
 async function runCommand($: Dollar, args: string, options: PluginOptions): Promise<string> {
   const arg = args.trim().toLowerCase()
   if (arg === 'off') {
@@ -160,13 +158,7 @@ async function runCommand($: Dollar, args: string, options: PluginOptions): Prom
   return lines.join('\n')
 }
 
-// ------------------------------------------------------------------ plain words
-
 const COMMAND_FAILED = 'Reflect · that did not work\nNothing changed.'
-const PLAIN_ARGS: Record<string, string> = { 'reflect status': 'status', 'reflect off': 'off', 'reflect on': 'on' }
-
-/** The `/reflect` argument a typed plain word stands for, or undefined for any other prompt. */
-const plainArgs = (word: string | undefined): string | undefined => (word === undefined ? undefined : PLAIN_ARGS[word])
 
 // ------------------------------------------------------------------ register
 
@@ -191,7 +183,7 @@ export const register: Register = (on, options) => {
     try {
       await $.command.register({
         name: 'reflect',
-        description: 'Turn corrections into saved rules: on, off or status (typing reflect status does the same)',
+        description: 'Turn corrections into saved rules: on, off or status',
         argumentHint: 'on|off|status',
       })
     } catch {
@@ -205,13 +197,8 @@ export const register: Register = (on, options) => {
   )
 
   // Fail OPEN: whatever goes wrong here, the prompt is submitted exactly as typed.
-  // The one exception is deliberate: the exact plain words `reflect status|on|off` run the /reflect command and are
-  // dropped (they never reach a model, nor the correction analysis below); if that command throws, the word is still
-  // dropped with the short failure notice, since sending it on would only cost a model request for a command.
-  // Every other prompt is never rewritten, dropped or delayed; the model call runs from a timer.
+  // A prompt is never rewritten, dropped or delayed; the model call runs from a timer.
   on('prompt.submit', async ($, e, next) => {
-    const args = plainArgs(plainWord(e))
-    if (args !== undefined) return dropWith({ log: text => $.ui.log(text) }, await runCommand($, args, options).catch(() => COMMAND_FAILED))
     try {
       await onSubmit($, e, options)
     } catch {

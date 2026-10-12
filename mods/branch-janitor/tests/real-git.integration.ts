@@ -289,14 +289,14 @@ async function main() {
     rmSync(w.dir, { recursive: true, force: true })
   }
 
-  // ---- plain words and the slash command are one function
+  // ---- the slash command
   {
     const w = buildWorld()
-    console.log('plain words')
+    console.log('slash command')
     const { deps } = depsFor(w, () => { throw new Error('listing must not ask') })
     const listed = await runCommand(deps, w.work, '')
     check(listed.includes('✓ merged-ff · '), 'listing')
-    check((await runCommand(deps, w.work, 'sideways')).includes('branch-janitor clean'), 'usage text names the plain words')
+    check((await runCommand(deps, w.work, 'sideways')).includes('/branch-janitor clean'), 'usage text names the slash commands')
     rmSync(w.dir, { recursive: true, force: true })
   }
 

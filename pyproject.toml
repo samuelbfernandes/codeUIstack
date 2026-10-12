@@ -3,7 +3,7 @@ requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
-name = "codeuistack"
+name = "moddeck"
 version = "0.4.1"
 description = "Safety and productivity mods for Claude Code, built for scientists."
 readme = "README.md"
@@ -21,11 +21,11 @@ classifiers = [
 dependencies = []   # standard library only, on purpose: nothing for the installer to fetch or to audit
 
 [project.urls]
-Homepage = "https://github.com/samuelbfernandes/codeUIstack"
-Issues = "https://github.com/samuelbfernandes/codeUIstack/issues"
+Homepage = "https://github.com/samuelbfernandes/moddeck"
+Issues = "https://github.com/samuelbfernandes/moddeck/issues"
 
 [project.scripts]
-codeuistack = "cctk.cli:main"
+moddeck = "cctk.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cctk"]

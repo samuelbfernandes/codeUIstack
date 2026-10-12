@@ -1,6 +1,6 @@
 # cache-tax
 
-Install (Claude Code 2.1.287 or later): `/plugin install cache-tax --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install cache-tax --marketplace samuelbfernandes/moddeck`
 
 ## What it does
 Claude's prompt cache goes cold after its TTL; the next message then re-writes the whole conversation at the
@@ -12,7 +12,7 @@ prompts are never asked about; if the guard throws, the message goes through. Th
 ends with `Keep it warm next time: /keepwarm 90m` (once; shown as plain text, the dialog cannot dim it). Nothing starts by itself: pings cost tokens.
 
 ## Use
-- Type `cache-tax` alone (any case, optional final `.`): a local report, never sent to the model, no tokens. `/cache-tax` is the same. At most six lines:
+- `/cache-tax`: a local report, never sent to the model, no tokens. At most six lines:
   ```
   Cache warm · ~58 min left · next message ~$0.02
   Context  ~77k tokens · last turn 46k (1.2k out)
@@ -37,4 +37,4 @@ ends with `Keep it warm next time: /keepwarm 90m` (once; shown as plain text, th
 - Prices are a built-in table (`hooks/lib.ts`), est. only; unknown models use Sonnet rates; the 1M-context surcharge is not modelled.
 - Hit ratio and last-turn figures start at zero in a resumed session and ignore subagents and keep-warm pings.
 - Keep-warm runs only while Claude Code is open and is not restored after a restart. Context size can be stale right after a compaction.
-- Not verified live: dialogs, timers, pings, the plain word and the report (mocks only). Nothing run on Windows.
+- Not verified live: dialogs, timers, pings and the report (mocks only). Nothing run on Windows.

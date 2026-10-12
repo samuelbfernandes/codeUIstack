@@ -1,4 +1,4 @@
-# codeUIstack
+# Moddeck
 
 **Safety and productivity mods for Claude Code, built for scientists.**
 Fifteen small add-ons (mods), two skills and a set of git guards that protect your work, keep your token bill visible, and stay quiet until
@@ -30,14 +30,14 @@ Everything else (`reflect`, `savvy-progress`, `filetree`, `replay-theater`, `too
 Look first, then decide. Nothing changes until you confirm.
 
 ```bash
-pipx install git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1
-codeuistack install --plan     # prints every change it would make, then stops
-codeuistack install --standard # one line, no questions: the recommended set (or --all: every mod, rule and guard)
-codeuistack                    # asks a few questions, shows the plan, applies it
+pipx install git+https://github.com/samuelbfernandes/moddeck@v0.4.1
+moddeck install --plan     # prints every change it would make, then stops
+moddeck install --standard # one line, no questions: the recommended set (or --all: every mod, rule and guard)
+moddeck                    # asks a few questions, shows the plan, applies it
 ```
 
-Or from a clone: `git clone https://github.com/samuelbfernandes/codeUIstack && cd codeUIstack && sh install.sh` (Windows: `install.cmd`).
-Only the mods, inside Claude Code: `/plugin marketplace add samuelbfernandes/codeUIstack`, then `/plugin install <mod>@codeuistack`.
+Or from a clone: `git clone https://github.com/samuelbfernandes/moddeck && cd Moddeck && sh install.sh` (Windows: `install.cmd`).
+Only the mods, inside Claude Code: `/plugin marketplace add samuelbfernandes/moddeck`, then `/plugin install <mod>@moddeck`.
 Other routes (uv, pip, conda, a plain download, or only the mods through Claude Code's own `/plugin` command) are in
 [docs/INSTALL.md](docs/INSTALL.md). You need Claude Code 2.1.287 or newer, `git`, and Python 3.9+ (not for the plugin-only route).
 
@@ -57,7 +57,7 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 - No network, no `sudo`, no shell strings, no third-party code: standard-library Python, about 1,300 lines, checked by CI.
 - `uninstall` removes exactly what it recorded and leaves your own settings and text alone (tested byte for byte).
 - `docs/AUDIT.md` lists, for every mod, the programs it starts, whether it writes files or spends tokens: network use is none.
-- Releases come with checksums, and `codeuistack verify` compares your install to the package.
+- Releases come with checksums, and `moddeck verify` compares your install to the package.
 
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
@@ -66,7 +66,7 @@ commit; Codex sends code to OpenAI when you enable it).
 
 | Mod | One line |
 |---|---|
-| `toolbox` | A side bar with every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
+| `moddeck` | A side bar with every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
 | `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
@@ -82,34 +82,33 @@ commit; Codex sends code to OpenAI when you enable it).
 | `diagram` | Draws Claude's mermaid diagrams as box art, offline |
 | `aside` | A quick side question in a pane, kept out of the conversation (uses a little credit) |
 
-**No slash needed.** Everything that costs no credit runs by itself, and the status commands answer to plain words: type `branch-janitor`, `suggest-model`, `cache-tax`, `agents-info`, `replay`, `filetree`, `skins`, `usage`, `secret-guard` or `diagram` as your whole prompt and it is handled on your computer, never sent to Claude. See [docs/TOOLS.md](docs/TOOLS.md).
+**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/skin`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
 Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
 Turn any mod off with `/plugin disable <name>`.
 
 ## Try each item (about a minute each)
 
-Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git init`) so nothing real is at risk. Words in `code` typed on
-their own line are your whole prompt; they are answered on your computer and never sent to Claude, so they cost nothing.
+Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git init`) so nothing real is at risk. `/commands` are answered on your computer and never sent to Claude, so they cost nothing (except `/aside` and `/keepwarm`).
 
 ### Mods
 
 | Item | Try this | You should see |
 |---|---|---|
-| **toolbox** | Type `toolbox` (wide window or desktop app), click a green switch, then click `branch-janitor` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent |
+| **moddeck** | Type `/moddeck` (wide window or desktop app), click the green `suggest` switch, then click `branch-janitor` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent |
 | **blast-radius** | Ask Claude: `create a folder build with a file a.txt, then delete the build folder` | Before `rm -rf build`: a box with the risk level, what is in the folder, what git could restore, "Recoverable: yes / partly / no", and **Cancel** as the first answer |
-| **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
+| **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `/cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
 | **suggest-model** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **suggest-model on** chip above the prompt; `suggest-model off` / `suggest-model on` / `suggest-model explain <text>` |
-| **branch-janitor** | `git checkout -b demo`, commit a file, then in another terminal `git checkout main && git merge demo`. Send any prompt in Claude Code | "Delete 1 finished branch?" with the command to restore it. Type `branch-janitor` for the list (with `gh`: open pull requests and their checks) |
+| **branch-janitor** | `git checkout -b demo`, commit a file, then in another terminal `git checkout main && git merge demo`. Send any prompt in Claude Code | "Delete 1 finished branch?" with the command to restore it. Type `/branch-janitor` for the list (with `gh`: open pull requests and their checks) |
 | **review-cost** | Needs Codex. In a repo with a `docs/THEORY_REVIEW.md` file, change a method file and ask Claude to `git push` | A green / amber / red estimate of the review's tokens with **Review / Skip** |
 | $ **reflect** | Tell Claude: `no, in this repo we always use tabs, never spaces` | A small band "Reflect" with the rule and **Save / Global / Edit / Skip** (saves to `CLAUDE.md`) |
-| **savvy-progress** | Ask: `use two subagents to list the files in src/ and in tests/ in parallel`. Then type `agents-info` and `agents tree` | A band with a task bar `▰▰▱ 2/3 tasks` and the running helpers with a **Stop** button; the words print a report and the nested helper tree |
-| **filetree** | Type `filetree` (wide window), then ask Claude to edit a file | A folder tree beside the chat, the touched file highlighted. `filetree` again closes it |
-| **replay-theater** | Ask Claude to change three files in one turn, then type `replay` | A one-line hint after the turn; the word opens a pane that steps through each edit as a diff |
-| **tool-skins** | Type `skins`, then `skin dracula` | The theme list, then tool calls drawn in the Dracula colours (`skin noir` is the default look; `/plugin disable tool-skins` removes the restyling) |
-| **secret-guard** | Type: `my token is ghp_0123456789abcdefghijklmnopqrstuvwxyz, remember it` (a made-up token). Then type `secret-guard` | A dialog "Send redacted / Send as typed / Hold it". The word shows how many secrets were hidden, by kind, never the secrets |
-| **budget-guard** | Type `budget 0.50`, chat until about 35 cents are spent, then type `usage` | A usage line appears above the prompt only when cost, context or your plan window gets high; at the limit one dialog asks **Continue (+50%) / Continue without limit / Hold it**. The word prints cost, tokens, cache hits and turn times |
-| **diagram** | Ask: `explain the steps of a GBLUP analysis as a mermaid flowchart`, then type `diagram` | A toast "type diagram to see it"; the word opens a pane with the flowchart drawn as boxes and arrows. `diagram close` closes it |
+| **savvy-progress** | Ask: `use two subagents to list the files in src/ and in tests/ in parallel`. Then type `/agents-info` and `/agents-info tree` | A band with a task bar `▰▰▱ 2/3 tasks` and the running helpers with a **Stop** button; the words print a report and the nested helper tree |
+| **filetree** | Type `/filetree` (wide window), then ask Claude to edit a file | A folder tree beside the chat, the touched file highlighted. `/filetree` again closes it |
+| **replay-theater** | Ask Claude to change three files in one turn, then type `/replay` | A one-line hint after the turn; the word opens a pane that steps through each edit as a diff |
+| **tool-skins** | Type `/skin`, then `/skin dracula` | The theme list, then tool calls drawn in the Dracula colours (`/skin noir` is the default look; `/plugin disable tool-skins` removes the restyling) |
+| **secret-guard** | Type: `my token is ghp_0123456789abcdefghijklmnopqrstuvwxyz, remember it` (a made-up token). Then type `/secret-guard` | A dialog "Send redacted / Send as typed / Hold it". The word shows how many secrets were hidden, by kind, never the secrets |
+| **budget-guard** | Type `/budget-guard 80` (ask once any plan window reaches 80/100 used; `/budget-guard $10` for a dollar limit with an API key), chat, then type `/budget-guard` for the report | A usage line appears above the prompt only when cost, context or your plan window gets high; at the limit one dialog asks **Continue (+50%) / Continue without limit / Hold it**. The word prints cost, tokens, cache hits and turn times |
+| **diagram** | Ask: `explain the steps of a GBLUP analysis as a mermaid flowchart`, then type `/diagram` | A toast "/diagram to see it"; the command opens a pane with the flowchart drawn as boxes and arrows. `/diagram close` closes it |
 | $ **aside** | Type: `/aside what does REML stand for?` (a little credit) | A pane with the answer; it is not added to the conversation. Off by default: tick it in the installer |
 
 ### Skills (Claude loads them by itself)
@@ -123,7 +122,7 @@ their own line are your whole prompt; they are answered on your computer and nev
 
 | Item | Try this | You should see |
 |---|---|---|
-| **Global rules** | Open `~/.claude/CLAUDE.md` | A block between `BEGIN codeuistack` and `END codeuistack` markers; your own text above and below is untouched |
+| **Global rules** | Open `~/.claude/CLAUDE.md` | A block between `BEGIN moddeck` and `END moddeck` markers; your own text above and below is untouched |
 | **Git guards** | `echo KEY=1 > .env && git add .env && git commit -m test`, then `git push --force` | The commit is refused (secret file staged) and the force-push is refused |
 | **Claude asks before git push** | Ask Claude to push, or to commit with `--no-verify` | Every `git push` asks for your OK; `--no-verify` is denied |
 | **Run tests before push** | In an R package or a Cargo project, `git push` | `devtools::test()` or `cargo test` runs first; a failure stops the push |

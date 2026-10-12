@@ -10,8 +10,8 @@ On Windows install [Git for Windows](https://git-scm.com/download/win) (it runs 
 Inside Claude Code:
 
 ```
-/plugin marketplace add samuelbfernandes/codeUIstack
-/plugin install blast-radius@codeuistack
+/plugin marketplace add samuelbfernandes/moddeck
+/plugin install blast-radius@moddeck
 ```
 
 Repeat the second line for each mod you want (`/plugin install` lists them). You get the mods; you do not get the rules,
@@ -22,38 +22,38 @@ git guards or the checklist of built-in features. Good for trying one tool.
 No prior install, no questions (replace `v0.4.1` with the release you want):
 
 ```
-pipx run --spec git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1 codeuistack install --standard
+pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.4.1 moddeck install --standard
 ```
 
 `--standard` is the recommended set; `--all` adds every mod (including the ones that spend credit, such as aside) and every rule, skill and git guard.
-Built-in features and third-party plugins stay at their defaults in both. Add `--plan` to only look. With uv: `uvx --from git+https://github.com/samuelbfernandes/codeUIstack@v0.4.1 codeuistack install --standard`.
+Built-in features and third-party plugins stay at their defaults in both. Add `--plan` to only look. With uv: `uvx --from git+https://github.com/samuelbfernandes/moddeck@v0.4.1 moddeck install --standard`.
 Then start a new Claude Code session.
 
 ## B. Full installer with pipx or uv (recommended)
 
 ```
-pipx install git+https://github.com/samuelbfernandes/codeUIstack@v0.1.0
-codeuistack install --plan      # look first
-codeuistack                     # then answer the questions
+pipx install git+https://github.com/samuelbfernandes/moddeck@v0.1.0
+moddeck install --plan      # look first
+moddeck                     # then answer the questions
 ```
 
-With uv: `uvx --from git+https://github.com/samuelbfernandes/codeUIstack@v0.1.0 codeuistack install --plan`.
-Once a release is on PyPI: `pipx install codeuistack`.
+With uv: `uvx --from git+https://github.com/samuelbfernandes/moddeck@v0.1.0 moddeck install --plan`.
+Once a release is on PyPI: `pipx install moddeck`.
 
 ## C. Plain pip, or conda
 
 ```
-python -m venv ~/.codeuistack-venv && ~/.codeuistack-venv/bin/pip install git+https://github.com/samuelbfernandes/codeUIstack@v0.1.0
-~/.codeuistack-venv/bin/codeuistack
+python -m venv ~/.moddeck-venv && ~/.moddeck-venv/bin/pip install git+https://github.com/samuelbfernandes/moddeck@v0.1.0
+~/.moddeck-venv/bin/moddeck
 ```
 
-Conda: `conda env create -f environment.yml && conda activate codeuistack-installer && codeuistack --plan`
+Conda: `conda env create -f environment.yml && conda activate moddeck-installer && moddeck --plan`
 (conda only supplies Python and pip; the installer has no dependencies).
 
 ## D. Download or clone, no installation of the installer
 
 ```
-git clone --branch v0.1.0 https://github.com/samuelbfernandes/codeUIstack && cd codeuistack
+git clone --branch v0.1.0 https://github.com/samuelbfernandes/moddeck && cd moddeck
 sh install.sh --plan            # macOS / Linux
 install.cmd --plan              # Windows (double-clicking install.cmd also works)
 ```
@@ -67,8 +67,8 @@ install.cmd --plan              # Windows (double-clicking install.cmd also work
    and what it costs in tokens. Items that need a program you do not have (Codex, rust-analyzer, Pyright) start unticked.
 4. The plan, then a final yes or no.
 
-Without questions: `codeuistack install --yes` (defaults), plus any of `--scope project --project DIR`, `--profile lab`,
-`--mods blast-radius,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `codeuistack list` shows every id.
+Without questions: `moddeck install --yes` (defaults), plus any of `--scope project --project DIR`, `--profile lab`,
+`--mods blast-radius,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `moddeck list` shows every id.
 
 ## Afterwards
 
@@ -76,17 +76,17 @@ Start a new Claude Code session, or run `/reload-plugins` in an open one.
 
 | Command | What it does |
 |---|---|
-| `codeuistack status` | what is installed, per scope |
-| `codeuistack verify` | installed files match the package? |
-| `codeuistack doctor` | which tools it can see (Claude Code, git, Codex ...) |
-| `codeuistack update` | re-apply your recorded choices after upgrading the package (`pipx upgrade codeuistack`) |
-| `codeuistack uninstall [--scope project --project DIR]` | remove exactly what was installed there |
-| `codeuistack install` again | change your choices; what you un-tick is removed |
+| `moddeck status` | what is installed, per scope |
+| `moddeck verify` | installed files match the package? |
+| `moddeck doctor` | which tools it can see (Claude Code, git, Codex ...) |
+| `moddeck update` | re-apply your recorded choices after upgrading the package (`pipx upgrade moddeck`) |
+| `moddeck uninstall [--scope project --project DIR]` | remove exactly what was installed there |
+| `moddeck install` again | change your choices; what you un-tick is removed |
 
 ## Upgrading
 
-Install the new version of the package (`pipx upgrade codeuistack`, or unzip the new download), then run
-`codeuistack update` (from a download: `sh install.sh update`; for a one-project install add `--scope project --project DIR`).
+Install the new version of the package (`pipx upgrade moddeck`, or unzip the new download), then run
+`moddeck update` (from a download: `sh install.sh update`; for a one-project install add `--scope project --project DIR`).
 It re-applies the choices you made last time and upgrades the installed mods. Start a new Claude Code session afterwards.
 
-To remove everything: run `uninstall` for each scope you used, then remove the package (`pipx uninstall codeuistack`).
+To remove everything: run `uninstall` for each scope you used, then remove the package (`pipx uninstall moddeck`).

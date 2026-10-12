@@ -1,6 +1,6 @@
 # aside
 
-Install (Claude Code 2.1.295 or later): `/plugin install aside --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.295 or later): `/plugin install aside --marketplace samuelbfernandes/moddeck`
 
 ## What it does
 Ask a quick side question without disturbing the main conversation. The question is answered over your current
@@ -11,14 +11,13 @@ main thread does not read it and your context does not grow.
 - `/aside <question>`: opens the pane with "Thinking…", then the question as a headline, the answer below it and a dim
   line `Side question · not added to the conversation · ~12k tokens est.`. A failed or empty answer shows
   `Aside · no answer, nothing changed`. The pane keeps the last 5 asides (newest first) for the session.
-- Type `aside` alone (any case, optional final `.`) for a short how-to; it is local, free and never sent to the model.
-  If asides are kept, it also brings the pane back. `/aside` with no question does the same.
+- `/aside` with no question gives a short how-to; it is local and free. If asides are kept, it also brings the pane back.
 - `Close` closes the pane. It works while Claude is busy with a turn.
-- Switch it off or on from the toolbox side bar (green on, red off), or type `aside off` / `aside on` (`/aside off|on` too). The choice is remembered across sessions.
-- Asking costs model credit, so there is deliberately no plain-word way to ask: only `/aside <question>`.
+- Switch it off or on from the moddeck side bar (green on, red off), or type `/aside off` / `/aside on`. The choice is remembered across sessions.
+- The `/` is required: a bare `aside` goes to the model like any prompt.
 
 ## Turn off
-Click it in the toolbox, type `aside off`, `/plugin disable aside`, or set `enabled` to off in the plugin settings.
+Click it in the moddeck, type `/aside off`, `/plugin disable aside`, or set `enabled` to off in the plugin settings.
 
 ## Settings
 - `enabled` (default on).

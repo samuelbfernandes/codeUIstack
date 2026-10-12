@@ -1,6 +1,6 @@
 {
   "name": "filetree",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",
@@ -8,7 +8,7 @@
     "autoOpen": {
       "type": "boolean",
       "title": "Open automatically",
-      "description": "Open the pane at session start where the screen can dock it beside the chat (fullscreen terminal, desktop app) and there is room. Never reopens it after you close it; /filetree and typing tree still toggle it.",
+      "description": "Open the pane at session start where the screen can dock it beside the chat (fullscreen terminal, desktop app) and there is room. Never reopens it after you close it; /filetree still toggles it.",
       "default": true
     },
     "maxDepth": {

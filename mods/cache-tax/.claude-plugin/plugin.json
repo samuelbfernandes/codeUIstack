@@ -1,6 +1,6 @@
 {
   "name": "cache-tax",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm.",
   "author": {
     "name": "Samuel Fernandes"

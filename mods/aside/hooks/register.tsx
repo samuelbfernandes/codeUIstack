@@ -16,25 +16,20 @@ import {
   tokensOf,
   whyNot,
 } from './lib'
-import { dropWith } from './reply'
-import { plainWord } from './words'
 
 type Dollar = EngineInterface
 
 const PANE = 'aside'
 const COMMAND = 'aside'
-/** Typed alone, this shows how /aside works. It never asks anything: asking costs model credit, so it needs /aside + a question. */
-const PLAIN_WORD = 'aside'
-const OFF = 'Aside is off · click aside in the toolbox side bar, or type aside on'
-const HELP_FAILED = "Aside · couldn't show the help"
+const OFF = 'Aside is off · click aside in the moddeck side bar, or type /aside on'
 
 const asides = atom({ plugin: 'aside', key: 'asides' } as const, [])
-/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the toolbox side bar so it redraws when ANY path flips it. */
+/** Mirror of the persisted on/off switch (`$.store` 'off'), read by the moddeck side bar so it redraws when ANY path flips it. */
 const isOff = atom({ plugin: 'aside', key: 'isOff' } as const, false)
 
 type Cfg = { isEnabled: boolean; maxChars: number }
 
-/** The one place the switch changes, for the toolbox side bar, the plain words and `/aside on|off` alike. */
+/** The one place the switch changes, for the moddeck side bar and `/aside on|off` alike. */
 async function setSwitch($: Dollar, off: boolean): Promise<void> {
   if (off) await $.store.set('off', true)
   else await $.store.delete('off')
@@ -51,7 +46,7 @@ async function isOn($: Dollar, cfg: Cfg): Promise<boolean> {
   }
 }
 
-/** `aside on` / `aside off` (typed, or `/aside on|off`). Anything else is not a switch word. */
+/** `/aside on` / `/aside off`. Anything else is not a switch word. */
 const switchWord = (text: string): 'on' | 'off' | undefined => {
   const t = text.trim().toLowerCase().replace(/\.$/, '').trim()
   return t === 'on' || t === 'aside on' ? 'on' : t === 'off' || t === 'aside off' ? 'off' : undefined
@@ -64,7 +59,7 @@ async function flip($: Dollar, cfg: Cfg, to: 'on' | 'off'): Promise<string> {
   } catch {
     return 'Aside · that did not work, nothing changed'
   }
-  return to === 'on' ? 'Aside · on' : 'Aside · off · type aside on, or click it in the toolbox, to turn it back on'
+  return to === 'on' ? 'Aside · on' : 'Aside · off · type /aside on, or click it in the moddeck, to turn it back on'
 }
 
 /** The pane opens for the person's own command, so it is placed at any width; focus and Esc are requests only. */
@@ -99,7 +94,7 @@ async function ask($: Dollar, cfg: Cfg, id: number, question: string): Promise<v
   }
 }
 
-/** `/aside` with no question and the plain word: how it works (free, local); past asides come back into view. */
+/** `/aside` with no question: how it works (free, local); past asides come back into view. */
 async function help($: Dollar, cfg: Cfg): Promise<string> {
   if (!(await isOn($, cfg))) return OFF
   const kept = (await read($, asides)).length
@@ -166,18 +161,6 @@ export const register: Register = (on, options) => {
   on('command.run', { command: COMMAND }, async ($, e) => ({ text: await runAside($, cfg, e.args) })).catch(() => ({
     text: NO_ANSWER,
   }))
-
-  // The plain word only explains (local, free, dropped so the model never sees it). A prompt that merely contains
-  // the word, or any other sender, is left alone. Asking has no plain word: it spends model credit, so it stays /aside.
-  // Fail-open: if even the explanation throws, the prompt still passes untouched.
-  on('prompt.submit', async ($, e, next) => {
-    const typedWord = plainWord(e)
-    if (typedWord === 'aside on' || typedWord === 'aside off') {
-      return dropWith(note => $.ui.log(note), await flip($, cfg, typedWord === 'aside on' ? 'on' : 'off'))
-    }
-    if (typedWord !== PLAIN_WORD) return next(e)
-    return dropWith(note => $.ui.log(note), await help($, cfg).catch(() => HELP_FAILED))
-  }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     const list = await read($, asides)

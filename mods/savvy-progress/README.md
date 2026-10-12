@@ -1,6 +1,6 @@
 # savvy-progress
 
-Install (Claude Code 2.1.287 or later): `/plugin install savvy-progress --marketplace samuelbfernandes/codeUIstack`
+Install (Claude Code 2.1.287 or later): `/plugin install savvy-progress --marketplace samuelbfernandes/moddeck`
 
 See Claude's plan progress and every helper (subagent) it runs, live, and roughly what it costs.
 
@@ -8,12 +8,11 @@ See Claude's plan progress and every helper (subagent) it runs, live, and roughl
   While helpers run it grows to a few rows: a bar of helpers finished (`▰▱▱ 1/3 helpers`), the task bar, and up to three
   running helpers with elapsed time and tool count, nested under the helper that started them. Quiet until there is a task list or a helper.
 - **Tasks bar**: counts Claude's own task list (the TodoWrite, or TaskCreate/TaskUpdate tools) in the main conversation.
-- **Pane** (`/agents-info`, or type `agents-info`, `agents info` or `agents` alone): each helper with type, model, status,
+- **Pane** (`/agents-info`): each helper with type, model, status,
   context bar, tokens, est. cost, elapsed time and tool count; a helper started by another helper is indented under it.
   Every running helper has a `Stop` button (it calls Claude's own TaskStop tool, so permission rules still apply).
-- **Tree as text**: `/agents-info tree`, or type `agents tree`, prints the same tree, one line per helper (the typed word gives one line, items joined by `|`).
-- `/agents-info band` shows or hides the band (remembered). Typed words are handled locally, never sent to the model (no tokens);
-  a sentence that merely contains a word, `agents band` and other senders are left alone.
+- **Tree as text**: `/agents-info tree` prints the same tree, one line per helper.
+- `/agents-info band` shows or hides the band (remembered). Slash commands run locally and cost no tokens.
 
 ## How the numbers are made
 - Tokens come from each helper's `turn.step` usage, replaced by its `turn.complete` total. "tok" = input + output + cache read + cache write.

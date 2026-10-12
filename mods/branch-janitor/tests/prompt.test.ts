@@ -1,15 +1,13 @@
-// The automatic look on every prompt, and the plain-word commands. Same scripted world as flow.test.ts.
+// The automatic look on every prompt, and a bare typed word is not a command. Same scripted world as flow.test.ts.
 import { test, expect } from 'claude-code/testing'
 
-import { dropWith, linesOf } from '../hooks/reply'
-import { plainWord } from '../hooks/words'
 import { SHA, world } from './world'
 import type { FakeBranch, Model } from './world'
 
 const SURFACES = [['terminal'], ['desktop'], ['terminal', 'desktop']] as const
 const MAIN = SHA('1')
 const DONE = SHA('d')
-const WATCHING = 'Watching branches · type branch-janitor to list them'
+const WATCHING = 'Watching branches · /branch-janitor to list them'
 
 const repo = (branches: Record<string, FakeBranch>, extra: Partial<Model> = {}): Model => ({
   current: 'main',
@@ -174,7 +172,7 @@ test('gh is asked once per branch tip until the fingerprint changes, and never f
 
 // ---------------------------------------------------------------- headless, other senders, fail-open
 
-test('headless (no surface): no probe, no question, no notice, and a plain word goes through to the model', async ($, on) => {
+test('headless (no surface): no probe, no question, no notice, and a typed word goes through to the model', async ($, on) => {
   const w = world(on, repo({ done: merged() }), { surfaces: [] })
   passthrough(on)
   const r = await typed($, w, 'branch-janitor')
@@ -240,157 +238,35 @@ test('a repository switched off: no scan, no notice, and later prompts cost only
   expect(w.notices.toasts).toHaveLength(0)
 })
 
-// ---------------------------------------------------------------- plain words
+// ---------------------------------------------------------------- the slash command
 
-const LISTING_WORDS = ['branch-janitor', 'janitor', 'clean branches', 'clean up branches', 'cleanup branches', 'delete merged branches']
-
-test('plainWord: exact words only, any case, optional trailing full stop', () => {
-  for (const w of LISTING_WORDS) {
-    expect(plainWord(w)).toBe('')
-    expect(plainWord(`  ${w.toUpperCase()}.  `)).toBe('')
-  }
-  expect(plainWord('branch-janitor clean')).toBe('clean')
-  expect(plainWord('Janitor  Clean.')).toBe('clean')
-  expect(plainWord('branch-janitor on')).toBe('on')
-  expect(plainWord('branch-janitor off')).toBe('off')
-  for (const not of ['', 'janitor on', 'janitor off', 'please janitor', 'branch-janitor clean now', 'clean the branches', 'janitor?', 'janitor!', 'branches', 'what is branch-janitor', '/branch-janitor', 'cleanup branch', 'janitor clean branches', 'delete merged branches please'])
-    expect(plainWord(not)).toBeUndefined()
-})
-
-for (const surfaces of SURFACES)
-  for (const word of LISTING_WORDS)
-    test(`"${word}" on ${surfaces.join('+')}: same output as /branch-janitor, dropped before the model, nothing deleted or asked`, async ($, on) => {
-      const model = repo({ done: merged(), wip: unmerged(SHA('3')) })
-      const w = world(on, model, { surfaces })
-      let reachedModel = 0
-      on('prompt.submit', (_$: any, e: { text: string }) => (reachedModel++, { text: e.text }))
-      const expected = (await slash($)).text!.split('\n')
-      const r = await $.prompt.submit({ text: word, wait: false, origin: { kind: 'composer' } })
-      expect(r.drop).toBe('Branches · 1 ready to delete, 1 to keep') // one line: the headline
-      expect(r.drop).toBe(expected[0])
-      expect(w.logs).toEqual([expected.slice(1).join('\n')]) // the rest, once, in the transcript
-      expect(w.logs[0]).toContain('✓ done · merged into main')
-      expect(reachedModel).toBe(0)
-      await w.clock.advance(MS)
-      expect(w.asks).toHaveLength(0)
-      expect(w.deleted).toEqual([])
-      expect(probes(w)).toHaveLength(0) // a command is not also a watch
-    })
-
-for (const surfaces of SURFACES)
-  for (const word of ['branch-janitor clean', 'Janitor Clean.'])
-    test(`"${word}" on ${surfaces.join('+')} runs the clean flow like /branch-janitor clean`, async ($, on) => {
-      const w = world(on, repo({ done: merged() }), { surfaces, answer: (_q, _o, h) => (h === 'Branches' ? 'Delete branch' : 'Keep') })
-      let reachedModel = 0
-      on('prompt.submit', (_$: any, e: { text: string }) => (reachedModel++, { text: e.text }))
-      const r = await $.prompt.submit({ text: word, wait: false, origin: { kind: 'composer' } })
-      expect(r.drop).toBe('Deleted 1 branch · restore with:')
-      expect(w.logs).toEqual([`git branch done ${DONE}`]) // once: the toast's own log is skipped, the reply logs it
-      expect(w.deleted).toEqual([{ flag: '-d', name: 'done' }])
-      expect(reachedModel).toBe(0)
-    })
-
-test('"branch-janitor off" and "on" toggle the repository exactly like the slash command', async ($, on) => {
-  const w = world(on, repo({ done: merged() }))
-  passthrough(on)
-  const off = await $.prompt.submit({ text: 'branch-janitor off', wait: false, origin: { kind: 'composer' } })
-  expect(off.drop).toBe('Branches · off for this repository')
-  expect(w.logs).toEqual(['Turn it on again: branch-janitor on'])
+test('slash command: list, clean and off/on', async ($, on) => {
+  const w = world(on, repo({ done: merged(), wip: unmerged(SHA('3')) }), { answer: (_q, _o, h) => (h === 'Branches' ? 'Delete branch' : 'Keep') })
+  expect((await slash($)).text!.split('\n')[0]).toBe('Branches · 1 ready to delete, 1 to keep')
+  expect(w.deleted).toEqual([])
+  expect((await slash($, 'clean')).text).toContain('Deleted 1 branch')
+  expect(w.deleted).toEqual([{ flag: '-d', name: 'done' }])
+  expect((await slash($, 'off')).text).toContain('Branches · off for this repository')
   expect(w.config).toEqual([['config', '--local', 'toolkit.branchJanitor', 'false']])
-  const back = await $.prompt.submit({ text: 'branch-janitor on', wait: false, origin: { kind: 'composer' } })
-  expect(back.drop).toBe('Branches · on for this repository')
+  expect((await slash($, 'on')).text).toBe('Branches · on for this repository')
   expect(w.config[1]).toEqual(['config', '--local', '--unset', 'toolkit.branchJanitor'])
 })
 
-test('a prompt that merely contains the words is left alone: it reaches the model and is not answered here', async ($, on) => {
-  const w = world(on, repo({ wip: unmerged(SHA('3')) }))
+test('a bare typed word is not a command: it reaches the model untouched', async ($, on) => {
+  const w = world(on, repo({ done: merged() }))
   passthrough(on)
-  for (const text of ['please run branch-janitor for me', 'what does the janitor do?', 'branch-janitor clean now', 'janitor on', 'clean branches and then commit', 'fix the janitor bug in cleanup branches code']) {
+  for (const text of ['branch-janitor', 'janitor', 'branch-janitor clean', 'branch-janitor off', 'clean branches']) {
     const r = await $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } })
     expect(r).toEqual({ text })
-    expect(r.drop).toBeUndefined()
   }
-  expect(w.cmds).toHaveLength(0) // nothing ran before the timers
-})
-
-test('a plain-word command that fails half way is dropped with an apology, never sent to the model', async ($, on) => {
-  const w = world(on, repo({ done: merged() }, { broken: true }))
-  let reachedModel = 0
-  on('prompt.submit', (_$: any, e: { text: string }) => (reachedModel++, { text: e.text }))
-  const r = await $.prompt.submit({ text: 'branch-janitor', wait: false, origin: { kind: 'composer' } })
-  expect(r.drop).toBeDefined()
-  expect(reachedModel).toBe(0)
+  expect(w.cmds).toHaveLength(0)
   expect(w.deleted).toEqual([])
+  expect(w.config).toEqual([])
 })
 
-test('plain words outside a repository say so', async ($, on) => {
-  world(on, { root: null as never, branches: {} } as Model)
-  passthrough(on)
-  const r = await $.prompt.submit({ text: 'janitor', wait: false, origin: { kind: 'composer' } })
-  expect(r.drop).toBe('Branches · not in a git repository')
-})
-
-// ---------------------------------------------------------------- the slash command's description
-
-test('the slash command is described as a helper the user runs, with the plain words', async ($, on) => {
+test('the slash command is described as a helper the user runs', async ($, on) => {
   const w = world(on, repo({}))
   await $.session.start({ cwd: '/work', surface: 'terminal', isInteractive: true })
   const reg = w.registered.find(r => r.name === 'branch-janitor')!
-  expect(reg.description).toBe('Tidies finished git branches. Runs by itself, or type: branch-janitor. You run this, not Claude.')
-})
-
-// ---------------------------------------------------------------- a drop reason is ONE line
-
-test('dropWith: the first line is the reason, the rest is one ui.log note, control characters are gone', () => {
-  const logged: string[] = []
-  const ui = { log: (t: string) => void logged.push(t) }
-  expect(dropWith(ui, 'Headline\n  second\r\n\n third \u2028 fourth\u0007')).toEqual({ drop: 'Headline' })
-  expect(logged).toEqual(['second\nthird\nfourth'])
-  logged.length = 0
-  expect(dropWith(ui, '  only one line  ')).toEqual({ drop: 'only one line' })
-  expect(dropWith(ui, '\n\n')).toEqual({ drop: 'Branches' })
-  expect(dropWith(ui, 'a\u0000b\tc\u0085d')).toEqual({ drop: 'a b c' }) // U+0085 is a line break too
-  expect(logged).toEqual(['d'])
-  expect(linesOf('x\ny')).toEqual(['x', 'y'])
-  expect(dropWith({ log: () => { throw new Error('no log') } }, 'a\nb')).toEqual({ drop: 'a' }) // a failing log never breaks the reply
-})
-
-const NO_BREAK = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/
-
-test('every plain-word reply is a single-line drop and the rest goes to ui.log', async ($, on) => {
-  const model = repo({ done: merged(), sq: { sha: SHA('2'), cherry: `- ${SHA('2')}\n` }, wip: unmerged(SHA('3')) })
-  const w = world(on, model, { answer: 'Keep' })
-  passthrough(on)
-  const say = async (text: string) => {
-    const before = w.logs.length
-    const r = await $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } })
-    expect(r.drop).toBeDefined()
-    expect(r.drop!).not.toMatch(NO_BREAK)
-    expect(r.drop!.length).toBeGreaterThan(0)
-    return { drop: r.drop!, logged: w.logs.slice(before) }
-  }
-  const list = await say('branch-janitor')
-  expect(list.drop).toBe('Branches · 2 ready to delete, 1 to keep')
-  expect(list.logged).toHaveLength(1)
-  expect(list.logged[0]).toContain('✓ done · merged into main')
-  expect(list.logged[0]!.split('\n').length).toBeGreaterThan(3)
-  const clean = await say('branch-janitor clean') // answered Keep
-  expect(clean.drop).toBe('Branches · kept everything')
-  expect(clean.logged).toEqual([])
-  const off = await say('branch-janitor off')
-  expect(off.drop).toBe('Branches · off for this repository')
-  expect(off.logged).toEqual(['Turn it on again: branch-janitor on'])
-  const on2 = await say('branch-janitor on')
-  expect(on2.drop).toBe('Branches · on for this repository')
-  expect(on2.logged).toEqual([])
-  for (const text of [...w.logs, ...w.toasts]) expect(text).not.toMatch(/[\u0000-\u0009\u000b-\u001f]/)
-})
-
-test('a failing plain-word command is a single-line drop', async ($, on) => {
-  const w = world(on, repo({ done: merged() }, { broken: true }))
-  passthrough(on)
-  const r = await $.prompt.submit({ text: 'janitor', wait: false, origin: { kind: 'composer' } })
-  expect(r.drop).toMatch(/^Branches · /) // git cannot run at all
-  expect(r.drop).not.toMatch(NO_BREAK)
-  expect(w.logs).toEqual([])
+  expect(reg.description).toBe('Tidies finished git branches. Runs by itself, or run /branch-janitor. You run this, not Claude.')
 })

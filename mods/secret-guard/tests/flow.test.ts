@@ -1,4 +1,4 @@
-// The hooks end to end: tool results, the row the model reads, typed prompts, plain words, switches, settings.
+// The hooks end to end: tool results, the row the model reads, typed prompts, /secret-guard, switches, settings.
 import { expect, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
@@ -12,6 +12,10 @@ const readRecord = (content: string) => ({ type: 'text', file: { filePath: '/wor
 const call = ($: Engine, tool: string, args: Record<string, unknown> = {}) => $.tool.call({ tool, ...args } as never) as Promise<Record<string, any>>
 const typed = ($: Engine, text: string, origin: { kind: string; name?: string } = { kind: 'composer' }, extra: object = {}) =>
   $.prompt.submit({ text, wait: false, origin, ...extra } as never) as Promise<{ text?: string; drop?: string }>
+/** The /secret-guard report text, which is multi-line: a headline, then detail lines. */
+const slash = ($: Engine, args = '') =>
+  $.command.run({ command: 'secret-guard', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
+const report = async ($: Engine, args = '') => (await slash($, args)).text ?? ''
 const start = ($: Engine, surface: Surface = 'terminal') => $.session.start({ cwd: '/work', surface, isInteractive: true })
 const everything = (w: { logs: string[] }, ...more: unknown[]) => JSON.stringify([w.logs, more])
 
@@ -99,9 +103,7 @@ test('the note speaks once per turn: later redactions are silent until the next 
   await typed($, 'next question')
   await call($, 'Bash')
   expect(w.logs).toEqual(['Secret guard · hid 2 secrets from tool output', 'Secret guard · hid 2 secrets from tool output'])
-  const t = await typed($, 'secret-guard')
-  expect(t.drop).toBe('Secret guard · on · hid 6 secrets this session')
-  expect(w.logs.at(-1)).toBe('Tool output: github-token 6\nType secret-guard off to pause it.')
+  expect(await report($)).toBe('Secret guard · on · hid 6 secrets this session\nTool output: github-token 6\nType /secret-guard off to pause it.')
 })
 
 test('one secret reads as "1 secret"', async ($, on) => {
@@ -187,9 +189,7 @@ for (const surface of SURFACES) {
     const r = await typed($, text)
     expect(r.text).toBe(text)
     expect(w.submitted).toEqual([text])
-    const report = await typed($, 'secret-guard')
-    expect(report.drop).toBe('Secret guard · on · nothing hidden yet')
-    expect(w.logs.at(-1)).toBe('Typed prompts: sent as typed 1\nType secret-guard off to pause it.')
+    expect(await report($)).toBe('Secret guard · on · nothing hidden yet\nTyped prompts: sent as typed 1\nType /secret-guard off to pause it.')
   })
 
   test(`typed prompt on ${surface}: "Hold it" holds with one reason line and an echo with the secret hidden`, async ($, on) => {
@@ -211,8 +211,7 @@ for (const answer of ['REJECT', 'something else entirely'])
     await start($)
     expect((await typed($, `k=${GH}`)).drop).toBe(HOLD_REASON)
     expect(w.submitted).toEqual([])
-    await typed($, 'secret-guard')
-    expect(w.logs.at(-1)).toBe('Typed prompts: held 1\nType secret-guard off to pause it.')
+    expect(await report($)).toBe('Secret guard · on · nothing hidden yet\nTyped prompts: held 1\nType /secret-guard off to pause it.')
   })
 
 test('the held echo is capped and keeps the start of a long prompt', async ($, on) => {
@@ -251,10 +250,7 @@ test('askOnPrompt=false: typed prompts are not checked at all', { options: { ask
   expect(w.asks).toEqual([])
 })
 
-// ------------------------------------------------------------------------------------------ plain words, /secret-guard, switches
-
-const slash = ($: Engine, args = '') =>
-  $.command.run({ command: 'secret-guard', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
+// ------------------------------------------------------------------------------------------ /secret-guard, switches
 
 test('session start registers /secret-guard', async ($, on) => {
   const w = world(on)
@@ -262,89 +258,62 @@ test('session start registers /secret-guard', async ($, on) => {
   expect(w.registered).toEqual(['secret-guard'])
 })
 
-test('the plain word reports counts by kind, never a secret; it is dropped and never reaches the model', async ($, on) => {
+test('/secret-guard reports counts by kind, never a secret', async ($, on) => {
   const w = world(on, {
     tools: { Bash: () => answered({ stdout: `a=${GH}\nb=${fake.awsKey()}\nDB_PASSWORD=Sup3rS3cretPass\nx=${fake.github(5)}`, stderr: '', interrupted: false }) },
   })
   await start($)
   await call($, 'Bash')
-  for (const word of ['secret-guard', 'Secret-Guard', '  secret-guard.  ']) {
-    w.logs.length = 0
-    const r = await typed($, word)
-    expect(r.drop).toBe('Secret guard · on · hid 4 secrets this session')
-    expect(w.logs).toEqual(['Tool output: github-token 2 · aws-access-key 1 · password 1\nType secret-guard off to pause it.'])
-  }
+  const text = await report($)
+  for (const secret of [GH, fake.github(5), fake.awsKey(), 'Sup3rS3cretPass']) expect(text + everything(w)).not.toContain(secret)
+  expect(text).toBe('Secret guard · on · hid 4 secrets this session\nTool output: github-token 2 · aws-access-key 1 · password 1\nType /secret-guard off to pause it.')
   expect(w.submitted).toEqual([])
-  const text = ((await slash($)).text ?? '') + everything(w)
-  for (const secret of [GH, fake.github(5), fake.awsKey(), 'Sup3rS3cretPass']) expect(text).not.toContain(secret)
-  expect((await slash($)).text).toBe('Secret guard · on · hid 4 secrets this session\nTool output: github-token 2 · aws-access-key 1 · password 1\nType secret-guard off to pause it.')
 })
 
 test('nothing hidden yet is said plainly', async ($, on) => {
   world(on)
   await start($)
-  expect((await slash($)).text).toBe('Secret guard · on · nothing hidden yet\nType secret-guard off to pause it.')
+  expect((await slash($)).text).toBe('Secret guard · on · nothing hidden yet\nType /secret-guard off to pause it.')
 })
 
-test('a prompt that merely contains the words is an ordinary prompt', async ($, on) => {
+test('a bare typed word is not handled: it goes to the model unchanged and the switch is unchanged', async ($, on) => {
   const w = world(on)
   await start($)
-  for (const text of ['please run secret-guard off for me', 'what does secret-guard do?', 'secret-guard off now', 'secret guard', 'secret-guard status', 'secret-guards']) {
-    const r = await typed($, text)
-    expect(r).toEqual({ text })
-  }
-  expect(w.submitted).toHaveLength(6)
+  const texts = ['secret-guard', 'Secret-Guard.', 'secret-guard off', 'please run secret-guard off for me', 'secret-guard status']
+  for (const text of texts) expect(await typed($, text), text).toEqual({ text })
+  expect(w.submitted).toEqual(texts)
+  expect(w.stored).toEqual([])
+  expect(await report($)).toContain('Secret guard · on')
 })
 
-test('plain words only count when typed by the person', async ($, on) => {
-  const w = world(on)
-  await start($)
-  const r = await typed($, 'secret-guard off', { kind: 'plugin', name: 'other' })
-  expect(r.text).toBe('secret-guard off')
-  expect(w.submitted).toEqual(['secret-guard off'])
-})
-
-test('off and on: remembered in the store, tool output and typed prompts follow, the report says so', async ($, on) => {
+test('/secret-guard off and on: remembered in the store, tool output and typed prompts follow, the report says so', async ($, on) => {
   const w = world(on, { tools: { Bash: () => answered({ stdout: `k=${GH}`, stderr: '', interrupted: false }) } })
   await start($)
-  const off = await typed($, 'secret-guard off')
-  expect(off.drop).toBe('Secret guard · off · nothing hidden yet')
-  expect(w.logs.at(-1)).toBe('Type secret-guard on to resume.')
+  expect(await report($, 'off')).toBe('Secret guard · off · nothing hidden yet\nType /secret-guard on to resume.')
   expect(w.stored).toEqual([['enabled', false]])
   expect((await call($, 'Bash')).result.stdout).toBe(`k=${GH}`)
   expect((await typed($, `k=${GH}`)).text).toBe(`k=${GH}`)
   expect(w.asks).toEqual([])
-  const on_ = await typed($, 'secret-guard on')
-  expect(on_.drop).toBe('Secret guard · on · nothing hidden yet')
+  expect(await report($, ' ON ')).toContain('Secret guard · on · nothing hidden yet')
   expect(w.stored).toEqual([['enabled', false], ['enabled', true]])
   expect((await call($, 'Bash')).result.stdout).toBe('k=[secret:github-token]')
+  expect(await report($, 'maybe')).toBe('Secret guard · unknown option “maybe”\nUse /secret-guard, /secret-guard on or /secret-guard off.')
 })
 
-test('/secret-guard off and on do the same as the words', async ($, on) => {
-  world(on, { tools: { Bash: () => answered({ stdout: `k=${GH}`, stderr: '', interrupted: false }) } })
-  await start($)
-  expect((await slash($, 'off')).text).toBe('Secret guard · off · nothing hidden yet\nType secret-guard on to resume.')
-  expect((await call($, 'Bash')).result.stdout).toBe(`k=${GH}`)
-  expect((await slash($, ' ON ')).text).toContain('Secret guard · on')
-  expect((await slash($, 'maybe')).text).toBe('Secret guard · unknown option “maybe”\nUse secret-guard, secret-guard on or secret-guard off.')
-})
-
-test('the off word survives a new session: the store is read at session start', async ($, on) => {
+test('the off switch survives a new session: the store is read at session start', async ($, on) => {
   world(on, { store: { enabled: false }, tools: { Bash: () => answered({ stdout: `k=${GH}`, stderr: '', interrupted: false }) } })
   await start($)
   expect((await call($, 'Bash')).result.stdout).toBe(`k=${GH}`)
-  expect((await slash($)).text).toBe('Secret guard · off · nothing hidden yet\nType secret-guard on to resume.')
+  expect((await slash($)).text).toBe('Secret guard · off · nothing hidden yet\nType /secret-guard on to resume.')
 })
 
-test('enabled=false in settings: nothing is hidden or asked, and the words say it is the setting', { options: { enabled: false } }, async ($, on) => {
+test('enabled=false in settings: nothing is hidden or asked, and /secret-guard says it is the setting', { options: { enabled: false } }, async ($, on) => {
   const w = world(on, { tools: { Bash: () => answered({ stdout: `k=${GH}`, stderr: '', interrupted: false }) } })
   await start($)
   expect((await call($, 'Bash')).result.stdout).toBe(`k=${GH}`)
   expect((await typed($, `k=${GH}`)).text).toBe(`k=${GH}`)
   expect(w.asks).toEqual([])
-  const r = await typed($, 'secret-guard on')
-  expect(r.drop).toBe('Secret guard · off in settings · nothing hidden yet')
-  expect(w.logs.at(-1)).toBe('Turn it on in the plugin settings.')
+  expect(await report($, 'on')).toBe('Secret guard · off in settings · nothing hidden yet\nTurn it on in the plugin settings.')
   expect((await call($, 'Bash')).result.stdout).toBe(`k=${GH}`)
 })
 
@@ -360,14 +329,14 @@ test('redactEmails=true: emails become [secret:email]', { options: { redactEmail
   expect((await call($, 'Read')).result.file.content).toBe('contact: [secret:email]')
 })
 
-test('extraPatterns: custom kind, and a bad pattern is reported at session start and by the word, never thrown', { options: { extraPatterns: 'LAB-[0-9]{6};;(oops;;a*' } }, async ($, on) => {
+test('extraPatterns: custom kind, and a bad pattern is reported at session start and by /secret-guard, never thrown', { options: { extraPatterns: 'LAB-[0-9]{6};;(oops;;a*' } }, async ($, on) => {
   const w = world(on, { tools: { Read: () => answered(readRecord('sample LAB-123456 ok')) } })
   await start($)
   expect(w.logs).toHaveLength(2)
   expect(w.logs[0]).toMatch(/^Secret guard · extra pattern 2 is not a valid regular expression \(/)
   expect(w.logs[1]).toBe('Secret guard · extra pattern 3 matches empty text, ignored')
   expect((await call($, 'Read')).result.file.content).toBe('sample [secret:custom] ok')
-  const r = await typed($, 'secret-guard')
-  expect(r.drop).toBe('Secret guard · on · hid 1 secret this session')
-  expect(w.logs.at(-1)).toContain('Problem: extra pattern 3 matches empty text, ignored')
+  const text = await report($)
+  expect(text).toContain('Secret guard · on · hid 1 secret this session')
+  expect(text).toContain('Problem: extra pattern 3 matches empty text, ignored')
 })

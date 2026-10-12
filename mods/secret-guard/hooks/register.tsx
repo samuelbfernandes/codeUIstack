@@ -4,7 +4,7 @@
 //     reads it; a `session.append` hook on the `tool-result` door is the net under it: it redacts the row the model
 //     actually reads, for EVERY tool and for errored results (which a `tool.call` answer cannot rewrite).
 //  2. Typed prompts. A prompt the person types that holds a secret-looking string is held for one question.
-//  3. Plain word `secret-guard` (and /secret-guard) reports counts by kind; `secret-guard off|on` switches it.
+//  3. `/secret-guard` reports counts by kind; `/secret-guard off|on` switches it.
 //
 // A secret is NEVER logged, stored or counted by value: tallies are kinds and numbers, the question names kinds,
 // and the echo of a held prompt is the redacted text.
@@ -22,7 +22,7 @@ import type { Hits } from './detect'
 import { dropWith } from './reply'
 import { ASK_HEADER, EMPTY_TALLY, HOLD, HOLD_REASON, SEND_AS_TYPED, SEND_REDACTED, announce, askText, report } from './report'
 import { scrubBlocks, scrubValue } from './scrub'
-import { isPeople, plainWord } from './words'
+import { isPeople } from './words'
 
 const COMMAND = 'secret-guard'
 const STORE_KEY = 'enabled'
@@ -34,13 +34,6 @@ const tally = atom({ plugin: 'secret-guard', key: 'tally' } as const, EMPTY_TALL
 const isOnAtom = atom({ plugin: 'secret-guard', key: 'isOn' } as const, null)
 
 const isWatched = (tool: string): boolean => WATCHED.has(tool) || tool.startsWith('mcp__')
-
-/** The plain words: the exact prompt, not a sentence containing one. Anything else after the name is not ours. */
-function wordArg(word: string | undefined): string | undefined {
-  if (word === 'secret-guard') return ''
-  if (word === 'secret-guard on' || word === 'secret-guard off') return word.slice('secret-guard '.length)
-  return undefined
-}
 
 /** Whether the guard is on: the settings switch AND the person's own word (kept in $.store, read once). */
 async function isOn($: EngineInterface, cfg: Config): Promise<boolean> {
@@ -68,10 +61,10 @@ async function note($: EngineInterface, source: 'tool' | 'typed', hits: Hits): P
   }
 }
 
-/** What `secret-guard`, `secret-guard on|off` and `/secret-guard [on|off]` do; the reply is plain text. */
+/** What `/secret-guard [on|off]` does; the reply is plain text. */
 async function run($: EngineInterface, cfg: Config, arg: string): Promise<string> {
   const wanted = arg.trim().toLowerCase()
-  if (wanted !== '' && wanted !== 'on' && wanted !== 'off') return `Secret guard · unknown option “${wanted.slice(0, 30)}”\nUse secret-guard, secret-guard on or secret-guard off.`
+  if (wanted !== '' && wanted !== 'on' && wanted !== 'off') return `Secret guard · unknown option “${wanted.slice(0, 30)}”\nUse /secret-guard, /secret-guard on or /secret-guard off.`
   if (wanted !== '') {
     await $.store.set(STORE_KEY, wanted === 'on')
     await update($, isOnAtom, () => wanted === 'on')
@@ -85,13 +78,13 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     // Fail-open: a store that cannot be read leaves the guard on.
     await isOn($, cfg)
-    await $.command.register({ name: COMMAND, description: 'Show what secret-guard hid this session; on / off switches it (typing secret-guard does the same)', argumentHint: '[on|off]' })
+    await $.command.register({ name: COMMAND, description: 'Show what secret-guard hid this session; on / off switches it', argumentHint: '[on|off]' })
     for (const problem of cfg.problems) safeLog($, `Secret guard · ${problem}`)
     return next(e)
   })
 
-  // Answers its own command and reads no `next`: a failure only skips /secret-guard.
-  on('command.run', { command: COMMAND }, async ($, e) => ({ text: await run($, cfg, e.args) }))
+  // Answers its own command and reads no `next`: a failure only says so.
+  on('command.run', { command: COMMAND }, async ($, e) => ({ text: await run($, cfg, e.args) })).catch(() => ({ text: 'Secret guard · could not read its own state' }))
 
   // 1a. Tool results, as a record. Only an answered result is rewritten; an `{ result }` of our own carries no `ref` or
   // `text`, so core maps it for the model again with the tool's own mapper. The errored ones are the net's job below.
@@ -120,14 +113,8 @@ export const register: Register = (on, options) => {
     return next({ ...e, message: { ...e.message, content: [...content] } })
   }).catch(($, e, next) => next(e))
 
-  // 2 and 3. Plain words first (dropped, so they cost nothing), then the check of what a person typed.
+  // 2. The check of what a person typed.
   on('prompt.submit', async ($, e, next) => {
-    const arg = wordArg(plainWord(e))
-    if (arg !== undefined) {
-      const text = await run($, cfg, arg).catch(() => 'Secret guard · could not read its own state')
-      return dropWith({ log: line => $.ui.log(line) }, text)
-    }
-
     await safe(() => update($, tally, t => (t.hasAnnounced ? { ...t, hasAnnounced: false } : t))) // a new turn may speak once
     if (!cfg.askOnPrompt || !isPeople(e.origin) || !(await isOn($, cfg))) return next(e)
 

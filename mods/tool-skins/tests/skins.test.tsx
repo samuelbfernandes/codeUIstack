@@ -264,43 +264,15 @@ test('components it does not know pass through untouched', async ($, on) => {
   }
 })
 
-// ---- plain words (v0.2.0): skins, skin <theme> --------------------------------------------------
+// ---- slash only ---------------------------------------------------------------------------------
 
 /** The person typing a prompt. */
 const typed = ($: Engine, _on: On, text: string, extra: object = {}) =>
   $.prompt.submit({ text, origin: { kind: 'composer' }, wait: false, ...extra } as never)
 
-test('`skins` lists like /skin and is dropped, not sent', async ($, on) => {
+test('a bare typed skins or skin <theme> is not a command: it reaches the model untouched', async ($, on) => {
   await engine($, on)
-  const listed = (await skin($, '')).text
-  for (const word of ['skins', 'Skins', '  SKINS. ']) {
-    const out = await typed($, on, word)
-    expect(out.drop).toBe((listed ?? '').split('\n')[0])
-    expect(out.text).toBeUndefined()
-  }
-})
-
-for (const surface of SURFACES) {
-  test(`\`skin <theme>\` switches live, persists and redraws (${surface})`, async ($, on) => {
-    await engine($, on)
-    const ui = await $.ui.mount({ plugin: 'tool-skins', surface, component: 'ToolUse', props: BASH })
-    expect(await colorOf(ui, 'Bash')).toBe(THEMES.noir.yellow)
-
-    const out = await typed($, on, 'skin tokyo-night')
-    expect(out.drop).toBe('Skin · Tokyo Night')
-    expect(out.text).toBeUndefined()
-    expect(await colorOf(ui, 'Bash')).toBe(THEMES['tokyo-night'].yellow)
-    expect(writes.at(-1)).toEqual({ key: 'theme', value: 'tokyo-night' })
-
-    expect((await typed($, on, 'Skin DRACULA.')).drop).toBe('Skin · Dracula')
-    expect(await colorOf(ui, 'Bash')).toBe(THEMES.dracula.yellow)
-    await ui.unmount()
-  })
-}
-
-test('`skin <theme>` needs the exact theme name; anything looser or longer goes to the model', async ($, on) => {
-  await engine($, on)
-  for (const text of ['skin', 'skin sol', 'skin tokyonight', 'skin n', 'skin plaid', 'skin dracula please', 'skin  dracula', 'change skin dracula', 'what skins are there', 'skinny']) {
+  for (const text of ['skins', 'Skins.', 'skin', 'skin nord', 'Skin DRACULA.', 'skin tokyo-night']) {
     const out = await typed($, on, text)
     expect(out.drop).toBeUndefined()
     expect(out.text).toBe(text)
@@ -309,37 +281,15 @@ test('`skin <theme>` needs the exact theme name; anything looser or longer goes 
   expect((await skin($, '')).text).toContain('● noir')
 })
 
-test('only the person typing is handled: other senders and attachments pass through', async ($, on) => {
+test('/skin alone lists with the slash hint; /skin <theme> switches', async ($, on) => {
   await engine($, on)
-  expect((await typed($, on, 'skins', { origin: { kind: 'scheduled-trigger' } })).drop).toBeUndefined()
-  expect((await typed($, on, 'skin nord', { origin: { kind: 'peer' } })).drop).toBeUndefined()
-  expect((await typed($, on, 'skin nord', { attachments: [{ type: 'image', data: 'x' }] })).drop).toBeUndefined()
-  expect(writes).toHaveLength(0)
+  expect((await skin($, '')).text).toContain('Run /skin followed by a name to switch.')
+  expect((await skin($, 'Dracula')).text).toBe('Skin · Dracula')
 })
 
-test('a store that fails still drops the word, with a short notice, and the theme stays', async ($, on) => {
+test('a store that fails gives a short notice and the theme stays', async ($, on) => {
   await engine($, on)
   failure.store = true
-  const out = await typed($, on, 'skin nord')
-  expect(out.drop).toBe('Skin · could not change it')
+  expect((await skin($, 'nord')).text).toBe('Skin · could not change it')
   expect((await skin($, '')).text).toContain('● noir')
-})
-
-// ---- one-line drop reasons (the engine draws a newline as a garbled character) ---------------
-
-test('no drop reason has a newline; the overflow lines go to ui.log once', async ($, on) => {
-  await engine($, on)
-  const listed = await typed($, on, 'skins')
-  expect(listed.drop).toBe('Skin · Noir')
-  expect(listed.drop).not.toContain('\n')
-  expect(logs).toEqual([`${THEME_NAMES.map(n => (n === 'noir' ? '● noir' : n)).join(' · ')}\nType skin followed by a name to switch.`])
-
-  logs.length = 0
-  const switched = await typed($, on, 'skin nord')
-  expect(switched.drop).toBe('Skin · Nord')
-  expect(logs).toEqual([]) // one line says it all
-
-  failure.store = true
-  const failed = await typed($, on, 'skin dracula')
-  expect(failed.drop).not.toContain('\n')
 })

@@ -430,7 +430,7 @@ test('/branch-janitor off and on switch the repository, with undo instructions',
   const w = world(on, repo({ done: merged() }))
   const run = (args: string) => $.command.run({ command: 'branch-janitor', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
   const off = await run('off')
-  expect(off.text).toContain('branch-janitor on')
+  expect(off.text).toContain('/branch-janitor on')
   expect(off.text!.split('\n')[0]).toBe('Branches · off for this repository')
   expect(w.config).toEqual([['config', '--local', 'toolkit.branchJanitor', 'false']])
   const report = await run('')
@@ -438,7 +438,7 @@ test('/branch-janitor off and on switch the repository, with undo instructions',
   const back = await run('on')
   expect(back.text).toBe('Branches · on for this repository')
   expect(w.config[1]).toEqual(['config', '--local', '--unset', 'toolkit.branchJanitor'])
-  expect((await run('nonsense')).text).toContain('branch-janitor clean')
+  expect((await run('nonsense')).text).toContain('/branch-janitor clean')
 })
 
 test('/branch-janitor outside a repository', async ($, on) => {

@@ -198,11 +198,9 @@ test('with no room for the pane nothing is asked', async ($, on) => {
   expect(w.forkPrompts).toHaveLength(0)
 })
 
-test('enabled=false asks nothing, for the command and the word', { options: { enabled: false } }, async ($, on) => {
+test('enabled=false asks nothing', { options: { enabled: false } }, async ($, on) => {
   const w = world(on)
   expect((await ask($, w, 'q')).text).toContain('Aside is off')
-  const out = await typed($, 'aside')
-  expect(out.drop).toContain('Aside is off')
   expect(w.forkPrompts).toHaveLength(0)
 })
 
@@ -214,29 +212,12 @@ test('/aside alone explains itself and asks nothing', async ($, on) => {
   expect(w.panes).toEqual([])
 })
 
-test('the plain word aside explains locally and is dropped; sentences and attachments pass', async ($, on) => {
-  const w = world(on)
-  for (const word of ['aside', ' Aside ', 'ASIDE.']) {
-    const out = await typed($, word)
-    expect(out.drop, word).toBe('Aside · ask a side question without touching this conversation')
-  }
-  expect(w.logs.some(l => l.includes('/aside'))).toBe(true)
-  expect(w.forkPrompts).toHaveLength(0)
-
-  for (const text of ['aside what is a p-value', 'as an aside, fix it', '/aside why', 'asides']) {
-    const out = await typed($, text)
-    expect(out.drop, text).toBeUndefined()
-  }
-  const withFile = await $.prompt.submit({ text: 'aside', wait: false, origin: { kind: 'composer' }, attachments: [{ type: 'image' }] } as never)
-  expect(withFile.drop).toBeUndefined()
-})
-
-test('the plain word brings back the kept asides', async ($, on) => {
+test('/aside brings back the kept asides', async ($, on) => {
   const w = world(on)
   await ask($, w, 'q1')
   w.panes = []
-  const out = await typed($, 'aside')
-  expect(out.drop).toBe('Aside · 1 kept in the pane')
+  const out = await slash($, '')
+  expect(out.text).toContain('Aside · 1 kept in the pane')
   expect(w.panes.map(p => p.id)).toEqual(['aside'])
 })
 
@@ -273,13 +254,14 @@ test('while off, /aside <question> sends nothing and says how to turn it on; /as
   expect((await slash($, 'what is REML?')).text).toContain('thinking')
 })
 
-test('typing "aside off" / "aside on" flips the switch and is dropped; a prompt that merely mentions it is not', async ($, on) => {
+test('a bare typed word is not handled: it goes to the model and the switch is unchanged', async ($, on) => {
   const w = world(on)
-  expect(await typed($, 'aside off')).toEqual({ drop: 'Aside · off · type aside on, or click it in the toolbox, to turn it back on' })
-  expect(w.store.get('off')).toBe(true)
-  expect(await typed($, 'Aside on.')).toEqual({ drop: 'Aside · on' })
+  for (const text of ['aside off', 'Aside on.', 'aside', 'please aside off now']) {
+    expect(await typed($, text), text).toEqual({ text })
+  }
   expect(w.store.has('off')).toBe(false)
-  expect(await typed($, 'please aside off now')).toEqual({ text: 'please aside off now' })
+  expect((await slash($, 'off')).text).toContain('Aside · off')
+  expect(w.store.get('off')).toBe(true)
 })
 
 test('enabled = false: on does not override it', { options: { enabled: false } }, async ($, on) => {

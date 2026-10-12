@@ -66,7 +66,7 @@ MOD_META: dict[str, tuple[str, str, bool]] = {
     "budget-guard": ("none", "", True),
     "diagram": ("none", "", False),
     "aside": ("a little: only when you run /aside", "", False),
-    "toolbox": ("none", "", True),
+    "moddeck": ("none", "", True),
 }
 # Mods that spend model credit when used: listed, but not switched on until the person chooses them.
 OFF_BY_DEFAULT = {"aside"}
