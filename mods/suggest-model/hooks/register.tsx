@@ -408,19 +408,21 @@ export const register: Register = (on, options) => {
       await setSwitch($, cfg, !now)
       $.ui.toast(now ? 'suggest-model · on' : 'suggest-model · off')
     }
-    // One control: the colored chip (green on, red off) is itself the button, a plain Button wrapping a
-    // colored Text, so a click anywhere on it flips the switch. No separate Turn on/off label.
+    // One control, drawn as a colored pill: a Box carries the color (green on, red off) so it shows on every
+    // surface, and a plain Button inside it is the click target. The pill sits at the left of the band and
+    // whatever another mod drew there goes to its right, so several mods' pills line up on one row.
+    const bg = off ? 'error' : 'success'
     const row = (
-      <Box key="suggest-model-row">
+      <Box key="suggest-pill" backgroundColor={bg} paddingX={1}>
         <Button key="toggle" plain onPress={flip}>
-          <Text bold color="inverseText" backgroundColor={off ? 'error' : 'success'}>
-            {` suggest-model ${off ? 'off' : 'on'} `}
+          <Text bold color="inverseText" backgroundColor={bg}>
+            {`suggest ${off ? 'off' : 'on'}`}
           </Text>
         </Button>
       </Box>
     )
     const below = await drawnBelow(next, e)
-    return below === undefined ? row : <Box key="suggest-model-band" flexDirection="column">{row}{below as never}</Box>
+    return below === undefined ? row : <Box key="suggest-band" flexDirection="row" gap={1}>{row}{below as never}</Box>
   }).catch(($, e, next) => next(e))
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started

@@ -1,6 +1,6 @@
 {
   "name": "aside",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",

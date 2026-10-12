@@ -24,7 +24,7 @@ Opus is the cheapest model that should handle it. Costlier and slower.
 Options: Keep Sonnet · Switch session to Opus · Run this task as a subagent on Opus · Keep and don't suggest again.
 
 ## Use
-A small coloured pill (green `suggest-model on`, red `suggest-model off`) sits just above the prompt box (terminal and desktop; hide it with the `showButton` setting). Click it to switch checking on or off; it is the same switch as the words below and is remembered across sessions.
+A small coloured pill (green `suggest on`, red `suggest off`) sits just above the prompt box (terminal and desktop; hide it with the `showButton` setting). Click it to switch checking on or off; it is the same switch as the words below and is remembered across sessions.
 
 Type `suggest-model` (status and last 5 checks), `suggest-model off`, `suggest-model on`. Only that exact text is handled; a prompt that merely mentions it goes to the model. `/suggest-model [status|on|off|explain <text>]` also works; `explain` is a free dry run that prints the cues, the per-model ratings, costs and what it would do.
 
