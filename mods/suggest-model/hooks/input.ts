@@ -34,12 +34,12 @@ export const isNotATask = (text: string): boolean => text.startsWith('/') || isC
 export type PlainWord = 'status' | 'on' | 'off'
 
 /**
- * `model-fit`, `model fit`, `model-fit on`, `model-fit off` (and the spaced spellings), EXACTLY:
+ * `suggest-model`, `suggest model`, `suggest-model on`, `suggest-model off` (and the spaced spellings), EXACTLY:
  * trimmed, any case, one optional trailing full stop. A prompt that merely contains the words is not one.
  */
 export function plainWord(text: string): PlainWord | undefined {
   const t = text.trim().toLowerCase().replace(/\.$/, '').trim().replace(/\s+/g, ' ')
-  const m = /^model[- ]fit(?: (on|off))?$/.exec(t)
+  const m = /^suggest[- ]model(?: (on|off))?$/.exec(t)
   if (m === null) return undefined
   return m[1] === 'on' ? 'on' : m[1] === 'off' ? 'off' : 'status'
 }

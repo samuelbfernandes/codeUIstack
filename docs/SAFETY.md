@@ -58,7 +58,7 @@ command it would run, then stops. Nothing is changed. (From a checkout: `sh inst
   questions or refusals; they never approve anything for you.
 - **A global install runs shell scripts on every `git commit` and `git push`** in every repository (git guards). They are in
   `global/githooks/`. A one-project install limits them to that repository. A repository's own hooks keep running.
-- **Codex sends code to OpenAI.** If you tick the second-model review (or choose Codex in `model-fit`), the changed code or
+- **Codex sends code to OpenAI.** If you tick the second-model review (or choose Codex in `suggest-model`), the changed code or
   your prompt is sent to Codex. That is why those items start unticked when Codex is not installed, and why `review-cost`
   shows the size first.
 - **`gh`.** `branch-janitor` runs a read-only `gh pr list` (only if you have `gh`) to see whether a pull request was merged.

@@ -11,6 +11,12 @@
       "description": "Turn off to make /aside and the word aside do nothing (no side question is ever sent).",
       "default": true
     },
+    "showButton": {
+      "type": "boolean",
+      "title": "On/off button",
+      "description": "Show a green/red aside chip in the band above the prompt box (terminal and desktop); clicking it turns /aside on or off.",
+      "default": true
+    },
     "maxAnswerChars": {
       "type": "number",
       "title": "Longest answer kept (characters)",

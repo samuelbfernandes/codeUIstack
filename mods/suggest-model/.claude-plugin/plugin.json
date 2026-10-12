@@ -1,5 +1,5 @@
 {
-  "name": "model-fit",
+  "name": "suggest-model",
   "version": "0.3.3",
   "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost.",
   "author": {
@@ -10,7 +10,7 @@
     "enabled": {
       "type": "boolean",
       "title": "Enabled",
-      "description": "Check every prompt and block with a dialog when the current model looks wrong for it. /model-fit on|off (or typing model-fit on|off) toggles it too.",
+      "description": "Check every prompt and block with a dialog when the current model looks wrong for it. /suggest-model on|off (or typing suggest-model on|off) toggles it too.",
       "default": true
     },
     "minConfidence": {
@@ -50,13 +50,13 @@
     "statusLine": {
       "type": "boolean",
       "title": "Status line",
-      "description": "Show a one-line, non-blocking verdict after each checked prompt, for example \"model-fit: Opus fits\" or \"model-fit: overkill, Haiku would do (~5x cheaper)\".",
+      "description": "Show a one-line, non-blocking verdict after each checked prompt, for example \"suggest-model: Opus fits\" or \"suggest-model: overkill, Haiku would do (~5x cheaper)\".",
       "default": true
     },
     "showButton": {
       "type": "boolean",
       "title": "On/off button",
-      "description": "Show a small ON/OFF button in the band above the prompt box (terminal and desktop) that turns model-fit on or off. It never replaces another band.",
+      "description": "Show a small ON/OFF button in the band above the prompt box (terminal and desktop) that turns suggest-model on or off. It never replaces another band.",
       "default": true
     },
     "costRatios": {

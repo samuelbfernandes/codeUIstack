@@ -8,7 +8,5 @@
   "license": "MIT",
   "tagline": "Safety and productivity mods for Claude Code, built for scientists.",
   "_note": "Single source of truth for the project name. Change it with: python scripts/rename.py --name NEWNAME --github OWNER/REPO. 'marketplace' must not contain the word claude. 'legacy' lists earlier names: status, update, install and uninstall find installs made under them and move them to the current name.",
-  "legacy": [
-    "sci-toolkit"
-  ]
+  "legacy": []
 }

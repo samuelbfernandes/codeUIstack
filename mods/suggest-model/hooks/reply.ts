@@ -16,7 +16,7 @@ export function dropWith(log: (text: string) => void, text: string): { drop: str
     .split(/\r\n|\r|\n/)
     .map(line => line.trim())
     .filter(line => line !== '')
-  const drop = oneLine(lines[0] ?? '') || 'model-fit'
+  const drop = oneLine(lines[0] ?? '') || 'suggest-model'
   const rest = lines.slice(1)
   if (rest.length > 0) {
     try {

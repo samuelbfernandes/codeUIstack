@@ -1,4 +1,4 @@
-// model-fit: every prompt the person types is checked locally (keyword rules, no model call by
+// suggest-model: every prompt the person types is checked locally (keyword rules, no model call by
 // default, zero tokens) for two risks: the current model is likely too WEAK for the task, or it is
 // OVERKILL for it. Each check refreshes a one-line status ($.ui.status); only a mismatch at or above
 // the confidence bar opens a dialog and BLOCKS the prompt until it is answered: switch the session,
@@ -13,9 +13,9 @@
 //
 // FAIL OPEN for everything except the question itself: an error in the predictor, state, switch,
 // spawn or Codex sends the prompt exactly as typed. The deliberate drops are: a prompt that is exactly
-// a model-fit plain word (handled here), a prompt sent to a subagent the person asked for, and a prompt
+// a suggest-model plain word (handled here), a prompt sent to a subagent the person asked for, and a prompt
 // HELD because the person dismissed the dialog (Esc) with `onDismiss` = hold, the default. A held
-// prompt is echoed back in full so nothing typed is lost; `model-fit off` ends any trap.
+// prompt is echoed back in full so nothing typed is lost; `suggest-model off` ends any trap.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
@@ -31,16 +31,16 @@ import type { Alias, Family } from './gate'
 import { isNotATask, plainWord } from './input'
 import { TIER_WORD, isStrong, predict, wordCount } from './predict'
 import type { Prediction } from './predict'
-import type { ModelFitEntry } from '../types'
+import type { SuggestModelEntry } from '../types'
 
 type Dollar = EngineInterface
 
-const seen = atom({ plugin: 'model-fit', key: 'seen' } as const, 0)
-const isMuted = atom({ plugin: 'model-fit', key: 'isMuted' } as const, false)
+const seen = atom({ plugin: 'suggest-model', key: 'seen' } as const, 0)
+const isMuted = atom({ plugin: 'suggest-model', key: 'isMuted' } as const, false)
 /** Mirror of the persisted on/off switch (`$.store` 'off'), so the button redraws when ANY path flips it. */
-const isOff = atom({ plugin: 'model-fit', key: 'isOff' } as const, false)
-const codexOk = atom({ plugin: 'model-fit', key: 'codexOk' } as const, null)
-const recent = atom({ plugin: 'model-fit', key: 'recent' } as const, [])
+const isOff = atom({ plugin: 'suggest-model', key: 'isOff' } as const, false)
+const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
+const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
 
 // Only the person typing is ever analysed. 'bridge' is the same person on a phone or the web.
 const PERSON = new Set(['composer', 'bridge'])
@@ -115,9 +115,9 @@ async function tally($: Dollar, kind: 'a' | 'd'): Promise<void> {
   })
 }
 
-const OFF_STATUS = 'model-fit: off · type model-fit on'
+const OFF_STATUS = 'suggest-model: off · type suggest-model on'
 
-/** The one place the switch changes, for the button, the plain words and /model-fit alike. */
+/** The one place the switch changes, for the button, the plain words and /suggest-model alike. */
 async function setSwitch($: Dollar, cfg: Cfg, off: boolean): Promise<void> {
   if (off) {
     await $.store.set('off', true)
@@ -138,7 +138,7 @@ async function isOn($: Dollar, cfg: Cfg): Promise<boolean> {
 // ------------------------------------------------------------------------ bookkeeping
 
 async function note($: Dollar, text: string, p: Prediction, outcome: string): Promise<void> {
-  const entry: ModelFitEntry = { snippet: snippet(text), tier: p.tier, confidence: p.confidence, reasons: p.reasons.slice(0, 3), outcome }
+  const entry: SuggestModelEntry = { snippet: snippet(text), tier: p.tier, confidence: p.confidence, reasons: p.reasons.slice(0, 3), outcome }
   await quietly(() => update($, recent, list => [...list, entry].slice(-KEEP_RECENT)))
 }
 
@@ -235,7 +235,7 @@ async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, c
 
   let answer: string
   try {
-    answer = await $.ui.ask(dialog.question, { options: dialog.order.map(c => dialog.labels[c]), header: 'Model fit' })
+    answer = await $.ui.ask(dialog.question, { options: dialog.order.map(c => dialog.labels[c]), header: 'Model choice' })
   } catch {
     // Esc or an interrupt. By default the prompt is HELD (not sent), and echoed so nothing typed is lost.
     if (cfg.onDismiss === 'send') {
@@ -253,21 +253,21 @@ async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, c
 /** After Esc: a one-line reason (the drop box); the prompt text goes to the transcript so nothing typed is lost. */
 export function heldMessage(text: string): string {
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
-  return ['model-fit blocked your prompt · nothing was sent. Send it again to choose, or type model-fit off.', shown].join('\n')
+  return ['suggest-model blocked your prompt · nothing was sent. Send it again to choose, or type suggest-model off.', shown].join('\n')
 }
 
 async function act($: Dollar, cfg: Cfg, choice: Choice, text: string, alias: Alias | undefined): Promise<Outcome> {
   if (choice === 'mute') {
     await update($, isMuted, () => true)
     await tally($, 'd')
-    $.ui.toast('model-fit · muted for this session. The status line stays.')
+    $.ui.toast('suggest-model · muted for this session. The status line stays.')
     return PASS
   }
   if (choice === 'switch' && alias !== undefined) {
     await tally($, 'a')
     const r = await switchModel({ list: () => $.config.list(), set: (key, value) => $.config.set({ key, value }) }, alias)
-    $.ui.toast(r.isSwitched ? `model-fit · switched to ${nameOf(alias)}` : manualSwitchHint(alias))
-    if (r.isSwitched) await showStatus($, cfg, `model-fit: switched to ${nameOf(alias)}`)
+    $.ui.toast(r.isSwitched ? `suggest-model · switched to ${nameOf(alias)}` : manualSwitchHint(alias))
+    if (r.isSwitched) await showStatus($, cfg, `suggest-model: switched to ${nameOf(alias)}`)
     return PASS // the prompt itself continues; the new model reads it if the switch took
   }
   if (choice === 'subagent' && alias !== undefined) {
@@ -275,15 +275,15 @@ async function act($: Dollar, cfg: Cfg, choice: Choice, text: string, alias: Ali
     if (await spawnSubagent(args => $.agent.spawn(args), text, alias)) {
       return { kind: 'drop', reason: `Sent to a ${alias} subagent; its answer will appear when done` }
     }
-    $.ui.toast('model-fit · could not start the subagent, sending to the current model')
+    $.ui.toast('suggest-model · could not start the subagent, sending to the current model')
     return PASS
   }
   if (choice === 'codex') {
     await tally($, 'a')
-    $.ui.toast('model-fit · asking Codex, read-only (can take a few minutes)', { timeoutMs: 8000 })
+    $.ui.toast('suggest-model · asking Codex, read-only (can take a few minutes)', { timeoutMs: 8000 })
     const r = await runCodex(runner($), await quietly(() => $.session.cwd()), text)
     if (!r.ok) {
-      $.ui.toast(`model-fit · Codex did not answer (${r.why}), sending as typed`, { timeoutMs: 8000 })
+      $.ui.toast(`suggest-model · Codex did not answer (${r.why}), sending as typed`, { timeoutMs: 8000 })
       return PASS
     }
     $.ui.log(`Codex review · read-only\n${r.text}`)
@@ -306,7 +306,7 @@ function verdictText(fit: Fit, current: Family | undefined): string {
 }
 
 async function explain($: Dollar, text: string, cfg: Cfg): Promise<string> {
-  if (text.trim() === '') return 'Usage: model-fit explain <text to test>'
+  if (text.trim() === '') return 'Usage: suggest-model explain <text to test>'
   const p = predict(text)
   const current = familyOf((await quietly(() => $.session.model())) ?? '')
   const fit = judge(p, current, cfg.minConfidence, cfg.costs, cfg.askOnStandard)
@@ -331,13 +331,13 @@ async function status($: Dollar, cfg: Cfg): Promise<string> {
   const rows = list.map(r => `${TIER_WORD[r.tier].toLowerCase()} ${r.confidence.toFixed(2)} “${r.snippet}” · ${r.reasons.join(', ')} → ${r.outcome}`)
   const costs = (['haiku', 'sonnet', 'opus', 'fable'] as const).filter(f => cfg.costs[f] !== undefined).map(f => `${nameOf(f)} ${cfg.costs[f]}x`).join(' · ')
   return [
-    `model-fit · ${on ? 'on' : 'off'} · ${model === undefined ? 'unrecognised model' : nameOf(model)}`,
+    `suggest-model · ${on ? 'on' : 'off'} · ${model === undefined ? 'unrecognised model' : nameOf(model)}`,
     on
       ? `Blocks and asks on a mismatch (confidence ≥ ${cfg.minConfidence.toFixed(2)})${cfg.askOnStandard ? ', ordinary tasks too' : ''}. Esc ${cfg.onDismiss === 'hold' ? 'holds the prompt' : 'sends it'}.`
-      : 'Not checking prompts. Type model-fit on to resume.',
+      : 'Not checking prompts. Type suggest-model on to resume.',
     `${costs} (rough, set in costRatios)`,
     total === 0 ? 'No answers yet' : `${c.accepted} accepted · ${c.dismissed} dismissed`,
-    ...((await read($, isMuted)) ? ['Questions muted this session. Type model-fit on to lift it.'] : []),
+    ...((await read($, isMuted)) ? ['Questions muted this session. Type suggest-model on to lift it.'] : []),
     ...(cfg.costProblems.length > 0 ? [`Ignored in costRatios: ${cfg.costProblems.join(', ')}.`] : []),
     ...(rows.length > 0 ? ['Recent', ...rows.map(r => `  ${r}`)] : []),
   ].join('\n')
@@ -349,14 +349,14 @@ async function runCommand($: Dollar, args: string, cfg: Cfg): Promise<string> {
   if (arg === 'explain') return explain($, rest.join(' '), cfg)
   if (arg === 'off') {
     await setSwitch($, cfg, true)
-    return 'model-fit · off\nNo prompt is checked. Type model-fit on to resume.'
+    return 'suggest-model · off\nNo prompt is checked. Type suggest-model on to resume.'
   }
   if (arg === 'on') {
-    if (!cfg.isEnabled) return 'model-fit · disabled\nThe enabled setting is false. Change it in /config.'
+    if (!cfg.isEnabled) return 'suggest-model · disabled\nThe enabled setting is false. Change it in /config.'
     await setSwitch($, cfg, false)
   }
   const text = await status($, cfg)
-  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: model-fit · model-fit on · model-fit off · model-fit explain <text>`
+  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: suggest-model · suggest-model on · suggest-model off · suggest-model explain <text>`
 }
 
 // --------------------------------------------------------------------- register
@@ -382,16 +382,16 @@ export const register: Register = (on, options) => {
     })
     await quietly(() =>
       $.command.register({
-        name: 'model-fit',
-        description: 'Model fit: status, on, off, or explain <text> (or just type model-fit)',
+        name: 'suggest-model',
+        description: 'Suggest model: status, on, off, or explain <text> (or just type suggest-model)',
         argumentHint: 'status|on|off|explain <text>',
       }),
     )
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('command.run', { command: 'model-fit' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
-    text: 'model-fit · that did not work, nothing changed',
+  on('command.run', { command: 'suggest-model' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
+    text: 'suggest-model · that did not work, nothing changed',
   }))
 
   // The on/off button sits in the band directly above the prompt (the lowest slot under the chat; the
@@ -406,21 +406,21 @@ export const register: Register = (on, options) => {
     const flip = async () => {
       const now = await read($, isOff)
       await setSwitch($, cfg, !now)
-      $.ui.toast(now ? 'model-fit · on' : 'model-fit · off')
+      $.ui.toast(now ? 'suggest-model · on' : 'suggest-model · off')
     }
-    // The colored chip is a plain Text (a color is drawn the same on every surface; a desktop draws its
-    // own native button, which may ignore the colors of its children). The Button beside it only flips.
+    // One control: the colored chip (green on, red off) is itself the button, a plain Button wrapping a
+    // colored Text, so a click anywhere on it flips the switch. No separate Turn on/off label.
     const row = (
-      <Box key="model-fit-row">
-        <Text bold color="inverseText" backgroundColor={off ? 'error' : 'success'}>
-          {` model-fit ${off ? 'off' : 'on'} `}
-        </Text>
-        <Text> </Text>
-        <Button key="toggle" variant="secondary" label={off ? 'Turn on' : 'Turn off'} onPress={flip} />
+      <Box key="suggest-model-row">
+        <Button key="toggle" plain onPress={flip}>
+          <Text bold color="inverseText" backgroundColor={off ? 'error' : 'success'}>
+            {` suggest-model ${off ? 'off' : 'on'} `}
+          </Text>
+        </Button>
       </Box>
     )
     const below = await drawnBelow(next, e)
-    return below === undefined ? row : <Box key="model-fit-band" flexDirection="column">{row}{below as never}</Box>
+    return below === undefined ? row : <Box key="suggest-model-band" flexDirection="column">{row}{below as never}</Box>
   }).catch(($, e, next) => next(e))
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started
@@ -428,7 +428,7 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     const word = PERSON.has(e.origin.kind) ? plainWord(e.text) : undefined
     if (word !== undefined) {
-      const reply = await runCommand($, word === 'status' ? '' : word, cfg).catch(() => 'model-fit · that did not work, nothing changed')
+      const reply = await runCommand($, word === 'status' ? '' : word, cfg).catch(() => 'suggest-model · that did not work, nothing changed')
       return dropWith(note => $.ui.log(note), reply)
     }
     const out = await review($, e, cfg).catch((): Outcome => PASS)

@@ -53,7 +53,7 @@ class Detected:
 # name -> (token note, needs, start-here)
 MOD_META: dict[str, tuple[str, str, bool]] = {
     "blast-radius": ("none", "", True),
-    "model-fit": ("none (local rules)", "", True),
+    "suggest-model": ("none (local rules)", "", True),
     "branch-janitor": ("none", "", True),
     "cache-tax": ("none (keep-warm pings are optional)", "", True),
     "review-cost": ("none (only estimates)", "codex", True),

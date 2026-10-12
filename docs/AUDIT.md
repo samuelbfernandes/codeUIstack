@@ -14,16 +14,16 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | cache-tax | no | none | no | yes | classic.SessionStart, command.run, prompt.submit, session.end, session.start, turn.complete, turn.start |
 | diagram | no | none | no | no | command.run, prompt.submit, session.end, session.start, turn.complete, ui.render |
 | filetree | no | git | no | no | command.run, prompt.submit, session.start, tool.call, ui.render |
-| model-fit | no | codex | no | yes | command.run, prompt.submit, session.start, ui.render |
 | reflect | no | none | yes | yes | command.run, prompt.submit, session.start, ui.render |
 | replay-theater | no | none | no | no | command.run, prompt.submit, session.end, session.start, tool.call, turn.complete, turn.start, ui.render |
 | review-cost | no | git | no | no | tool.call, ui.render |
 | savvy-progress | no | none | no | no | agent.spawn, command.run, prompt.submit, session.start, tool.call, turn.complete, turn.step, ui.render |
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
+| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start, ui.render |
 | tool-skins | no | none | no | no | command.run, prompt.submit, session.start, ui.render |
 
 "Writes files" means the mod can write through Claude Code's file API (reflect does, only when you press Save).
-"Spends model tokens" means the mod can ask a model something itself (reflect: a small model once per correction; cache-tax: optional keep-warm pings; model-fit: only if you pick the subagent option).
+"Spends model tokens" means the mod can ask a model something itself (reflect: a small model once per correction; cache-tax: optional keep-warm pings; suggest-model: only if you pick the subagent option).
 
 ## Shell scripts (git guards)
 

@@ -133,15 +133,15 @@ export function judge(p: Prediction, current: Family | undefined, minConfidence:
 export function statusText(fit: Fit, current: Family | undefined, costs: Costs): string | undefined {
   if (current === undefined || fit.kind === 'none') return undefined
   const me = nameOf(current)
-  if (fit.kind === 'fits') return `model-fit: ${me} fits`
-  if (fit.kind === 'review') return 'model-fit: review, Codex available'
+  if (fit.kind === 'fits') return `suggest-model: ${me} fits`
+  if (fit.kind === 'review') return 'suggest-model: review, Codex available'
   const rec = nameOf(fit.recommended)
   if (fit.kind === 'hint') {
-    if (fit.why === 'borderline') return `model-fit: ${me} is borderline for this, ${rec} is safer`
+    if (fit.why === 'borderline') return `suggest-model: ${me} is borderline for this, ${rec} is safer`
     const by = cheaperBy(costs, current, fit.recommended)
-    return `model-fit: ${rec} would do${by ? ` (${by})` : ''}`
+    return `suggest-model: ${rec} would do${by ? ` (${by})` : ''}`
   }
-  if (fit.risk === 'under') return `model-fit: weak for this, use ${rec}`
+  if (fit.risk === 'under') return `suggest-model: weak for this, use ${rec}`
   const by = cheaperBy(costs, current, fit.recommended)
-  return `model-fit: overkill, ${rec} would do${by ? ` (${by})` : ''}`
+  return `suggest-model: overkill, ${rec} would do${by ? ` (${by})` : ''}`
 }

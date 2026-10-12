@@ -68,7 +68,7 @@ export async function switchModel(config: ConfigApi, alias: Alias): Promise<Swit
 }
 
 export const manualSwitchHint = (alias: Alias): string =>
-  `model-fit: could not switch automatically. Type /model ${alias} yourself.`
+  `suggest-model: could not switch automatically. Type /model ${alias} yourself.`
 
 // ---------------------------------------------------------------------- subagent
 

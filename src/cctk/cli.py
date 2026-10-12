@@ -29,6 +29,9 @@ def parser(cli_name: str) -> argparse.ArgumentParser:
     ins.add_argument("--with", dest="with_", action="append", metavar="ID", help="switch an item on (repeatable; see `list`)")
     ins.add_argument("--without", action="append", metavar="ID", help="switch an item off (repeatable)")
     ins.add_argument("--mods", metavar="LIST", help="install exactly these mods (comma separated), or 'all' / 'none'")
+    preset = ins.add_mutually_exclusive_group()
+    preset.add_argument("--standard", action="store_true", help="one line, no questions: the recommended set (same as -y with the defaults)")
+    preset.add_argument("--all", action="store_true", help="one line, no questions: every mod, rule, skill and git guard (built-in features and third-party plugins stay at their defaults)")
     ins.add_argument("-y", "--yes", action="store_true", help="no questions: use the defaults (plus --with/--without)")
     ins.add_argument("--plan", action="store_true", help="print exactly what would change and stop; changes nothing")
     ins.add_argument("--force-hooks", action="store_true", help="replace an existing git core.hooksPath (default: keep it)")
@@ -73,6 +76,8 @@ def _selection(args, det, root, saved: set[str] | None) -> set[str]:
     items = catalog.available(det, root)
     ids = {i.id for i in items}
     sel = set(saved) if saved is not None else catalog.defaults(det, root)
+    if getattr(args, "all", False):
+        sel |= {i.id for i in items if i.group in (catalog.GROUP_MOD, catalog.GROUP_RULE) and det.platform in i.platforms and (i.group == catalog.GROUP_MOD or not i.needs or det.has(i.needs))}
     if getattr(args, "mods", None):
         mod_ids = {i.id for i in items if i.group == catalog.GROUP_MOD}
         want = mod_ids if args.mods == "all" else set() if args.mods == "none" else set(_split([args.mods]))
@@ -92,6 +97,8 @@ def _selection(args, det, root, saved: set[str] | None) -> set[str]:
 
 
 def cmd_install(args, update: bool = False) -> int:
+    if getattr(args, "standard", False) or getattr(args, "all", False):
+        args.yes = True   # a preset is the one-line install: it asks nothing (add --plan to only look)
     det, root = catalog.Detected.probe(), payload.data_root()
     ident, home, cli = payload.identity(root), Path.home(), ClaudeCLI()
     talk = ui.interactive() and not args.yes and not getattr(args, "plan", False)
@@ -150,7 +157,7 @@ def cmd_install(args, update: bool = False) -> int:
 
 def _done(lay: installer.Layout, ctx: installer.Ctx, ident: dict) -> None:
     print("\nDone." + (f" {len(ctx.warnings)} warning(s) above." if ctx.warnings else ""))
-    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; type a word alone to ask one:  branch-janitor   model-fit   cache-tax")
+    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; type a word alone to ask one:  branch-janitor   suggest-model   cache-tax")
     print(f"What each tool does: {lay.stage / 'docs' / 'TOOLS.md'}" if (lay.stage / "TOOLS.md").exists() else "What each tool does: see docs/TOOLS.md in the repository.")
     cli = ident["cli"]
     where = "" if lay.user else f" --scope project --project {lay.project}"
