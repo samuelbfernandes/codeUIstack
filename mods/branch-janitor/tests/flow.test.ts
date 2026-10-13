@@ -127,14 +127,15 @@ test('rate limit: one scan per repo per minMinutes unless the command was a merg
   expect(scans()).toBe(3)
 })
 
-test('delete (merged): git branch -d, one toast and one transcript line with the restore command', async ($, on) => {
+test('delete (merged): git branch -d, one toast and transcript lines with the restore command', async ($, on) => {
   const w = world(on, repo({ done: merged() }), { answer: 'Delete branch' })
   const r = await merge($)
   expect(w.deleted).toEqual([{ flag: '-d', name: 'done' }])
   expect(w.cmds.find(c => c[6] === 'branch')).toEqual(expect.arrayContaining(['branch', '-d', '--', 'done']))
   expect(w.toasts).toHaveLength(1)
   expect(w.toasts[0]).toBe(`Deleted 1 branch · restore with:\ngit branch done ${DONE}`)
-  expect(w.logs[0]).toBe(w.toasts[0])
+  expect(w.logs).toEqual(['Deleted 1 branch · restore with:', `git branch done ${DONE}`])
+  expect(w.logs.every(l => !l.includes('\n'))).toBe(true) // a newline in $.ui.log draws as a stray glyph
   expect((r.result as { stdout: string }).stdout).toBe('ran git merge done')
 })
 

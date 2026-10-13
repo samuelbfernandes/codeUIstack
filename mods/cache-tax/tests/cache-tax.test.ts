@@ -374,18 +374,19 @@ test('the cold stop reason has no line break; the detail goes to ui.log', STOP, 
   expect(w.logs[0]).toContain('Idle')
 })
 
-test('dropWith: first line is the reason, the rest is one ui.log call', () => {
+test('dropWith: first line is the reason, the rest is one ui.log call per line, none with a line break', () => {
   const logged: string[] = []
   const ui = (text: string) => void logged.push(text)
 
   expect(dropWith(ui, 'one line only')).toEqual({ drop: 'one line only' })
   expect(logged).toEqual([])
 
-  expect(dropWith(ui, '  head\u0007er \t x  \n\n   a  \r\n b\n  ')).toEqual({ drop: 'head er x' })
-  expect(logged).toEqual(['a\nb'])
+  expect(dropWith(ui, '  head\u0007er \t x  \n\n   a  \r\n b\n\u0007\n\tc\u0007d\n  ')).toEqual({ drop: 'head er x' })
+  expect(logged).toEqual(['   a', ' b', '  c d'])
+  expect(logged.every(l => !/[\r\n]/.test(l))).toBe(true) // a newline in $.ui.log draws as a stray glyph
 
   expect(dropWith(ui, '\n \n')).toEqual({ drop: 'cache-tax' })
-  expect(logged).toHaveLength(1)
+  expect(logged).toHaveLength(3)
 
   // a log that throws never undoes the drop
   const broken = () => { throw new Error('no surface') }
@@ -716,4 +717,16 @@ test('clock formatting: expiry, past, null, 12 hour, bad input', async () => {
   expect(cacheClockLine(noon, 87.5, now)).toBe('Cache until 14:30 · hit 87.5%')
   expect(cacheClockLine(noon - 2 * MIN, null, now)).toBe('Cache expired')
   expect(cacheClockLine(null, null, now)).toBe('Cache until unknown')
+})
+
+test('a held multi-line prompt is echoed one transcript line per line, indentation kept, none with a line break', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1')
+  await w.clock.advance(61 * MIN)
+
+  w.answer = 'Hold it'
+  await submit($, 'fix this:\n\ndef f():\n    return 1\n')
+  expect(w.logs).toEqual(['fix this:', 'def f():', '    return 1'])
+  expect(w.logs.every(l => !/[\r\n]/.test(l))).toBe(true)
 })

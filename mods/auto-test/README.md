@@ -5,8 +5,8 @@ Install (Claude Code 2.1.295 or later): `/plugin install auto-test --marketplace
 ## What it does
 Runs your project's tests once at the end of a turn in which Claude edited files (Edit, Write or NotebookEdit),
 and shows the result: a toast `auto-test · passed (12s)` or `auto-test · FAILED`. On a failure the last 40 lines of
-the output are also printed in the transcript. It is **off until you turn it on**, because running tests costs time.
-Nothing is sent to the model, so it costs no tokens.
+the output are also printed in the transcript, each on its own line so they can be copied. It is **off until you turn
+it on**, because running tests costs time. Nothing is sent to the model, so it costs no tokens.
 
 ## Use
 - `/auto-test on` / `/auto-test off`: the switch. It is remembered across sessions.

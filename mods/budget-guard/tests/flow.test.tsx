@@ -459,3 +459,11 @@ test('fail open: a dollar limit with an unreadable usage still lets the prompt t
   w.usageThrows = true
   expect((await submit($, 'hello')).drop).toBeUndefined()
 })
+
+test('a held multi-line prompt is echoed one transcript line per line, indentation kept, none with a line break', LIMIT, async ($, on) => {
+  const w = world(on)
+  w.rateLimits = W5(82, '2026-01-01T11:12:00Z')
+  await submit($, 'fix this:\n\ndef f():\n\treturn 1\r\n')
+  expect(w.logs).toEqual(['fix this:', 'def f():', '  return 1'])
+  expect(w.logs.every(l => !/[\r\n]/.test(l))).toBe(true) // a newline in $.ui.log draws as a stray glyph
+})
