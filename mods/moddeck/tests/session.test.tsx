@@ -559,6 +559,7 @@ test('the permission mode shows only when it is not the ordinary one, red for by
   await start($, w)
   const pane = await mount($)
   expect(await texts(pane)).toContain('permissions bypassed !')
+  expect(await texts(pane)).toContain('Mode: ') // its label, with a colon
   expect(await colorOf(pane, 'permissions bypassed !')).toContain('error')
 })
 

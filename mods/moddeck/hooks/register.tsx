@@ -9,7 +9,7 @@ import type { BtwEntry } from '../types'
 import { addEntry, buildPrompt, cutAnswer, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
 import { GROUPS, SKILLS, TOOLS, priced, splitCommand } from './catalog'
 import type { Action, Option, SavedPrompt, Tool } from './catalog'
-import { CARD_CHROME, CARD_GAP, DESC_MIN, barTarget, listAt, packCards, pillText, scrollBar } from './layout'
+import { CARD_CHROME, barTarget, listAt, pillText, scrollBar } from './layout'
 import type { BottomList } from './layout'
 import { linkedWorktree, parseStatusV2 } from './gitinfo'
 import type { GitInfo } from './gitinfo'
@@ -42,6 +42,14 @@ const WIDE_COLUMNS = 96
 const HINT = 'Side panel · use /tui fullscreen'
 const FAILED = 'Moddeck · could not open'
 const PANE_SURFACES = new Set(['terminal', 'desktop'])
+/** The app's pills ("Deep solid"): white on a deep fill, the same in every theme. Green on, red off, gray a command. */
+const PILL = { on: '#166534', off: '#991B1B', run: '#374151', text: '#FFFFFF' } as const
+/** Inside the app's boxes: the fill, the text, the descriptions and the clickable words, for a dark and a light theme. */
+type Ink = { fill: string; text: string; desc: string; link: string }
+const INK: Record<'dark' | 'light', Ink> = {
+  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5' },
+  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5' },
+}
 
 const autoOpen = atom({ plugin: 'moddeck', key: 'autoOpen' } as const, 'new')
 /** First row shown in each scrolling list (`skills`, `prompts`): a list shows a few rows at a time, with a scroll bar, when it has many. */
@@ -132,12 +140,17 @@ async function valueOf(read: Promise<unknown>): Promise<unknown> {
 }
 
 const firstLine = (text: string | undefined): string => (text ?? '').split('\n')[0]?.trim() ?? ''
+/** `$.ui.log` draws one transcript line, where a newline shows as a stray glyph: the lines are joined with " · " instead. */
+export const oneLine = (text: string): string =>
+  text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .join(' · ')
 
-/** Show a command's reply: its first line as a toast, the whole text in the transcript. */
+/** Show a command's reply: its first line as a toast (the engine already prints the whole reply under the command). */
 function show($: Dollar, text: string | undefined, fallback: string): void {
-  const body = (text ?? '').trim()
-  $.ui.toast(firstLine(body) || fallback)
-  if (body.includes('\n')) $.ui.log(body)
+  $.ui.toast(firstLine((text ?? '').trim()) || fallback)
 }
 
 /** A switch click: run the mod's own `on` / `off` at once. */
@@ -318,7 +331,7 @@ async function runUpdate($: Dollar, latest: string): Promise<void> {
       await update($, updateAvail, () => null)
       $.ui.toast(`Moddeck ${latest} installed · restart Claude Code to use it`, { timeoutMs: 15_000 })
     } else {
-      $.ui.log(`Moddeck update failed (exit ${out.exitCode})\n${(out.stderr || out.stdout).split('\n').slice(-8).join('\n')}`)
+      $.ui.log(oneLine(`Moddeck update failed (exit ${out.exitCode})\n${(out.stderr || out.stdout).split('\n').slice(-8).join('\n')}`))
       $.ui.toast(manual, { timeoutMs: 15_000 })
     }
   } catch {
@@ -408,6 +421,13 @@ async function refreshGit($: Dollar): Promise<void> {
   }
   const times = [await stamp(['git', '--no-optional-locks', 'log', '-1', '--format=%ct']), await stamp(['git', '--no-optional-locks', 'for-each-ref', '--sort=-creatordate', '--count=1', '--format=%(creatordate:unix)', 'refs/moddeck/checkpoints'])].filter((t): t is number => t !== undefined)
   await safe(() => update($, backupAt, () => (times.length > 0 ? Math.max(...times) : null)))
+}
+
+/** The theme picked in /config: a light one gets the light box colours, any other (or none readable) the dark ones. */
+async function inkOf($: Dollar): Promise<Ink> {
+  const rows = await attempt(() => $.config.list())
+  const theme = rows?.find(r => r.key === 'theme')?.value
+  return typeof theme === 'string' && /light/i.test(theme) ? INK.light : INK.dark
 }
 
 /** The permission mode set in the settings (or a config row, where the menu has one). The mode Shift+Tab switches to mid-session is not readable by a mod. */
@@ -738,6 +758,18 @@ export const register: Register = (on, options) => {
     const isInline = e.props.placement === 'inline' || e.viewport?.isFullscreen === false
     if (e.surface === 'terminal' && isInline) return <Text dimColor>{HINT}</Text>
     paneOffset = e.props.scroll?.offset ?? 0
+    // The desktop app lays boxes out like a web page: a box never shrinks below its text unless told it may (minWidth 0),
+    // and text past its box is clipped (with "…") only when the box hides overflow. It also draws a Button's `label`
+    // instead of its children, so there a Button gets no label and a switch's colour is the box around its name.
+    // The terminal's tree is left exactly as it was.
+    const desk = e.surface === 'desktop'
+    const fit = desk ? ({ minWidth: 0, overflow: 'hidden' } as const) : {}
+    // The app's boxes are filled and their text coloured from INK; the terminal keeps its theme's colours.
+    const ink = desk ? await inkOf($) : undefined
+    const fill = ink ? { backgroundColor: ink.fill } : {}
+    const inked = ink ? { color: ink.text } : {}
+    const dim = ink ? { color: ink.desc } : { dimColor: true }
+    const link = ink?.link ?? 'suggestion'
     const cols = Math.max(20, e.props.bodyColumns)
     const room = Math.max(10, cols - CARD_CHROME)
 
@@ -745,7 +777,7 @@ export const register: Register = (on, options) => {
     const partsLine = (key: string, parts: readonly Part[]) => (
       <Text key={key} wrap="truncate-end">
         {parts.map((p, i) => (
-          <Text key={`${key}:${i}`} color={p.color} dimColor={p.dim} bold={p.bold}>
+          <Text key={`${key}:${i}`} color={p.color ?? (ink ? (p.dim ? ink.desc : ink.text) : undefined)} dimColor={ink ? undefined : p.dim} bold={p.bold}>
             {p.text}
           </Text>
         ))}
@@ -753,16 +785,16 @@ export const register: Register = (on, options) => {
     )
     // A card: a bold title, then a round box whose rows are parted by thin rules (the look of the Session box).
     const rule = (key: string) => (
-      <Text key={key} dimColor wrap="truncate-end">
+      <Text key={key} {...dim} wrap="truncate-end">
         {'─'.repeat(300)}
       </Text>
     )
-    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number; rules?: boolean } = {}) => (
-      <Box key={key} flexDirection="column" width={opts.width} flexShrink={1}>
+    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number | string; rules?: boolean } = {}) => (
+      <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
         <Text bold wrap="truncate-end">
           {title}
         </Text>
-        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} {...fill} {...fit}>
           {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
         </Box>
       </Box>
@@ -778,10 +810,14 @@ export const register: Register = (on, options) => {
         const lines = layoutLines(shown, await currentLayout($, conf), settings.width)
         if (lines.length > 0) {
           sessionBox = (
-            <Box key="session" flexDirection="column" borderStyle="round" paddingX={1}>
-              <Text bold>Session</Text>
+            <Box key="session" flexDirection="column" borderStyle="round" paddingX={1} {...fill} {...fit}>
+              <Text bold {...inked}>
+                Session
+              </Text>
               {lines.map(l => (
-                <Box key={`session:row:${l.key}`}>{partsLine(`session:line:${l.key}`, l.parts)}</Box>
+                <Box key={`session:row:${l.key}`} {...fit}>
+                  {partsLine(`session:line:${l.key}`, l.parts)}
+                </Box>
               ))}
             </Box>
           )
@@ -796,32 +832,38 @@ export const register: Register = (on, options) => {
     const isBtwOpen = await read($, btwOpen)
     const btwHead = (
       <Button key="btw:toggle" plain onPress={() => void update($, btwOpen, o => !o)}>
-        <Text bold wrap="truncate-end">{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
+        <Text bold {...inked} wrap="truncate-end">{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
       </Button>
     )
     const btwBox = !isBtwOpen ? (
-      <Box key="btw" borderStyle="round" paddingX={1}>
+      <Box key="btw" borderStyle="round" paddingX={1} {...fill} {...fit}>
         {btwHead}
-        <Box flexGrow={1} flexShrink={1} paddingLeft={1}>
-          <Text dimColor wrap="truncate-end">
+        <Box flexGrow={1} flexShrink={1} paddingLeft={1} {...fit}>
+          <Text {...dim} wrap="truncate-end">
             $ ask without touching the chat
           </Text>
         </Box>
       </Box>
     ) : (
-      <Box key="btw" flexDirection="column" borderStyle="round" paddingX={1}>
+      <Box key="btw" flexDirection="column" borderStyle="round" paddingX={1} {...fill} {...fit}>
         {btwHead}
         {btws.slice(0, 2).map(b => (
           <Box key={`btw:${b.id}`} flexDirection="column">
-            <Text color="suggestion" wrap="truncate-end">{`› ${headline(b.question, room)}`}</Text>
-            {b.answer !== '' && <Text wrap="wrap">{b.answer}</Text>}
-            <Text dimColor wrap="truncate-end">{footer(b)}</Text>
+            <Text color={link} wrap="truncate-end">{`› ${headline(b.question, room)}`}</Text>
+            {b.answer !== '' && (
+              <Text {...inked} wrap="wrap">
+                {b.answer}
+              </Text>
+            )}
+            <Text {...dim} wrap="truncate-end">
+              {footer(b)}
+            </Text>
           </Box>
         ))}
         {Input !== undefined ? (
           <Input key="btw:input" label="› " placeholder="ask without touching the chat" submitLabel="ask" onSubmit={(v: string) => void askBtw($, btwMax, v).then(t => $.ui.toast(t.split('\n')[0] ?? t))} />
         ) : (
-          <Text dimColor>type /btw your question</Text>
+          <Text {...dim}>type /btw your question</Text>
         )}
       </Box>
     )
@@ -854,25 +896,35 @@ export const register: Register = (on, options) => {
     const actionsShown = (t: Tool): Option[] => (t.isSwitch && !isOnOf(t) ? [] : (t.options ?? []))
     const action = (key: string, label: string, act1: Action, costs?: boolean) => (
       <Button key={key} plain onPress={() => act($, act1)}>
-        <Text color="suggestion">{`[${priced(label, costs)}]`}</Text>
+        <Text color={link}>{`[${priced(label, costs)}]`}</Text>
       </Button>
     )
-    const controlsWidth = (t: Tool): number => {
-      const select = t.levels !== undefined ? Math.max(...t.levels.map(l => l.length)) + 4 : 0
-      const buttons = actionsShown(t).reduce((n, o) => n + priced(o.label, o.costs).length + 3, 0)
-      return select + buttons
-    }
     const nameOf = (t: Tool) => priced(t.label, t.costs)
     const line = (t: Tool, nameWidth: number) => {
       const isOn = isOnOf(t)
       const text = pillText(nameOf(t), nameWidth)
+      const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn!))
+      const run = () => (t.click ? act($, t.click) : undefined)
+      // In the app every name is a pill (PILL): green or red for a switch, gray for a command that runs on click. The pill box
+      // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
+      const pillOf = (key: string, color: string, onPress: () => unknown) => (
+        <Box key={`pill:${t.id}`} backgroundColor={color} flexShrink={0}>
+          <Button key={key} plain onPress={onPress as () => void}>
+            <Text bold color={PILL.text} backgroundColor={color}>
+              {text}
+            </Text>
+          </Button>
+        </Box>
+      )
       const name =
-        isOn === undefined ? (
-          <Button key={`tool:${t.id}`} plain onPress={() => (t.click ? act($, t.click) : undefined)}>
+        desk ? (
+          isOn === undefined ? pillOf(`tool:${t.id}`, PILL.run, run) : pillOf(`switch:${t.id}`, isOn ? PILL.on : PILL.off, press)
+        ) : isOn === undefined ? (
+          <Button key={`tool:${t.id}`} plain onPress={run}>
             <Text bold>{text}</Text>
           </Button>
         ) : (
-          <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={() => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn))}>
+          <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={press}>
             <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'error'}>
               {text}
             </Text>
@@ -882,14 +934,14 @@ export const register: Register = (on, options) => {
         <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
       )
       return (
-        <Box key={`row:${t.id}`} columnGap={1}>
+        <Box key={`row:${t.id}`} columnGap={1} {...fit}>
           <Box flexShrink={0} columnGap={1}>
             {name}
             {level as never}
             {actionsShown(t).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
           </Box>
-          <Box flexGrow={1} flexShrink={1}>
-            <Text dimColor wrap="truncate-end">
+          <Box flexGrow={1} flexShrink={1} {...fit}>
+            <Text {...dim} wrap="truncate-end">
               {t.desc ?? t.note ?? ''}
             </Text>
           </Box>
@@ -897,20 +949,11 @@ export const register: Register = (on, options) => {
       )
     }
     const groupTools = GROUPS.map(g => ({ g, tools: TOOLS.filter(t => t.group === g && visible(t)) })).filter(x => x.tools.length > 0)
-    const mins = groupTools.map(({ tools }) => {
+    // One column: every card on its own line, the full width of the pane.
+    const toolCards = groupTools.map(({ g, tools }) => {
       const nameWidth = Math.max(...tools.map(t => nameOf(t).length))
-      return CARD_CHROME + Math.max(...tools.map(t => nameWidth + 2 + 1 + controlsWidth(t))) + DESC_MIN
+      return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)))
     })
-    // Cards with short names share a line when the pane is wide enough; each stays its own box.
-    const toolCards = packCards(mins, cols).map((ln, i) => (
-      <Box key={`cards:${i}`} columnGap={CARD_GAP} alignItems="flex-start">
-        {ln.map(({ index, width }) => {
-          const { g, tools } = groupTools[index]!
-          const nameWidth = Math.max(...tools.map(t => nameOf(t).length))
-          return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)), { width: ln.length > 1 ? width : undefined })
-        })}
-      </Box>
-    ))
 
     // Skills and saved prompts: a card each, `rows` lines at a time, with a scroll bar on the right when there are more.
     // A click on the bar's track moves a page; the wheel over the list moves it a line.
@@ -918,18 +961,20 @@ export const register: Register = (on, options) => {
     const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string) => {
       const shown = Math.min(rows, items.length)
       const top = clampTop(scrolled[id] ?? 0, items.length, shown)
-      const nameWidth = Math.max(...items.map(i => label(i).length))
+      // In the app a name starts with "/": a click puts its command in the prompt box.
+      const nameOf = (item: T) => (desk ? `/${label(item)}` : label(item))
+      const nameWidth = Math.max(...items.map(i => nameOf(i).length))
       const lines = items.slice(top, top + shown).map(item => (
-        <Box key={`${id}:line:${keyOf(item)}`} columnGap={1}>
+        <Box key={`${id}:line:${keyOf(item)}`} columnGap={1} {...fit}>
           <Box flexShrink={0}>
             <Button key={keyOf(item)} plain onPress={() => act($, { text: text(item), run: false })}>
-              <Text bold color="suggestion">
-                {label(item).padEnd(nameWidth)}
+              <Text bold color={link}>
+                {nameOf(item).padEnd(nameWidth)}
               </Text>
             </Button>
           </Box>
-          <Box flexGrow={1} flexShrink={1}>
-            <Text dimColor wrap="truncate-end">
+          <Box flexGrow={1} flexShrink={1} {...fit}>
+            <Text {...dim} wrap="truncate-end">
               {desc(item)}
             </Text>
           </Box>
@@ -938,15 +983,15 @@ export const register: Register = (on, options) => {
       const bar = items.length > shown && (
         <Box key={`${id}:bar`} flexDirection="column" flexShrink={0}>
           {scrollBar(top, shown, items.length).map((cell, i) => (
-            <Button key={`${id}:bar:${i}`} plain label={`${title} scroll bar`} onPress={() => void update($, tops, t => ({ ...t, [id]: barTarget(top, shown, items.length, i) }))}>
-              <Text color={cell === 'thumb' ? 'suggestion' : 'inactive'}>{cell === 'thumb' ? '┃' : '│'}</Text>
+            <Button key={`${id}:bar:${i}`} plain label={desk ? undefined : `${title} scroll bar`} onPress={() => void update($, tops, t => ({ ...t, [id]: barTarget(top, shown, items.length, i) }))}>
+              <Text color={cell === 'thumb' ? link : (ink?.desc ?? 'inactive')}>{cell === 'thumb' ? '┃' : '│'}</Text>
             </Button>
           ))}
         </Box>
       )
       return card(`group:${id}`, items.length > shown ? `${title} · ${items.length}` : title, [
-        <Box key={`${id}:window`} columnGap={1}>
-          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+        <Box key={`${id}:window`} columnGap={1} {...fit}>
+          <Box flexDirection="column" flexGrow={1} flexShrink={1} {...fit}>
             {lines}
           </Box>
           {bar as never}
@@ -967,13 +1012,16 @@ export const register: Register = (on, options) => {
     const wideNow = await read($, wide)
     const updateNow = await read($, updateAvail)
     return (
-      <Box flexDirection="column" gap={1}>
-        <Box justifyContent="space-between">
-          <Text bold>Moddeck</Text>
-          <Button key="expand" plain label={wideNow ? 'Narrow the panel' : 'Expand the panel'} onPress={() => expand($)}>
-            <Text color="suggestion">{wideNow ? '⤡' : '⤢'}</Text>
-          </Button>
-        </Box>
+      <Box flexDirection="column" gap={1} {...fit}>
+        {/* The desktop's own frame already has the title, an expand and a close button. */}
+        {!desk && (
+          <Box justifyContent="space-between">
+            <Text bold>Moddeck</Text>
+            <Button key="expand" plain label={wideNow ? 'Narrow the panel' : 'Expand the panel'} onPress={() => expand($)}>
+              <Text color="suggestion">{wideNow ? '⤡' : '⤢'}</Text>
+            </Button>
+          </Box>
+        )}
         {updateNow !== null && (
           <Button key="update" plain onPress={() => void offerUpdate($, updateNow)}>
             <Text color="warning" wrap="truncate-end">{`⬆ Moddeck ${updateNow} is available · click to update`}</Text>
