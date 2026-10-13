@@ -1,0 +1,7 @@
+{
+  "name": "test-ledger",
+  "version": "0.1.0",
+  "description": "Keeps a list of the test, lint, build, format and check commands Claude runs this session (pytest, R CMD check, cargo, npm, ruff, ...) with pass or fail and duration. Watches only; never blocks.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

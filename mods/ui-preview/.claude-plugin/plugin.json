@@ -1,0 +1,7 @@
+{
+  "name": "ui-preview",
+  "version": "0.1.0",
+  "description": "Runs the app in this project (a plumber API first; also npm run dev, Shiny for R or Python, Streamlit) on 127.0.0.1 and shows it in a pane: the plumber routes, the output, a headless-browser screenshot, and a button that drafts a review prompt. Starts nothing until you ask.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

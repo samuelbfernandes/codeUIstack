@@ -68,7 +68,7 @@ def _print_plan(steps: list[installer.Step], lay: installer.Layout, opts: instal
         print(f"  {n}. {s.title}")
         for ln in s.lines:
             print(f"     - {ln}")
-    print("  Network: none from this installer. (Official plugins, if you picked any, are downloaded by Claude Code itself.)")
+    print("  Network: none from this installer. (Plugins and marketplaces you picked are downloaded by Claude Code itself; MCP servers are fetched by npx or reached by Claude Code when a session uses them.)")
     print("  Undo: `uninstall` removes exactly what is listed; your own settings and text are never edited beyond the lines above.")
 
 
@@ -135,7 +135,7 @@ def cmd_install(args, update: bool = False) -> int:
     if talk:
         print("\nEach list shows what is switched on by default. Items that need a program you do not have (for example Codex) start switched off.")
         items = catalog.available(det, root)
-        for g in (catalog.GROUP_MOD, catalog.GROUP_RULE, catalog.GROUP_ADDON):
+        for g in catalog.GROUPS:
             grp = [i for i in items if i.group == g]
             keep = ui.checklist(catalog.GROUP_TITLES[g], grp, sel)
             sel = (sel - {i.id for i in grp}) | keep
@@ -237,7 +237,7 @@ def cmd_verify(args) -> int:
 
 def cmd_list(args) -> int:
     det = catalog.Detected.probe()
-    for g in (catalog.GROUP_MOD, catalog.GROUP_RULE, catalog.GROUP_ADDON):
+    for g in catalog.GROUPS:
         print(f"\n{catalog.GROUP_TITLES[g]}")
         for i in catalog.items(det):
             if i.group != g:

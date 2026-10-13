@@ -1,0 +1,7 @@
+{
+  "name": "error-inbox",
+  "version": "0.1.0",
+  "description": "Keeps the last 30 failed or refused tool calls of the session in a pane, each with a button that drafts a prompt asking Claude to explain it. Watches only; never blocks.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

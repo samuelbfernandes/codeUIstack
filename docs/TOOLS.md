@@ -4,7 +4,7 @@ Everything installs once (everywhere, or in one project) and then works in every
 they have something useful to say. "Tokens" means what the tool costs you in model usage; "none" means it runs on your
 computer only.
 
-## The twenty-two mods
+## The thirty mods
 
 A mod is a small add-on that changes Claude Code's own screen or behaviour. Turn any of them off with
 `/plugin disable <name>` and back on with `/plugin enable <name>`.
@@ -32,6 +32,17 @@ A mod is a small add-on that changes Claude Code's own screen or behaviour. Turn
 | **checkpoint** | Safety snapshots of the working tree kept as git refs (your branch, index and stash are never touched). Restoring asks first and shows what would be lost. | A dialog only on restore or drop. | none | `/checkpoint [name\|list\|diff\|restore\|drop]`. |
 | **long-run-ping** | A toast, a sound and a notification when a turn runs over 60 s or a command over 120 s. | The ping. | none | The switch in the side bar, or `/long-run-ping [on\|off\|status\|test]`. |
 | **diagram** | Claude's ` ```mermaid ` answers show as raw text. This draws flowcharts, sequence diagrams and pie charts as box art in a pane. Offline. | A small "type diagram" hint after an answer with a diagram. | none | `/diagram`, `/diagram close`. |
+| **staged-review** ¹ | The staged diff (`git diff --cached`, stat first) in a pane, before you commit. | A pane when you open it. | none | `/staged-review [path]` |
+| **error-inbox** ¹ | Keeps the last 30 failed or refused tool calls (tool, command or path, error text cut to 600 characters, secrets scrubbed). Each has a button that puts "explain this error" in the prompt box. Memory only. | Nothing until you open it. | none | `/error-inbox [on\|off\|clear\|status]` |
+| **decision-log** ¹ | `/decision <text> [-- rationale]` adds a dated, numbered row to `docs/DECISIONS.md` (the table agents-md-scaffold sets up; created if missing). It writes only that file, only on `/decision`. | The row in the file. | none | `/decision ...`, `/decision-log` (last 20 rows). |
+| **csv-table** ¹ | Previews a csv, tsv or txt table: delimiter, columns, a type per column, the first 20 rows and the row count. Refuses files over 2 MB (setting `maxKb`). | A pane. | none | `/csv-table <path>` |
+| **test-ledger** ¹ | Records every test, lint, build, format and check command Claude runs (pytest, ruff, R CMD check, devtools::test, air, jarl, cargo, npm, vitest, quarto ...) with pass or fail and duration. Memory only, secrets scrubbed. | Nothing until you open it. | none | `/test-ledger [on\|off\|clear\|status]` |
+| **scope-watch** ¹ | Set a folder with `/scope-watch <folder>`; an edit outside it brings a toast and a one-line note to Claude, once per file. Never blocks. | A toast. | tiny (one note per out-of-scope file) | `/scope-watch [folder\|off\|status]` |
+| **color-lab** ¹ | Hex, RGB and HSL for two colours, the WCAG contrast ratio with AA and AAA results, swatches, and the nearest passing shade when AA fails. | A pane. | none | `/color-lab <fg> [bg]` |
+| **format-on-edit** | After Claude edits a file, formats just that file: Air for R, Ruff for Python, and for JS/TS/CSS/HTML the project's own Prettier or Biome (only when the project already uses one). Setting `lint` also runs `ruff check --fix` and `jarl check --fix`. Tells Claude to re-read a file it reformatted. Off until you switch it on; a formatter that is not installed is skipped. | A one-line note to Claude when a file changed. | tiny (that note) | The switch in the side bar, or `/format-on-edit [on\|off\|status]`. |
+| **ui-preview** | Runs the app in this project: a plumber API first (its routes listed from `/openapi.json`), then a JS dev server (`npm run dev`), Shiny for R, Shiny for Python or Streamlit. Shows the server's last lines, takes a 1280x800 screenshot with headless Chrome or Edge (saved to `.claude/ui-preview/`, git-ignored), and puts a "review this page" prompt in the prompt box. Talks only to 127.0.0.1. | A pane. | none (the review prompt is yours to send) | `/ui-preview [start [file] [--port N]\|stop\|shot\|status]` |
+
+¹ Adapted from [awesome-claude-code-mods](https://github.com/whyashthakker/awesome-claude-code-mods) (MIT, © 2026 Yash Thakker and contributors) and rewritten for moddeck; each mod's README says what changed.
 
 A `/command` runs on your computer without sending anything to Claude, so it costs no credit (except `/btw` and `/keepwarm`).
 The slash is required: a bare word is an ordinary prompt. Every command is also one click away in the **moddeck** side bar.
@@ -70,3 +81,7 @@ All optional, all shown in the installer's checklist with their token cost. Only
 plugin directory are ever installed: You Should Know tips, hardened settings (credential files unreadable by Claude's file
 tools), the sandbox, telemetry off, rust-analyzer and Pyright diagnostics, security review, CLAUDE.md upkeep, code simplifier,
 and the PubMed / bioRxiv / life-science connectors. Popular third-party projects are only ever *suggested*: see `SUGGESTIONS.md`.
+
+The one exception is the **UI development** list (Chrome DevTools MCP, btw, mcptools, Plotly Cloud MCP, Posit's Shiny,
+Quarto and R-package skills, frontend-design): third-party, never switched on by default, never picked by `--standard`
+or `--all`, only installed when you tick an item or pass `--with <id>`. See [UI-DEV.md](UI-DEV.md).

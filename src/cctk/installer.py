@@ -104,8 +104,17 @@ def normalize(selected: set[str], det: catalog.Detected, root: Path | None = Non
 
 def plugin_ids(selected: set[str], marketplace: str, catalog_items: list[catalog.Item]) -> list[str]:
     ids = [f"{i.id}@{marketplace}" for i in catalog_items if i.group == catalog.GROUP_MOD and i.id in selected]
-    ids += [i.plugin for i in catalog_items if i.plugin.endswith(catalog.OFFICIAL) and i.id in selected]
+    ids += [i.plugin for i in catalog_items if (i.plugin.endswith(catalog.OFFICIAL) or i.source) and i.id in selected]
     return ids
+
+
+def market_sources(selected: set[str], catalog_items: list[catalog.Item]) -> dict[str, str]:
+    """Third-party marketplaces the selected plugins come from: {marketplace name: owner/repo}."""
+    return {i.plugin.split("@", 1)[1]: i.source for i in catalog_items if i.source and i.id in selected}
+
+
+def mcp_specs(selected: set[str], catalog_items: list[catalog.Item]) -> list[list[str]]:
+    return [list(i.mcp) for i in catalog_items if i.mcp and i.id in selected]
 
 
 # ---------------------------------------------------------------- building the plan
@@ -137,8 +146,12 @@ def build_steps(opts: Options, cli: ClaudeCLI, det: catalog.Detected, root: Path
     if "git-guards" in sel:
         steps.append(Step("Git guards", _git_lines(lay, opts, sel), lambda c: _git(c, opts, sel)))
     pids = plugin_ids(sel, ident["marketplace"], items)
+    srcs = market_sources(sel, items)
     if pids:
-        steps.append(Step("Mods and official plugins", _plugin_lines(lay, ident, pids), lambda c: _plugins(c, ident, pids)))
+        steps.append(Step("Mods and plugins", _plugin_lines(lay, ident, pids, srcs), lambda c: _plugins(c, ident, pids, srcs)))
+    specs = mcp_specs(sel, items)
+    if specs or load_state(lay).get("mcp"):
+        steps.append(Step("MCP servers", _mcp_lines(lay, specs), lambda c: _mcp(c, specs)))
     for line in notes:
         steps.append(Step("Note", [line], lambda c: None))
     return lay, steps, notes
@@ -167,12 +180,27 @@ def _git_lines(lay: Layout, opts: Options, sel: set[str]) -> list[str]:
     return out
 
 
-def _plugin_lines(lay: Layout, ident: dict, pids: list[str]) -> list[str]:
+def _plugin_lines(lay: Layout, ident: dict, pids: list[str], srcs: dict[str, str] | None = None) -> list[str]:
     out = [f"Run: claude plugin marketplace add {lay.stage} --scope {lay.claude_scope}   (a local folder, no download)"]
+    for name, src in (srcs or {}).items():
+        out.append(f"Run: claude plugin marketplace add {src} --scope {lay.claude_scope}   (third-party marketplace '{name}': downloaded by Claude Code from github.com/{src}; skipped if you already have it)")
     for p in pids:
         official = p.endswith(catalog.OFFICIAL)
-        out.append(f"Run: claude plugin install {p} -s {lay.claude_scope}" + ("   (official Anthropic plugin: downloaded by Claude Code from github.com/anthropics)" if official else ""))
+        third = p.split("@", 1)[1] in (srcs or {})
+        out.append(f"Run: claude plugin install {p} -s {lay.claude_scope}" + ("   (official Anthropic plugin: downloaded by Claude Code from github.com/anthropics)" if official else "   (third-party plugin)" if third else ""))
     return out
+
+
+def _mcp_lines(lay: Layout, specs: list[list[str]]) -> list[str]:
+    out = [f"Run: claude mcp add -s {lay.claude_scope} {' '.join(_quote(x) for x in s)}" for s in specs]
+    if not specs:
+        out.append("Remove the MCP servers an earlier run added and that are no longer chosen.")
+    out.append("A server that already exists under the same name is left as it is (yours wins) and is not recorded.")
+    return out
+
+
+def _quote(x: str) -> str:
+    return f'"{x}"' if any(ch in x for ch in " '()") else x
 
 
 # ---------------------------------------------------------------- steps: apply
@@ -197,6 +225,8 @@ def _revert_previous(c: Ctx, sel: set[str]) -> None:
     # plugins are diffed later (they are slow to reinstall); keep the record
     c.state["plugins"] = old.get("plugins", [])
     c.state["marketplace"] = old.get("marketplace", {})
+    c.state["markets"] = old.get("markets", [])
+    c.state["mcp"] = old.get("mcp", [])
 
 
 def _rules(c: Ctx, profile: str) -> None:
@@ -308,7 +338,7 @@ def _git(c: Ctx, opts: Options, sel: set[str]) -> None:
         _exclude(c, patterns)
 
 
-def _plugins(c: Ctx, ident: dict, pids: list[str]) -> None:
+def _plugins(c: Ctx, ident: dict, pids: list[str], srcs: dict[str, str] | None = None) -> None:
     lay, cli = c.layout, c.cli
     if not cli.available:
         c.warn("'claude' was not found on PATH: the mods and plugins were skipped. Install Claude Code, then run this installer again.")
@@ -325,6 +355,21 @@ def _plugins(c: Ctx, ident: dict, pids: list[str]) -> None:
             c.warn(f"marketplace add failed: {out.strip().splitlines()[-1] if out.strip() else rc}")
             return
         mp.update({"name": name, "scope": lay.claude_scope, "added": True})
+    known = cli.marketplace_names()
+    ours = c.state.setdefault("markets", [])
+    skip: set[str] = set()
+    for mname, src in (srcs or {}).items():
+        if mname in known:
+            continue
+        rc, out = cli.marketplace_add(src, lay.claude_scope, lay.cwd)
+        if rc != 0 and "already" not in out.lower():
+            c.warn(f"could not add the marketplace {src}: {out.strip().splitlines()[-1] if out.strip() else rc}. Its plugins are skipped.")
+            skip.add(mname)
+            continue
+        if mname not in {m["name"] for m in ours}:
+            ours.append({"name": mname, "source": src, "scope": lay.claude_scope})
+        c.say(f"   ok   marketplace {src}")
+    pids = [p for p in pids if p.split("@", 1)[1] not in skip]
     have = {p["id"] for p in cli.installed(lay.cwd) if p.get("scope") == lay.claude_scope}
     offered = cli.available_ids()
     prev = c.state.setdefault("plugins", [])
@@ -350,6 +395,41 @@ def _plugins(c: Ctx, ident: dict, pids: list[str]) -> None:
             c.say(f"   ok   {pid}")
         if pid not in {p["id"] for p in prev}:
             prev.append({"id": pid, "scope": lay.claude_scope, "official": official})
+    _drop_markets(c, {p.split("@", 1)[1] for p in pids})
+
+
+def _drop_markets(c: Ctx, needed: set[str]) -> None:
+    """Remove the third-party marketplaces an earlier run added that no chosen plugin needs any more."""
+    ours = c.state.get("markets", [])
+    for m in [m for m in ours if m["name"] not in needed]:
+        rc, _ = c.cli.marketplace_remove(m["name"], m["scope"], c.layout.cwd)
+        c.say(f"   removed marketplace {m['source']}" if rc == 0 else f"   could not remove marketplace {m['source']}")
+        ours.remove(m)
+
+
+def _mcp(c: Ctx, specs: list[list[str]]) -> None:
+    lay, cli = c.layout, c.cli
+    if not cli.available:
+        c.warn("'claude' was not found on PATH: the MCP servers were skipped.")
+        return
+    prev = c.state.setdefault("mcp", [])
+    want = {s[0] for s in specs}
+    for gone in [m for m in prev if m["name"] not in want]:
+        rc, _ = cli.mcp_remove(gone["name"], gone["scope"], lay.cwd)
+        c.say(f"   removed MCP server {gone['name']}" if rc == 0 else f"   could not remove MCP server {gone['name']}")
+        prev.remove(gone)
+    for spec in specs:
+        name = spec[0]
+        if name in {m["name"] for m in prev}:
+            c.say(f"   ok   {name} (already added)")
+            continue
+        rc, out = cli.mcp_add(spec, lay.claude_scope, lay.cwd)
+        if rc != 0:
+            why = out.strip().splitlines()[-1] if out.strip() else f"exit {rc}"
+            c.warn(f"could not add the MCP server {name}: {why}. " + ("You already have one with that name: it was kept." if "already exists" in out.lower() else "Skipped."))
+            continue
+        prev.append({"name": name, "scope": lay.claude_scope})
+        c.say(f"   ok   MCP server {name}")
 
 
 # ---------------------------------------------------------------- apply / uninstall
@@ -461,6 +541,12 @@ def uninstall(lay: Layout, cli: ClaudeCLI, say: Callable[[str], None] = print) -
         for p in st.get("plugins", []):
             rc, _ = cli.uninstall(p["id"], p["scope"], lay.cwd)
             say(f"   {'removed' if rc == 0 else 'could not remove'} {p['id']}")
+        for m in st.get("mcp", []):
+            rc, _ = cli.mcp_remove(m["name"], m["scope"], lay.cwd)
+            say(f"   {'removed' if rc == 0 else 'could not remove'} MCP server {m['name']}")
+        for m in st.get("markets", []):
+            rc, _ = cli.marketplace_remove(m["name"], m["scope"], lay.cwd)
+            say(f"   {'removed' if rc == 0 else 'could not remove'} marketplace {m['source']}")
         mp = st.get("marketplace", {})
         if mp.get("name"):
             cli.marketplace_remove(mp["name"], mp.get("scope", lay.claude_scope), lay.cwd)

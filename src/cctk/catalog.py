@@ -11,13 +11,16 @@ from dataclasses import dataclass, field
 
 from . import payload
 
-GROUP_MOD, GROUP_RULE, GROUP_ADDON = "mod", "layer", "addon"
+GROUP_MOD, GROUP_RULE, GROUP_ADDON, GROUP_UI = "mod", "layer", "addon", "ui"
 GROUP_TITLES = {
     GROUP_MOD: "Mods (screens and behaviour added to Claude Code)",
     GROUP_RULE: "Rules, skills and git guards",
     GROUP_ADDON: "Built-in Claude Code features and official plugins (turned on for you, nothing third-party)",
+    GROUP_UI: "UI development in R, Python and JavaScript (third-party skills and MCP servers; off unless you tick them)",
 }
+GROUPS = (GROUP_MOD, GROUP_RULE, GROUP_ADDON, GROUP_UI)
 OFFICIAL = "anthropic-plugin-directory"
+CHROME_DEVTOOLS_MCP = "chrome-devtools-mcp@1.10.1"   # pinned: bump by hand after reading its changelog
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,8 @@ class Item:
     needs: str = ""               # a program that must be on PATH for the item to be useful
     platforms: tuple[str, ...] = ("darwin", "linux", "windows")
     plugin: str = ""              # for official plugins: plugin@marketplace
+    source: str = ""              # a third-party plugin's marketplace, as `claude plugin marketplace add` takes it (owner/repo)
+    mcp: tuple[str, ...] = ()     # an MCP server: what follows `claude mcp add -s <scope>`, its name first
 
 
 @dataclass
@@ -42,7 +47,7 @@ class Detected:
     @classmethod
     def probe(cls) -> "Detected":
         d = cls()
-        for t in ("claude", "git", "codex", "rust-analyzer", "pyright-langserver", "cargo", "Rscript"):
+        for t in ("claude", "git", "codex", "rust-analyzer", "pyright-langserver", "cargo", "Rscript", "npx", "air", "ruff", "jarl"):
             d.tools[t] = shutil.which(t) is not None
         return d
 
@@ -104,6 +109,15 @@ def items(det: Detected, root=None) -> list[Item]:
         Item("plugin:pubmed", GROUP_ADDON, "PubMed search (official plugin)", "Literature search in Claude through a PubMed connector.", "yes: tool definitions in every session", default=False, plugin=f"pubmed@{OFFICIAL}"),
         Item("plugin:biorxiv", GROUP_ADDON, "bioRxiv / medRxiv (official plugin)", "Preprint search through a bioRxiv connector.", "yes: tool definitions in every session", default=False, plugin=f"biorxiv@{OFFICIAL}"),
         Item("plugin:bio-research", GROUP_ADDON, "Life-science research bundle (official plugin)", "Anthropic's bundle of literature, genomics and target-prioritisation connectors. Large.", "yes: many tool definitions in every session", default=False, plugin=f"bio-research@{OFFICIAL}"),
+        # Third-party, on purpose and only on request: never on by default, never chosen by --standard or --all.
+        Item("plugin:frontend-design", GROUP_UI, "Frontend design (official plugin)", "Anthropic's skill for distinctive, polished HTML and CSS: typography, colour and layout that avoid the generic look.", "one skill description until used", default=False, plugin=f"frontend-design@{OFFICIAL}"),
+        Item("mcp:chrome-devtools", GROUP_UI, "Chrome DevTools MCP (Google)", f"Claude opens your app in Chrome and reads console errors, network traffic and performance traces. Added as `npx -y {CHROME_DEVTOOLS_MCP} --no-usage-statistics --no-performance-crux`: usage statistics and CrUX lookups to Google are off.", "yes: about 25 tool definitions in every session", default=False, needs="npx", mcp=("chrome-devtools", "--", "npx", "-y", CHROME_DEVTOOLS_MCP, "--no-usage-statistics", "--no-performance-crux")),
+        Item("mcp:r-btw", GROUP_UI, "R help pages for Claude: btw (Posit)", "Claude reads the help pages, vignettes and versions of the R packages you have installed (plumber, shiny, bslib, gt ...) instead of guessing. Needs the btw R package: install.packages('btw').", "yes: tool definitions in every session", default=False, needs="Rscript", mcp=("r-btw", "--", "Rscript", "-e", "btw::btw_mcp_server(list('docs', 'pkg', 'env', 'sessioninfo', 'cran'))")),
+        Item("mcp:r-mcptools", GROUP_UI, "Run R in your live session: mcptools (Posit)", "Claude runs R code in an R session you opened (call mcptools::mcp_session() there). Powerful: it runs any R code, so keep permission prompts on. Needs the mcptools R package.", "yes: tool definitions in every session", default=False, needs="Rscript", mcp=("r-mcptools", "--", "Rscript", "-e", "mcptools::mcp_server()")),
+        Item("mcp:plotly-cloud", GROUP_UI, "Plotly Cloud MCP (Dash docs)", "Current Dash and Plotly documentation and Plotly Cloud app management. Needs a Plotly Cloud account: sign in with /mcp after installing.", "yes: tool definitions in every session; network", default=False, mcp=("plotly-cloud", "--transport", "http", "https://cloud.plotly.com/_mcp")),
+        Item("posit:shiny", GROUP_UI, "Shiny and bslib skills (Posit)", "Posit's own skills: bslib dashboards, cards, value boxes, theming, brand.yml. Comes from github.com/posit-dev/skills.", "a few skill descriptions until used", default=False, plugin="shiny@posit-dev-skills", source="posit-dev/skills"),
+        Item("posit:quarto", GROUP_UI, "Quarto skills (Posit)", "Quarto documents, dashboards and websites, brand.yml and alt text. Comes from github.com/posit-dev/skills.", "a few skill descriptions until used", default=False, plugin="quarto@posit-dev-skills", source="posit-dev/skills"),
+        Item("posit:r-lib", GROUP_UI, "R package skills (Posit)", "testthat, tidyverse style, cli, lifecycle and CRAN checks, for apps and APIs built as packages. Comes from github.com/posit-dev/skills.", "a few skill descriptions until used", default=False, plugin="r-lib@posit-dev-skills", source="posit-dev/skills"),
     ]
     return out
 

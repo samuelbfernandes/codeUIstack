@@ -43,9 +43,24 @@
       "description": "One-click safety snapshots of your working tree (untracked files too) that never touch your branch, index or stash. /checkpoint, list, diff, restore, drop. Restore shows what would be lost and asks first."
     },
     {
+      "name": "color-lab",
+      "source": "./mods/color-lab",
+      "description": "Checks the contrast of a text colour on a background (WCAG 2.x AA and AAA) and suggests the nearest shade that passes. Pure arithmetic; reads no files."
+    },
+    {
+      "name": "csv-table",
+      "source": "./mods/csv-table",
+      "description": "Previews a csv, tsv or txt table in a pane: delimiter, columns with simple types, row count and the first 20 rows. Reads only the file you name."
+    },
+    {
       "name": "data-guard",
       "source": "./mods/data-guard",
       "description": "Asks before a git commit or git add takes in large files, data files, personal-looking table columns or Jupyter notebooks with outputs. Only names are ever shown, never file contents."
+    },
+    {
+      "name": "decision-log",
+      "source": "./mods/decision-log",
+      "description": "/decision <text> [-- rationale] adds a dated row to the project's docs/DECISIONS.md (the agents-md-scaffold table); /decision-log shows the last 20. Writes only that file, only when asked."
     },
     {
       "name": "diagram",
@@ -53,9 +68,19 @@
       "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: run /diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
     },
     {
+      "name": "error-inbox",
+      "source": "./mods/error-inbox",
+      "description": "Keeps the last 30 failed or refused tool calls of the session in a pane, each with a button that drafts a prompt asking Claude to explain it. Watches only; never blocks."
+    },
+    {
       "name": "filetree",
       "source": "./mods/filetree",
       "description": "The project's file tree in a pane beside the chat, lit up as Claude reads, edits and commits files. Read-only."
+    },
+    {
+      "name": "format-on-edit",
+      "source": "./mods/format-on-edit",
+      "description": "After Claude edits a file, formats just that file with the project's formatter (Air for R, Ruff for Python, Prettier or Biome for JS when the project uses one) and tells Claude to read it again. Off until you type /format-on-edit on."
     },
     {
       "name": "long-run-ping",
@@ -98,9 +123,19 @@
       "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts."
     },
     {
+      "name": "scope-watch",
+      "source": "./mods/scope-watch",
+      "description": "Set the folder you are working in; when Claude edits a file outside it, you get a toast and Claude gets a short note to check the edit was intended. Never blocks."
+    },
+    {
       "name": "secret-guard",
       "source": "./mods/secret-guard",
       "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent."
+    },
+    {
+      "name": "staged-review",
+      "source": "./mods/staged-review",
+      "description": "Shows what is staged for the next commit (git diff --cached, stat and diff) in a pane, with a Refresh button. Read-only."
     },
     {
       "name": "suggest-model",
@@ -108,9 +143,19 @@
       "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
     },
     {
+      "name": "test-ledger",
+      "source": "./mods/test-ledger",
+      "description": "Keeps a list of the test, lint, build, format and check commands Claude runs this session (pytest, R CMD check, cargo, npm, ruff, ...) with pass or fail and duration. Watches only; never blocks."
+    },
+    {
       "name": "tool-skins",
       "source": "./mods/tool-skins",
       "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> switches live."
+    },
+    {
+      "name": "ui-preview",
+      "source": "./mods/ui-preview",
+      "description": "Runs the app in this project (a plumber API first; also npm run dev, Shiny for R or Python, Streamlit) on 127.0.0.1 and shows it in a pane: the plumber routes, the output, a headless-browser screenshot, and a button that drafts a review prompt. Starts nothing until you ask."
     }
   ]
 }

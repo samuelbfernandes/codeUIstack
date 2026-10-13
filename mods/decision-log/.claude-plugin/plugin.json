@@ -1,0 +1,7 @@
+{
+  "name": "decision-log",
+  "version": "0.1.0",
+  "description": "/decision <text> [-- rationale] adds a dated row to the project's docs/DECISIONS.md (the agents-md-scaffold table); /decision-log shows the last 20. Writes only that file, only when asked.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}
