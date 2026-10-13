@@ -1,7 +1,7 @@
 // Update check: pure helpers. The look-up itself is `git ls-remote --tags` run by register.tsx; nothing here touches the engine.
 
 /** The project release this copy of moddeck shipped with (a test and scripts/check-all.sh keep it equal to pyproject.toml). */
-export const RELEASE = '0.4.1'
+export const RELEASE = '0.5.0'
 export const REPO = 'samuelbfernandes/moddeck'
 export const REMOTE = `https://github.com/${REPO}.git`
 /** The tags are looked up at most this often; a re-open inside the window reuses the last answer. */
