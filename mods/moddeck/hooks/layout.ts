@@ -1,46 +1,9 @@
-// The side bar's layout arithmetic, kept pure so it can be tested: how the tool cards share a line when the pane is wide,
-// the scroll bar of a long list, and which list a mouse wheel tick is over. Every row the pane draws is one line (text that
-// does not fit is cut with "…", never wrapped), so heights are exact counts of rows.
+// The side bar's layout arithmetic, kept pure so it can be tested: the scroll bar of a long list, and which list a mouse
+// wheel tick is over. Every row the pane draws is one line (text that does not fit is cut with "…", never wrapped), so
+// heights are exact counts of rows.
 
 /** Cells a card's border and padding take: a round border (2) and one cell of padding on each side (2). */
 export const CARD_CHROME = 4
-/** The fewest cells of description a card keeps when it shares a line; below that it takes a line of its own. */
-export const DESC_MIN = 8
-/** Cells between two cards on one line. */
-export const CARD_GAP = 1
-
-/**
- * Packs cards, in order, onto lines of `columns` cells: a card joins the line while every card on it still gets its
- * minimum; the spare cells are then shared out in proportion. A card alone on its line takes the whole width.
- */
-export function packCards(mins: readonly number[], columns: number, gap = CARD_GAP): { index: number; width: number }[][] {
-  const lines: number[][] = []
-  let line: number[] = []
-  let used = 0
-  mins.forEach((m, i) => {
-    const need = line.length === 0 ? m : used + gap + m
-    if (line.length > 0 && need > columns) {
-      lines.push(line)
-      line = [i]
-      used = m
-    } else {
-      line.push(i)
-      used = need
-    }
-  })
-  if (line.length > 0) lines.push(line)
-  return lines.map(l => {
-    if (l.length === 1) return [{ index: l[0]!, width: columns }]
-    const total = l.reduce((n, i) => n + mins[i]!, 0)
-    const spare = columns - total - gap * (l.length - 1)
-    let given = 0
-    return l.map((i, k) => {
-      const extra = k === l.length - 1 ? spare - given : Math.floor((spare * mins[i]!) / total)
-      given += extra
-      return { index: i, width: mins[i]! + extra }
-    })
-  })
-}
 
 /** Each cell of a list's scroll bar, top to bottom: the thumb (where the window is) or the track. */
 export function scrollBar(top: number, shown: number, total: number): ('thumb' | 'track')[] {

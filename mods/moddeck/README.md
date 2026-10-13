@@ -46,18 +46,23 @@ no command or state changed.
 - **Automation**: auto-test (`[run]`, `[status]` while on), long-run-ping.
 - **Workspace utilities**: checkpoint, branch-janitor, cache-tax, budget-guard, savvy-progress, filetree, replay-theater,
   diagram. Their names are plain (not switches): a click runs the command (`/checkpoint`, `/cache-tax`, ...; the first line
-  of the reply is a toast, the whole reply goes in the transcript). Commands that need your text or change something
+  of the reply is a toast, and the engine prints the whole reply under the command). Commands that need your text or change something
   (`[clean]` for `/branch-janitor clean`, `[$ warm]` for `/keepwarm 90m`, `[restore]` for `/checkpoint restore `) are put in
   the prompt box; nothing is sent until you press Enter.
-- **Columns**: when the pane is wide enough for every card on a line to keep its names, controls and a few cells of
-  description, the cards share the line, each still its own box (Prompt helpers beside Model controls, Guards beside
-  Automation). The expand button opens the pane 96 columns wide, enough for that; a narrow pane is one column.
+- **One column**: the cards stand one under the other, each the full width of the pane.
 - A card with no readable line is not drawn (a mod that is not installed has no line).
 - **Skills** and **Prompts** (prompt-library's saved prompts): name and description per line; a click puts the text in the
   prompt box. With more than `skillRows` items the card shows that many and gets a **scroll bar** on its right (the thumb
   shows where you are): a click on the track moves a page, and the mouse wheel over the list moves it a line (the wheel
   anywhere else scrolls the pane as usual). The card's title then shows the count (`Skills · 5`).
 - A `$` marks what spends model tokens (reflect, the Side Question, `/keepwarm`).
+- **In the desktop app** every name is a pill, white on deep green or red for a switch and on gray for a command that runs
+  on click (the same colours in every theme); the whole pill is the button. Every box is filled (dark, or light when
+  `/config` names a light theme) with its text, descriptions and clickable words coloured to match; skill and prompt names
+  start with "/". Every box may shrink below its text and cuts it with "…", so a box keeps its four edges when the pane
+  is dragged narrower and nothing overlaps. The pane has no title row there
+  (the app's frame has the title, expand and close). The terminal draws the same content with its own top bar and
+  coloured name text.
 
 ## Use
 It opens by itself at session start where the screen can dock it (fullscreen terminal, desktop app), once per session.
@@ -81,7 +86,7 @@ row ids in display order, default `model,context,usage,cost,cache,git,tokens,act
   observers (they let each event through first and keep their books in `try/catch`), and each failing source drops only its row.
 - The `cost` and `cache` rows need `budget-guard` and `cache-tax` to publish their atoms; without them those parts are not drawn.
 - The session name is not given to mods by the engine, so the environment row does not show one.
-- Never verified live: the pane, the dropdown, the columns, the scroll bar and the wheel, and filling the prompt box were
+- Never verified live: the pane, the dropdown, the scroll bar and the wheel, and filling the prompt box were
   tested against Claude Code's simulated engine only (it checks the tree, not how a surface paints it).
 
 ## Side Question

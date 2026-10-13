@@ -1,15 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { CARD_GAP, barTarget, listAt, packCards, pillText, scrollBar } from '../hooks/layout'
-
-test('packCards keeps a card on the line while every card still gets its minimum, and shares the spare cells out', () => {
-  expect(packCards([30, 30, 50], 40)).toEqual([[{ index: 0, width: 40 }], [{ index: 1, width: 40 }], [{ index: 2, width: 40 }]])
-  const wide = packCards([30, 30, 50], 70)
-  expect(wide).toEqual([[{ index: 0, width: 34 }, { index: 1, width: 35 }], [{ index: 2, width: 70 }]])
-  expect(wide[0]!.reduce((n, c) => n + c.width, 0) + CARD_GAP).toBe(70) // the line is filled exactly
-  expect(packCards([80], 40)).toEqual([[{ index: 0, width: 40 }]]) // a card wider than the pane still gets the pane
-  expect(packCards([], 40)).toEqual([])
-})
+import { barTarget, listAt, pillText, scrollBar } from '../hooks/layout'
 
 test('scrollBar puts the thumb where the window is, sized to the share it shows', () => {
   expect(scrollBar(0, 4, 4)).toEqual(['thumb', 'thumb', 'thumb', 'thumb']) // everything shows

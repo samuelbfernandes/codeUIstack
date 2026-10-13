@@ -131,7 +131,7 @@ const MODE_LABEL: Record<string, { text: string; color?: string; dim?: boolean }
 function modeRow(s: Snapshot): Row | undefined {
   if (!s.permissionMode) return undefined
   const m = MODE_LABEL[s.permissionMode] ?? { text: s.permissionMode, dim: true }
-  return { id: 'mode', parts: [{ text: 'Mode ', dim: true }, { text: m.text, color: m.color, dim: m.dim }] }
+  return { id: 'mode', parts: [{ text: 'Mode: ', dim: true }, { text: m.text, color: m.color, dim: m.dim }] }
 }
 
 export const BACKUP_WARN_MS = 2 * 60 * 60_000

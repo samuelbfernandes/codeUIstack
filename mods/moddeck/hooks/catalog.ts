@@ -13,7 +13,7 @@ export type Action = { text: string; run: boolean }
 export type Option = { label: string; costs?: boolean } & Action
 
 export type Group = 'Prompt helpers' | 'Guards' | 'Automation' | 'Model controls' | 'Workspace utilities'
-/** In drawing order: the cards with short names come first, so a wide pane can set them side by side. */
+/** In drawing order, one card under the other. */
 export const GROUPS: Group[] = ['Prompt helpers', 'Model controls', 'Guards', 'Automation', 'Workspace utilities']
 
 export type Tool = {
