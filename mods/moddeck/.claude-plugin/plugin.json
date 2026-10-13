@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check.",
   "author": {
     "name": "Samuel Fernandes"
@@ -18,6 +18,12 @@
       "title": "Skills shown at once",
       "description": "How many skills (and saved prompts) the side bar shows at once; a longer list gets a scroll bar (click its track, or use the mouse wheel over the list).",
       "default": 4
+    },
+    "appTheme": {
+      "type": "string",
+      "title": "Side bar colours in the desktop app",
+      "description": "light or dark: match the app's own theme (a mod cannot see it). /moddeck theme light|dark changes and keeps it.",
+      "default": "dark"
     },
     "showSession": {
       "type": "boolean",

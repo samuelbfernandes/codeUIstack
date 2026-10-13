@@ -40,7 +40,8 @@ stay quiet until they have something useful to say.
 
 1. Start a session: the side bar opens by itself beside the chat.
 2. Type `/moddeck` to close or reopen it.
-3. Drag its edge to resize: text that does not fit ends in "…".
+3. Using the app in light mode? Click ☀ at the top of the side bar (☾ for dark), or type `/moddeck theme light`.
+4. Drag its edge to resize: text that does not fit ends in "…".
 
 <p>
   <img src="docs/images/moddeck-desktop-top.png" width="49%" alt="moddeck side bar in the desktop app: the Session box, Side Question, Prompt helpers, Model controls and Guards">

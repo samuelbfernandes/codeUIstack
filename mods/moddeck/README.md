@@ -57,9 +57,11 @@ no command or state changed.
   anywhere else scrolls the pane as usual). The card's title then shows the count (`Skills · 5`).
 - A `$` marks what spends model tokens (reflect, the Side Question, `/keepwarm`).
 - **In the desktop app** every name is a pill, white on deep green or red for a switch and on gray for a command that runs
-  on click (the same colours in every theme); the whole pill is the button. Every box is filled (dark, or light when
-  `/config` names a light theme) with its text, descriptions and clickable words coloured to match; skill and prompt names
-  start with "/". Every box may shrink below its text and cuts it with "…", so a box keeps its four edges when the pane
+  on click (the same colours in every theme); the whole pill is the button. Every box is filled (dark, or light after
+  `/moddeck theme light`) with its text, descriptions and clickable words coloured to match; skill and prompt names
+  start with "/". On a light theme the app draws button text dark, so the light colours use pale pills of the same hues
+  (and a light fill). A mod cannot see the app's own light or dark choice: click ☀ or ☾ at the top of the side bar, or type `/moddeck theme light|dark` (setting
+  `appTheme`, default dark, kept for later sessions) picks it. Every box may shrink below its text and cuts it with "…", so a box keeps its four edges when the pane
   is dragged narrower and nothing overlaps. The pane has no title row there
   (the app's frame has the title, expand and close). The terminal draws the same content with its own top bar and
   coloured name text.
