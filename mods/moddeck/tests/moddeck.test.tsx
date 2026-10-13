@@ -390,17 +390,16 @@ test('desktop: no button carries a label (the app would draw it instead of the n
   expect(tree.match(/"width":\d/g)).toBeNull() // a card's width is never a count of cells
 })
 
-test('desktop: the boxes are filled in the dark colours, or the light ones under a light theme; skill names start with "/"', MODS, async ($, on) => {
+test('desktop: the boxes are filled in the dark colours by default, the light ones after /moddeck theme light; skill names start with "/"', MODS, async ($, on) => {
   world(on)
-  let theme = 'dark'
-  on('config.list', () => ({ value: [{ key: 'theme', value: theme }] as never }))
+  on('config.list', () => ({ value: [{ key: 'theme', value: 'light' }] as never })) // /config's theme is not read: the app's may differ
   const boxOf = async (pane: { find: (q: { key: string }) => Promise<unknown> }) => JSON.stringify(await pane.find({ key: 'group:Workspace utilities' }))
   let pane = await mount($, 'desktop')
   expect(await boxOf(pane)).toContain('"backgroundColor":"#1F1F1E"')
   expect(await boxOf(pane)).toContain('"color":"#9A9893"') // the descriptions
   expect(await texts(pane)).toContain('/dual-model-review')
   await pane.unmount()
-  theme = 'light-daltonized'
+  await run($, 'moddeck', 'theme light')
   pane = await mount($, 'desktop')
   expect(await boxOf(pane)).toContain('"backgroundColor":"#FAF9F5"')
   await pane.unmount()
@@ -418,4 +417,47 @@ test('terminal: rows keep the plain tree (no minWidth or overflow props), the sw
   expect(tree).not.toContain('overflow')
   expect(await switchOf(pane, 'terminal', 'suggest')).toContain('"backgroundColor":"success"')
   expect(await pane.find({ key: 'expand' })).toBeDefined()
+})
+
+test('desktop: /moddeck theme light gives the light fill and pale pills (the app draws button text dark there); dark changes it back, whatever /config says', MODS, async ($, on) => {
+  world(on)
+  on('config.list', () => ({ value: [{ key: 'theme', value: 'dark' }] as never })) // the app can be light while /config says dark
+  await run($, 'suggest-model', 'on')
+  const look = async () => {
+    const pane = await mount($, 'desktop')
+    const out = { box: JSON.stringify(await pane.find({ key: 'group:Workspace utilities' })), pill: await switchOf(pane, 'desktop', 'suggest') }
+    await pane.unmount()
+    return out
+  }
+  expect((await look()).box).toContain('"backgroundColor":"#1F1F1E"')
+  expect(await run($, 'moddeck', 'theme light')).toMatchObject({ text: 'Moddeck · theme light' })
+  const light = await look()
+  expect(light.box).toContain('"backgroundColor":"#FAF9F5"')
+  expect(light.pill).toContain('"backgroundColor":"#BBF7D0"')
+  expect(await run($, 'moddeck', 'theme dark')).toMatchObject({ text: 'Moddeck · theme dark' })
+  expect((await look()).box).toContain('"backgroundColor":"#1F1F1E"')
+  expect(((await run($, 'moddeck', 'theme pink')) as { text: string }).text).toContain('light or dark')
+})
+
+test('desktop: the appTheme setting picks the light colours without a command', { ...MODS, options: { appTheme: 'light' } }, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'group:Workspace utilities' }))).toContain('"backgroundColor":"#FAF9F5"')
+  expect(await switchOf(pane, 'desktop', 'checkpoint')).toContain('"backgroundColor":"#E5E7EB"')
+})
+
+test('desktop: the sun and the moon at the top switch the colours, the one in use at full strength; the terminal has neither', MODS, async ($, on) => {
+  world(on)
+  const pane = await mount($, 'desktop')
+  const box = async () => JSON.stringify(await pane.find({ key: 'group:Workspace utilities' }))
+  expect(JSON.stringify(await pane.find({ key: 'theme:light' }))).toContain('"dimColor":true')
+  expect(JSON.stringify(await pane.find({ key: 'theme:dark' }))).not.toContain('"dimColor":true')
+  await pane.press({ key: 'theme:light' })
+  expect(await box()).toContain('"backgroundColor":"#FAF9F5"')
+  expect(JSON.stringify(await pane.find({ key: 'theme:light' }))).not.toContain('"dimColor":true')
+  await pane.press({ key: 'theme:dark' })
+  expect(await box()).toContain('"backgroundColor":"#1F1F1E"')
+  await pane.unmount()
+  const term = await mount($, 'terminal')
+  expect(await term.find({ key: 'theme:light' })).toBeUndefined()
 })

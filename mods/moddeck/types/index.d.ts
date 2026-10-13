@@ -77,6 +77,8 @@ declare module 'claude-code' {
       wide: boolean
       /** The Session box layout as `/moddeck rows compact|expanded` set it (also kept in the store as `layout`); null = the settings apply. */
       layout: DeckLayout | null
+      /** The desktop app's side bar colours as `/moddeck theme light|dark` set them (also kept in the store as `theme`); null = the `appTheme` setting. */
+      theme: 'light' | 'dark' | null
     }
   }
 }

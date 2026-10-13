@@ -42,14 +42,20 @@ const WIDE_COLUMNS = 96
 const HINT = 'Side panel · use /tui fullscreen'
 const FAILED = 'Moddeck · could not open'
 const PANE_SURFACES = new Set(['terminal', 'desktop'])
-/** The app's pills ("Deep solid"): white on a deep fill, the same in every theme. Green on, red off, gray a command. */
-const PILL = { on: '#166534', off: '#991B1B', run: '#374151', text: '#FFFFFF' } as const
-/** Inside the app's boxes: the fill, the text, the descriptions and the clickable words, for a dark and a light theme. */
-type Ink = { fill: string; text: string; desc: string; link: string }
+/**
+ * The app's colours, the "Deep solid" palette in a dark and a light version: the box fill, its text, its descriptions,
+ * its clickable words, and the name pills (on, off, a command). The app draws a button's text itself, in its own
+ * theme's colour (light on a dark theme, dark on a light one), so a pill's fill is chosen to read under that text:
+ * deep on a dark theme, a pale tint of the same hue on a light one.
+ */
+type Ink = { fill: string; text: string; desc: string; link: string; on: string; off: string; run: string }
 const INK: Record<'dark' | 'light', Ink> = {
-  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5' },
-  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5' },
+  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5', on: '#166534', off: '#991B1B', run: '#374151' },
+  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5', on: '#BBF7D0', off: '#FECACA', run: '#E5E7EB' },
 }
+type ThemePick = 'light' | 'dark'
+const THEMES: readonly ThemePick[] = ['light', 'dark']
+const isThemePick = (v: unknown): v is ThemePick => typeof v === 'string' && (THEMES as readonly string[]).includes(v)
 
 const autoOpen = atom({ plugin: 'moddeck', key: 'autoOpen' } as const, 'new')
 /** First row shown in each scrolling list (`skills`, `prompts`): a list shows a few rows at a time, with a scroll bar, when it has many. */
@@ -96,6 +102,8 @@ const envCounts = atom({ plugin: 'moddeck', key: 'env' } as const, null as EnvCo
 /** The rows shown (a comma list in display order) and the layout, as /moddeck rows set them; null = not set by the person (the settings apply). */
 const rowsList = atom({ plugin: 'moddeck', key: 'rows' } as const, null as string | null)
 const layoutPick = atom({ plugin: 'moddeck', key: 'layout' } as const, null as Layout | null)
+/** `/moddeck theme light|dark`, this session's pick (kept in the store too); null = the setting. */
+const themePick = atom({ plugin: 'moddeck', key: 'theme' } as const, null as ThemePick | null)
 
 const LEDGER = { plugin: 'budget-guard', key: 'ledger' } as const
 const CACHE = { plugin: 'cache-tax', key: 'cache' } as const
@@ -104,6 +112,7 @@ const HELP = [
   'Moddeck · /moddeck shows or hides the side bar',
   '/moddeck update checks for a newer release · /btw <question> asks in the side bar',
   `/moddeck rows list · hide <id> · show <id> · compact · expanded`,
+  '/moddeck theme light · dark (the side bar colours in the desktop app)',
   `ids: ${ROW_IDS.join(', ')}`,
 ].join('\n')
 
@@ -423,11 +432,27 @@ async function refreshGit($: Dollar): Promise<void> {
   await safe(() => update($, backupAt, () => (times.length > 0 ? Math.max(...times) : null)))
 }
 
-/** The theme picked in /config: a light one gets the light box colours, any other (or none readable) the dark ones. */
-async function inkOf($: Dollar): Promise<Ink> {
-  const rows = await attempt(() => $.config.list())
-  const theme = rows?.find(r => r.key === 'theme')?.value
-  return typeof theme === 'string' && /light/i.test(theme) ? INK.light : INK.dark
+/**
+ * The app's colours: `/moddeck theme` (this session's, else saved), else the `appTheme` setting. A mod cannot see the
+ * app's own light or dark choice, so the person picks it.
+ */
+async function inkOf($: Dollar, setting: ThemePick): Promise<Ink> {
+  const stored = await storedText($, 'theme')
+  return INK[(await read($, themePick)) ?? (isThemePick(stored) ? stored : setting)]
+}
+
+/** `/moddeck theme light|dark`: the side bar's colours in the app, kept for later sessions. */
+async function themeCommand($: Dollar, words: string[]): Promise<string> {
+  const want = words[0]
+  if (words.length !== 1 || !isThemePick(want)) return 'Moddeck · /moddeck theme light or dark'
+  await setTheme($, want)
+  return `Moddeck · theme ${want}`
+}
+
+/** The light or dark colours, now and in later sessions: `/moddeck theme`, or the sun and moon at the top of the side bar. */
+async function setTheme($: Dollar, want: ThemePick): Promise<void> {
+  await update($, themePick, () => want)
+  await attempt(() => $.store.set('theme', want))
 }
 
 /** The permission mode set in the settings (or a config row, where the menu has one). The mode Shift+Tab switches to mid-session is not readable by a mod. */
@@ -538,7 +563,7 @@ async function observeMeasure($: Dollar, e: { context: MeasureAtom['context']; r
 }
 
 /** The settings the Session box reads, settled once at load. */
-type Conf = { showSession: boolean; layout: Layout; rows: string; box: Omit<BoxSettings, 'width'> }
+type Conf = { showSession: boolean; layout: Layout; rows: string; theme: ThemePick; box: Omit<BoxSettings, 'width'> }
 
 /** What is shown now: the person's /moddeck rows choice (this session's, else saved), else the settings. */
 async function currentRows($: Dollar, c: Conf): Promise<RowId[]> {
@@ -624,6 +649,7 @@ export const register: Register = (on, options) => {
     showSession: options.showSession !== false,
     layout: options.sessionLayout === 'compact' ? 'compact' : 'expanded',
     rows: typeof options.sessionRows === 'string' ? options.sessionRows : DEFAULT_ROWS,
+    theme: isThemePick(options.appTheme) ? options.appTheme : 'dark',
     box: {
       sevenDayAt: num(options.usageSevenDayAt, DEFAULT_BOX.sevenDayAt),
       toolsMaxVisible: Math.max(1, Math.floor(num(options.toolsMaxVisible, DEFAULT_BOX.toolsMaxVisible))),
@@ -656,6 +682,7 @@ export const register: Register = (on, options) => {
     const words = String((e as { args?: unknown }).args ?? '').trim().split(/\s+/).filter(Boolean)
     if (words.length === 0) return { text: await toggle($) }
     if (words[0]!.toLowerCase() === 'update') return { text: await checkForUpdate($, true) }
+    if (words[0]!.toLowerCase() === 'theme') return { text: await themeCommand($, words.slice(1).map(w => w.toLowerCase())) }
     if (words[0]!.toLowerCase() === 'rows') return { text: await rowsCommand($, conf, words.slice(1).map(w => w.toLowerCase())) }
     return { text: HELP }
   }).catch(() => ({ text: FAILED }))
@@ -765,7 +792,7 @@ export const register: Register = (on, options) => {
     const desk = e.surface === 'desktop'
     const fit = desk ? ({ minWidth: 0, overflow: 'hidden' } as const) : {}
     // The app's boxes are filled and their text coloured from INK; the terminal keeps its theme's colours.
-    const ink = desk ? await inkOf($) : undefined
+    const ink = desk ? await inkOf($, conf.theme) : undefined
     const fill = ink ? { backgroundColor: ink.fill } : {}
     const inked = ink ? { color: ink.text } : {}
     const dim = ink ? { color: ink.desc } : { dimColor: true }
@@ -905,12 +932,12 @@ export const register: Register = (on, options) => {
       const text = pillText(nameOf(t), nameWidth)
       const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn!))
       const run = () => (t.click ? act($, t.click) : undefined)
-      // In the app every name is a pill (PILL): green or red for a switch, gray for a command that runs on click. The pill box
+      // In the app every name is a pill (INK): green or red for a switch, gray for a command that runs on click. The pill box
       // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
       const pillOf = (key: string, color: string, onPress: () => unknown) => (
         <Box key={`pill:${t.id}`} backgroundColor={color} flexShrink={0}>
           <Button key={key} plain onPress={onPress as () => void}>
-            <Text bold color={PILL.text} backgroundColor={color}>
+            <Text bold color={ink?.text} backgroundColor={color}>
               {text}
             </Text>
           </Button>
@@ -918,7 +945,7 @@ export const register: Register = (on, options) => {
       )
       const name =
         desk ? (
-          isOn === undefined ? pillOf(`tool:${t.id}`, PILL.run, run) : pillOf(`switch:${t.id}`, isOn ? PILL.on : PILL.off, press)
+          isOn === undefined ? pillOf(`tool:${t.id}`, ink!.run, run) : pillOf(`switch:${t.id}`, isOn ? ink!.on : ink!.off, press)
         ) : isOn === undefined ? (
           <Button key={`tool:${t.id}`} plain onPress={run}>
             <Text bold>{text}</Text>
@@ -1013,7 +1040,18 @@ export const register: Register = (on, options) => {
     const updateNow = await read($, updateAvail)
     return (
       <Box flexDirection="column" gap={1} {...fit}>
-        {/* The desktop's own frame already has the title, an expand and a close button. */}
+        {/* The desktop's own frame already has the title, an expand and a close button; under it, the sun and the moon
+            pick the light or dark colours (the one in use at full strength, the other dim). */}
+        {desk && (
+          <Box key="themes" columnGap={2} {...fit}>
+            <Button key="theme:light" plain dimColor={ink === INK.light ? undefined : true} onPress={() => void setTheme($, 'light')}>
+              ☀
+            </Button>
+            <Button key="theme:dark" plain dimColor={ink === INK.dark ? undefined : true} onPress={() => void setTheme($, 'dark')}>
+              ☾
+            </Button>
+          </Box>
+        )}
         {!desk && (
           <Box justifyContent="space-between">
             <Text bold>Moddeck</Text>
