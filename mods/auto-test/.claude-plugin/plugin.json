@@ -1,6 +1,6 @@
 {
   "name": "auto-test",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Runs the project's tests once at the end of a turn in which Claude edited files, and shows a green or red result. Off until you type /auto-test on.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",

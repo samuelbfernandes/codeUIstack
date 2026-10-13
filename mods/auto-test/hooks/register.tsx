@@ -113,7 +113,9 @@ async function execute(c: Ctx, $: Dollar): Promise<void> {
   c.lastRun = { status: 'fail', label: cmd.label, at: started, ms, note: tail }
   await setLast('fail', $)
   await quiet(() => $.ui.toast('auto-test · FAILED'))
-  await quiet(() => $.ui.log(`auto-test · FAILED · ${cmd.label} · exit ${out.exitCode} · ${fmtSeconds(ms)}\n${tail}`))
+  // One `$.ui.log` call per line: a newline inside one call draws as a stray glyph, and the tail is meant to be copied.
+  await quiet(() => $.ui.log(`auto-test · FAILED · ${cmd.label} · exit ${out.exitCode} · ${fmtSeconds(ms)}`))
+  for (const line of tail.split('\n')) if (line.trim() !== '') await quiet(() => $.ui.log(line))
   if (c.cfg.tellModel) {
     const note = `auto-test: the project's tests failed after your last edits (${cmd.label}, exit ${out.exitCode}). Last output:\n${tail}`
     await quiet(() => $.session.append({ message: { type: 'user', content: [{ type: 'text', text: note }] } }))

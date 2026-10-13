@@ -165,14 +165,23 @@ test('fail: a FAILED toast, only the last 40 lines in the log, and still nothing
   await editedTurn($, w)
   expect(w.toasts).toEqual(['auto-test · FAILED'])
   expect(w.state.get(LAST)).toBe('fail')
-  expect(w.logs).toHaveLength(1)
-  const log = w.logs[0]!
-  expect(log).toContain('line 100')
-  expect(log).toContain('boom')
-  expect(log).not.toContain('line 50\n')
-  expect(log).not.toContain('line 1\n')
-  expect(log.split('\n').length).toBeLessThanOrEqual(42)
+  expect(w.logs[0]).toMatch(/^auto-test · FAILED · cargo test · exit 101 · /)
+  expect(w.logs).toContain('line 100')
+  expect(w.logs.at(-1)).toBe('boom')
+  expect(w.logs).not.toContain('line 50')
+  expect(w.logs).not.toContain('line 1')
+  expect(w.logs.length).toBeLessThanOrEqual(41)
   expect(w.session.appended()).toHaveLength(0)
+})
+
+test('fail: every transcript line is one line (a newline in $.ui.log draws as a stray glyph), indentation and blank lines aside', async ($, on) => {
+  const stdout = 'running 2 tests\r\n\n  ---- x stdout ----\n    at src/lib.rs:12:5\n'
+  const w = world(on, { files: { 'Cargo.toml': '' }, run: { exitCode: 101, stdout, stderr: 'error: test failed\n' }, ...ON })
+  await start($)
+  await editedTurn($, w)
+  expect(w.logs.length).toBeGreaterThan(1)
+  expect(w.logs.every(l => !l.includes('\n') && !l.includes('\r'))).toBe(true)
+  expect(w.logs.slice(1)).toEqual(['running 2 tests', '  ---- x stdout ----', '    at src/lib.rs:12:5', 'error: test failed'])
 })
 
 test('tellModel adds a note on failure only', { options: { tellModel: true } }, async ($, on) => {
