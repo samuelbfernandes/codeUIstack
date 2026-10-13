@@ -1,5 +1,5 @@
-// moddeck: a side bar with the toolkit's mods and skills, one boxed row each. A switch (green on, red off) flips at once by
-// running the mod's own command; a row runs its command at once when
+// moddeck: a side bar with the toolkit's mods and skills, one line each inside a card per group. A switch is the mod's name
+// (green on, red off) and flips at once by running the mod's own command; another name runs its command at once when
 // that is harmless, or puts it in the prompt box (`$.prompt.fill`) when it needs your text or changes something.
 // Nothing here spends tokens or sends a prompt by itself.
 import { atom, read, update } from 'claude-code'
@@ -8,7 +8,9 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { BtwEntry } from '../types'
 import { addEntry, buildPrompt, cutAnswer, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
 import { GROUPS, SKILLS, TOOLS, priced, splitCommand } from './catalog'
-import type { Action, SavedPrompt, Tool } from './catalog'
+import type { Action, Option, SavedPrompt, Tool } from './catalog'
+import { CARD_CHROME, CARD_GAP, DESC_MIN, barTarget, listAt, packCards, pillText, scrollBar } from './layout'
+import type { BottomList } from './layout'
 import { linkedWorktree, parseStatusV2 } from './gitinfo'
 import type { GitInfo } from './gitinfo'
 import {
@@ -26,7 +28,7 @@ import {
   startRun,
   targetOf,
 } from './sessionrows'
-import type { Activity, BoxSettings, EnvCounts, Layout, RowId, Snapshot, TokenTotals } from './sessionrows'
+import type { Activity, BoxSettings, EnvCounts, Layout, Part, RowId, Snapshot, TokenTotals } from './sessionrows'
 
 import { ASK_HEADER, CHECK_EVERY_MS, LATER, RELEASE, REMOTE, SKIP, UPDATE_NOW, askText, installArgv, isNewer, latestRelease, manualCommand } from './update'
 
@@ -35,13 +37,14 @@ type Dollar = EngineInterface
 const PANE = 'moddeck'
 const TITLE = 'Moddeck'
 const COLUMNS = 40
-const WIDE_COLUMNS = 64
+/** Wide enough for the cards with short names to sit two to a line. */
+const WIDE_COLUMNS = 96
 const HINT = 'Side panel · use /tui fullscreen'
 const FAILED = 'Moddeck · could not open'
 const PANE_SURFACES = new Set(['terminal', 'desktop'])
 
 const autoOpen = atom({ plugin: 'moddeck', key: 'autoOpen' } as const, 'new')
-/** First row shown in each scrolling list (`skills`, `prompts`): a list scrolls a few rows at a time when it has many. */
+/** First row shown in each scrolling list (`skills`, `prompts`): a list shows a few rows at a time, with a scroll bar, when it has many. */
 const tops = atom({ plugin: 'moddeck', key: 'tops' } as const, {} as Record<string, number>)
 /** The updateCheck setting, set once by `register` (the open path in `toggle` reads it). */
 let updateCheckOn = true
@@ -54,7 +57,12 @@ const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, nul
 /** The expand button: the pane is drawn wide (`WIDE_COLUMNS`) instead of `COLUMNS`. */
 const wide = atom({ plugin: 'moddeck', key: 'wide' } as const, false)
 const DEFAULT_SKILL_ROWS = 4
-/** What the person last picked in a dropdown here (`blast-radius`, `review-cost`): the pick shows at once, even where the other mod's state is not watched for redraws. */
+/** Where the last drawing put the pane's window and its lists, for the wheel (`ui.scroll`); a fresh load starts empty. */
+let paneOffset = 0
+let bottomLists: BottomList[] = []
+let scrollables: Record<string, { total: number; shown: number }> = {}
+const clampTop = (top: number, total: number, shown: number): number => Math.max(0, Math.min(top, total - shown))
+/** What the person last picked in a dropdown here (`blast-radius`, and `blast-radius:last`, the level its switch goes back to): the pick shows at once, even where the other mod's state is not watched for redraws. */
 const picks = atom({ plugin: 'moddeck', key: 'picks' } as const, {} as Record<string, string>)
 
 // ---- the Session box: what is kept in memory (never in the transcript), and read by the pane ---------------------------------
@@ -168,6 +176,13 @@ async function pick($: Dollar, id: string, command: string, value: string): Prom
   } catch {
     $.ui.toast(`Moddeck · could not set ${command} to ${value}`)
   }
+}
+
+/** blast-radius's name is a switch too: off, or back to the level it had (medium the first time). */
+async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>): Promise<void> {
+  const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
+  if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
+  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off')
 }
 
 async function safe(f: () => Promise<unknown>): Promise<void> {
@@ -706,6 +721,15 @@ export const register: Register = (on, options) => {
     return out
   }).catch(($, e, next) => next(e))
 
+  // The mouse wheel over a long list (Skills, Prompts) scrolls that list; anywhere else it scrolls the pane as usual.
+  on('ui.scroll', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    const hit = e.pointer === undefined ? undefined : listAt(bottomLists, e.contentRows, paneOffset + e.pointer.row)
+    const list = hit === undefined ? undefined : scrollables[hit.id]
+    if (hit === undefined || list === undefined || e.by === 0) return next(e)
+    await update($, tops, t => ({ ...t, [hit.id]: clampTop((t[hit.id] ?? 0) + e.by, list.total, list.shown) }))
+    return {}
+  }).catch(($, e, next) => next(e)) // a failed list scroll still scrolls the pane
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const R = $.ui.resolve(e) as ReturnType<typeof $.ui.resolve> & { Input?: (p: Record<string, unknown>) => unknown }
     const { Box, Button, Select, Text } = R
@@ -713,12 +737,42 @@ export const register: Register = (on, options) => {
     if ((await read($, autoOpen)) === 'checking') defer($, () => settleAutoOpen($, e.props.placement))
     const isInline = e.props.placement === 'inline' || e.viewport?.isFullscreen === false
     if (e.surface === 'terminal' && isInline) return <Text dimColor>{HINT}</Text>
+    paneOffset = e.props.scroll?.offset ?? 0
+    const cols = Math.max(20, e.props.bodyColumns)
+    const room = Math.max(10, cols - CARD_CHROME)
+
+    // Every line is one row: coloured parts inside one Text, so a pane narrower than the line cuts it with "…".
+    const partsLine = (key: string, parts: readonly Part[]) => (
+      <Text key={key} wrap="truncate-end">
+        {parts.map((p, i) => (
+          <Text key={`${key}:${i}`} color={p.color} dimColor={p.dim} bold={p.bold}>
+            {p.text}
+          </Text>
+        ))}
+      </Text>
+    )
+    // A card: a bold title, then a round box whose rows are parted by thin rules (the look of the Session box).
+    const rule = (key: string) => (
+      <Text key={key} dimColor wrap="truncate-end">
+        {'─'.repeat(300)}
+      </Text>
+    )
+    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number; rules?: boolean } = {}) => (
+      <Box key={key} flexDirection="column" width={opts.width} flexShrink={1}>
+        <Text bold wrap="truncate-end">
+          {title}
+        </Text>
+        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+          {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
+        </Box>
+      </Box>
+    )
 
     // The Session box at the top: live figures from the engine, each row hidden when its figure is missing.
     let sessionBox: unknown = null
     if (showSession) {
       try {
-        const settings: BoxSettings = { ...conf.box, width: Math.max(20, e.props.bodyColumns - 6) }
+        const settings: BoxSettings = { ...conf.box, width: room }
         const built = buildRows(await snapshotOf($), settings)
         const shown = (await currentRows($, conf)).map(id => built[id]).filter((r): r is NonNullable<typeof r> => r !== undefined)
         const lines = layoutLines(shown, await currentLayout($, conf), settings.width)
@@ -727,13 +781,7 @@ export const register: Register = (on, options) => {
             <Box key="session" flexDirection="column" borderStyle="round" paddingX={1}>
               <Text bold>Session</Text>
               {lines.map(l => (
-                <Box key={`session:row:${l.key}`}>
-                  {l.parts.map((p, i) => (
-                    <Text key={`session:part:${l.key}:${i}`} color={p.color} dimColor={p.dim} bold={p.bold} wrap="truncate-end">
-                      {p.text}
-                    </Text>
-                  ))}
-                </Box>
+                <Box key={`session:row:${l.key}`}>{partsLine(`session:line:${l.key}`, l.parts)}</Box>
               ))}
             </Box>
           )
@@ -743,176 +791,22 @@ export const register: Register = (on, options) => {
       }
     }
 
-    // Switches: only the ones whose state this side bar can read; the pill is the button.
-    // Each switch reads its own mod's state; a mod that is not installed (or not readable) is simply not drawn.
-    const flag = (v: unknown, isOff: boolean): boolean | undefined => (typeof v === 'boolean' ? (isOff ? !v : v) : undefined)
-    const ons: Record<string, boolean | undefined> = {
-      suggest: flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
-      reflect: flag(await valueOf($.state.get(REFLECT_OFF as never)), true),
-      'secret-guard': flag(await valueOf($.state.get(SECRET_ON as never)), false),
-      'data-guard': flag(await valueOf($.state.get(DATA_OFF as never)), true),
-      'big-file-guard': flag(await valueOf($.state.get(BIGFILE_OFF as never)), true),
-      'repro-log': flag(await valueOf($.state.get(REPRO_OFF as never)), true),
-      'auto-test': flag(await valueOf($.state.get(AUTOTEST_OFF as never)), true),
-      'long-run-ping': flag(await valueOf($.state.get(PING_OFF as never)), true),
-    }
-    const blast = await valueOf($.state.get(BLAST_LEVEL as never))
-    const reviewOff = await valueOf($.state.get(REVIEW_OFF as never))
-    const chosen = await read($, picks)
-    // The level each dropdown shows: the person's last pick, else the mod's own state; undefined = the mod is not readable.
-    const levelOf: Record<string, string | undefined> = {
-      'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
-      'review-cost': chosen['review-cost'] ?? (typeof reviewOff === 'boolean' ? (reviewOff ? 'off' : 'on') : undefined),
-    }
-
-    // One column of grouped cards, in the style of a settings page. Every row: icon, name, short description on the left, its
-    // switch or dropdown on the right, and (wrapping inside the row) its action buttons underneath. Only the look is new:
-    // every press runs the same handler as before.
-    const wideNow = await read($, wide)
-    const room = Math.max(10, e.props.bodyColumns - 6)
-    const rule = (key: string) => (
-      <Text key={key} dimColor wrap="truncate-end">
-        {'─'.repeat(300)}
-      </Text>
-    )
-    const card = (key: string, title: string, rowsOf: unknown[]) => (
-      <Box key={key} flexDirection="column">
-        <Text bold>{title}</Text>
-        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
-          {rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r])) as never}
-        </Box>
-      </Box>
-    )
-    // Skills and saved prompts: a bold title and plain rows, no box and no lines; the blank line between sections is the parent's gap.
-    const plainList = (key: string, title: string, rowsOf: unknown[]) => (
-      <Box key={key} flexDirection="column">
-        <Text bold>{title}</Text>
-        {rowsOf as never}
-      </Box>
-    )
-    // An action button: blue text, wrapping with its neighbours; `$` marks what spends model tokens.
-    const action = (key: string, label: string, act1: Action, costs?: boolean) => (
-      <Button key={key} plain onPress={() => act($, act1)}>
-        <Text color="suggestion" wrap="truncate-end">{`[${priced(label, costs)}]`}</Text>
-      </Button>
-    )
-    const actionsOf = (t: Tool) =>
-      (t.options ?? []).length > 0 && (
-        <Box key={`options:${t.id}`} flexWrap="wrap" columnGap={1} paddingLeft={2} width={room}>
-          {(t.options ?? []).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
-        </Box>
-      )
-    // The row itself: left side (icon, name, description), right side (the control).
-    const line = (t: Tool, name: unknown, control: unknown, extra?: unknown) => (
-      <Box key={`row:${t.id}`} flexDirection="column">
-        <Box justifyContent="space-between" columnGap={1}>
-          <Box flexDirection="column" flexShrink={1}>
-            <Box columnGap={1}>
-              <Text dimColor>{t.icon}</Text>
-              {name as never}
-            </Box>
-            {t.desc && (
-              <Text dimColor wrap="truncate-end">
-                {`  ${t.desc}`}
-              </Text>
-            )}
-          </Box>
-          {control as never}
-        </Box>
-        {extra as never}
-      </Box>
-    )
-    const title = (t: Tool) => (
-      <Text bold wrap="truncate-end">
-        {priced(t.label, t.costs)}
-      </Text>
-    )
-    // A switch is a small pill: green and "on", or gray and "off". The pill is the button.
-    const pill = (t: Tool, isOn: boolean) => (
-      <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={() => flip($, t, isOn)}>
-        <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'inactive'}>
-          {isOn ? ' on ●' : '● off'}
-        </Text>
-      </Button>
-    )
-
-    const drawn = (t: Tool): unknown => {
-      if (t.levels !== undefined) {
-        // blast-radius and review-cost work by themselves: a dropdown of levels, one of them off.
-        const level = levelOf[t.id]
-        if (level === undefined) return undefined // not installed, or not readable: not drawn
-        return line(t, title(t), <Select key={`level:${t.id}`} value={level} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />)
-      }
-      if (t.isSwitch) {
-        const isOn = ons[t.id]
-        if (isOn === undefined) return undefined // not installed, or not readable: not drawn
-        // Options show only while the switch is on, unless the tool says they always show.
-        return line(t, title(t), pill(t, isOn), isOn ? actionsOf(t) : undefined)
-      }
-      if (t.click !== undefined) {
-        const click = t.click
-        const name = (
-          <Button key={`tool:${t.id}`} plain onPress={() => act($, click)}>
-            <Text bold wrap="truncate-end">{priced(t.label, t.costs)}</Text>
-          </Button>
-        )
-        return line(t, name, <Text dimColor>›</Text>, actionsOf(t))
-      }
-      return line(t, title(t), <Text dimColor>{t.note ?? 'runs by itself'}</Text>)
-    }
-    const groups = GROUPS.flatMap(g => {
-      const rowsOf = TOOLS.filter(t => t.group === g).map(drawn).filter(r => r !== undefined)
-      return rowsOf.length > 0 ? [card(`group:${g}`, g, rowsOf)] : []
-    })
-
-    // Skills and saved prompts are plain one-line rows in the same card style.
-    const listRow = (key: string, label: string, text: string) => (
-      <Button key={key} plain onPress={() => act($, { text, run: false })}>
-        <Text wrap="truncate-end">{label}</Text>
-      </Button>
-    )
-
-    // A list with its own scroll: `rows` rows at a time, with ▲ / ▼ buttons, only when there are more.
-    const scrolled = await read($, tops)
-    const windowed = (id: string, items: unknown[], draw: (item: never) => unknown) => {
-      const many = items.length > rows
-      const top = Math.max(0, Math.min(scrolled[id] ?? 0, items.length - rows))
-      const scrollTo = (to: number) => update($, tops, t => ({ ...t, [id]: Math.max(0, Math.min(to, items.length - rows)) }))
-      const shown = items.slice(many ? top : 0, many ? top + rows : undefined).map(draw as never)
-      const scroller = many && (
-        <Box key={`${id}:scroll`} gap={2}>
-          <Button key={`${id}:up`} plain onPress={() => scrollTo(top - 1)}>
-            <Text dimColor={top === 0}>▲ up</Text>
-          </Button>
-          <Text dimColor>{`${top + 1}–${Math.min(top + rows, items.length)} of ${items.length}`}</Text>
-          <Button key={`${id}:down`} plain onPress={() => scrollTo(top + 1)}>
-            <Text dimColor={top + rows >= items.length}>▼ down</Text>
-          </Button>
-        </Box>
-      )
-      return { shown, scroller }
-    }
-    const skillList = windowed('skills', SKILLS, ((k: (typeof SKILLS)[number]) => listRow(`skill:${k.id}`, k.label, k.text)) as never)
-
-    // Saved prompts (prompt-library): a click puts the text in the prompt box. Not drawn while that mod is not readable.
-    const saved = await valueOf($.state.get(PROMPTS as never))
-    const prompts: SavedPrompt[] = Array.isArray(saved)
-      ? (saved as unknown[]).filter((p): p is SavedPrompt => typeof (p as SavedPrompt)?.name === 'string' && typeof (p as SavedPrompt)?.text === 'string')
-      : []
-    const promptList = windowed('prompts', prompts, ((p: SavedPrompt) => listRow(`prompt:${p.name}`, p.name, p.text)) as never)
-
-    // The Side Question panel at the bottom: the last answers, then a field. Enter asks; nothing enters the conversation.
-    const updateNow = await read($, updateAvail)
+    // The Side Question panel, right under the Session box: one line until clicked, then the last answers and a field.
     const btws = await read($, btwList)
     const isBtwOpen = await read($, btwOpen)
     const btwHead = (
       <Button key="btw:toggle" plain onPress={() => void update($, btwOpen, o => !o)}>
-        <Text bold>{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
+        <Text bold wrap="truncate-end">{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
       </Button>
     )
     const btwBox = !isBtwOpen ? (
       <Box key="btw" borderStyle="round" paddingX={1}>
         {btwHead}
+        <Box flexGrow={1} flexShrink={1} paddingLeft={1}>
+          <Text dimColor wrap="truncate-end">
+            $ ask without touching the chat
+          </Text>
+        </Box>
       </Box>
     ) : (
       <Box key="btw" flexDirection="column" borderStyle="round" paddingX={1}>
@@ -932,6 +826,146 @@ export const register: Register = (on, options) => {
       </Box>
     )
 
+    // Switches: only the ones whose state this side bar can read. Each switch reads its own mod's state; a mod that is not
+    // installed (or not readable) is simply not drawn.
+    const flag = (v: unknown, isOff: boolean): boolean | undefined => (typeof v === 'boolean' ? (isOff ? !v : v) : undefined)
+    const ons: Record<string, boolean | undefined> = {
+      suggest: flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
+      reflect: flag(await valueOf($.state.get(REFLECT_OFF as never)), true),
+      'secret-guard': flag(await valueOf($.state.get(SECRET_ON as never)), false),
+      'data-guard': flag(await valueOf($.state.get(DATA_OFF as never)), true),
+      'big-file-guard': flag(await valueOf($.state.get(BIGFILE_OFF as never)), true),
+      'repro-log': flag(await valueOf($.state.get(REPRO_OFF as never)), true),
+      'auto-test': flag(await valueOf($.state.get(AUTOTEST_OFF as never)), true),
+      'long-run-ping': flag(await valueOf($.state.get(PING_OFF as never)), true),
+      'review-cost': flag(await valueOf($.state.get(REVIEW_OFF as never)), true),
+    }
+    const blast = await valueOf($.state.get(BLAST_LEVEL as never))
+    const chosen = await read($, picks)
+    // The level the dropdown shows: the person's last pick, else the mod's own state; undefined = the mod is not readable.
+    const levelOf: Record<string, string | undefined> = {
+      'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
+    }
+
+    // One line per tool: its name (a green or red pill when it is a switch), its controls, then its description, which
+    // takes what is left and is cut with "…". The descriptions, icons and groups are presentation only.
+    const isOnOf = (t: Tool): boolean | undefined => (t.levels !== undefined ? (levelOf[t.id] === undefined ? undefined : levelOf[t.id] !== 'off') : ons[t.id])
+    const visible = (t: Tool): boolean => (t.isSwitch || t.levels !== undefined ? isOnOf(t) !== undefined : true)
+    const actionsShown = (t: Tool): Option[] => (t.isSwitch && !isOnOf(t) ? [] : (t.options ?? []))
+    const action = (key: string, label: string, act1: Action, costs?: boolean) => (
+      <Button key={key} plain onPress={() => act($, act1)}>
+        <Text color="suggestion">{`[${priced(label, costs)}]`}</Text>
+      </Button>
+    )
+    const controlsWidth = (t: Tool): number => {
+      const select = t.levels !== undefined ? Math.max(...t.levels.map(l => l.length)) + 4 : 0
+      const buttons = actionsShown(t).reduce((n, o) => n + priced(o.label, o.costs).length + 3, 0)
+      return select + buttons
+    }
+    const nameOf = (t: Tool) => priced(t.label, t.costs)
+    const line = (t: Tool, nameWidth: number) => {
+      const isOn = isOnOf(t)
+      const text = pillText(nameOf(t), nameWidth)
+      const name =
+        isOn === undefined ? (
+          <Button key={`tool:${t.id}`} plain onPress={() => (t.click ? act($, t.click) : undefined)}>
+            <Text bold>{text}</Text>
+          </Button>
+        ) : (
+          <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={() => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn))}>
+            <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'error'}>
+              {text}
+            </Text>
+          </Button>
+        )
+      const level = t.levels !== undefined && (
+        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
+      )
+      return (
+        <Box key={`row:${t.id}`} columnGap={1}>
+          <Box flexShrink={0} columnGap={1}>
+            {name}
+            {level as never}
+            {actionsShown(t).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
+          </Box>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text dimColor wrap="truncate-end">
+              {t.desc ?? t.note ?? ''}
+            </Text>
+          </Box>
+        </Box>
+      )
+    }
+    const groupTools = GROUPS.map(g => ({ g, tools: TOOLS.filter(t => t.group === g && visible(t)) })).filter(x => x.tools.length > 0)
+    const mins = groupTools.map(({ tools }) => {
+      const nameWidth = Math.max(...tools.map(t => nameOf(t).length))
+      return CARD_CHROME + Math.max(...tools.map(t => nameWidth + 2 + 1 + controlsWidth(t))) + DESC_MIN
+    })
+    // Cards with short names share a line when the pane is wide enough; each stays its own box.
+    const toolCards = packCards(mins, cols).map((ln, i) => (
+      <Box key={`cards:${i}`} columnGap={CARD_GAP} alignItems="flex-start">
+        {ln.map(({ index, width }) => {
+          const { g, tools } = groupTools[index]!
+          const nameWidth = Math.max(...tools.map(t => nameOf(t).length))
+          return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)), { width: ln.length > 1 ? width : undefined })
+        })}
+      </Box>
+    ))
+
+    // Skills and saved prompts: a card each, `rows` lines at a time, with a scroll bar on the right when there are more.
+    // A click on the bar's track moves a page; the wheel over the list moves it a line.
+    const scrolled = await read($, tops)
+    const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string) => {
+      const shown = Math.min(rows, items.length)
+      const top = clampTop(scrolled[id] ?? 0, items.length, shown)
+      const nameWidth = Math.max(...items.map(i => label(i).length))
+      const lines = items.slice(top, top + shown).map(item => (
+        <Box key={`${id}:line:${keyOf(item)}`} columnGap={1}>
+          <Box flexShrink={0}>
+            <Button key={keyOf(item)} plain onPress={() => act($, { text: text(item), run: false })}>
+              <Text bold color="suggestion">
+                {label(item).padEnd(nameWidth)}
+              </Text>
+            </Button>
+          </Box>
+          <Box flexGrow={1} flexShrink={1}>
+            <Text dimColor wrap="truncate-end">
+              {desc(item)}
+            </Text>
+          </Box>
+        </Box>
+      ))
+      const bar = items.length > shown && (
+        <Box key={`${id}:bar`} flexDirection="column" flexShrink={0}>
+          {scrollBar(top, shown, items.length).map((cell, i) => (
+            <Button key={`${id}:bar:${i}`} plain label={`${title} scroll bar`} onPress={() => void update($, tops, t => ({ ...t, [id]: barTarget(top, shown, items.length, i) }))}>
+              <Text color={cell === 'thumb' ? 'suggestion' : 'inactive'}>{cell === 'thumb' ? '┃' : '│'}</Text>
+            </Button>
+          ))}
+        </Box>
+      )
+      return card(`group:${id}`, items.length > shown ? `${title} · ${items.length}` : title, [
+        <Box key={`${id}:window`} columnGap={1}>
+          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+            {lines}
+          </Box>
+          {bar as never}
+        </Box>,
+      ])
+    }
+    const skillCard = SKILLS.length > 0 ? listCard('skills', 'Skills', SKILLS, k => `skill:${k.id}`, k => k.label, k => k.desc, k => k.text) : null
+    // Saved prompts (prompt-library): a click puts the text in the prompt box. Not drawn while that mod is not readable.
+    const saved = await valueOf($.state.get(PROMPTS as never))
+    const prompts: SavedPrompt[] = Array.isArray(saved)
+      ? (saved as unknown[]).filter((p): p is SavedPrompt => typeof (p as SavedPrompt)?.name === 'string' && typeof (p as SavedPrompt)?.text === 'string')
+      : []
+    const promptCard = prompts.length > 0 ? listCard('prompts', 'Prompts', prompts, p => `prompt:${p.name}`, p => p.name, p => p.text, p => p.text) : null
+    // Where the lists sit, counted from the bottom, for the wheel: the lowest first.
+    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: Math.min(rows, prompts.length) }] : []), ...(SKILLS.length > 0 ? [{ id: 'skills', shown: Math.min(rows, SKILLS.length) }] : [])]
+    scrollables = { skills: { total: SKILLS.length, shown: Math.min(rows, SKILLS.length) }, prompts: { total: prompts.length, shown: Math.min(rows, prompts.length) } }
+
+    const wideNow = await read($, wide)
+    const updateNow = await read($, updateAvail)
     return (
       <Box flexDirection="column" gap={1}>
         <Box justifyContent="space-between">
@@ -946,12 +980,13 @@ export const register: Register = (on, options) => {
           </Button>
         )}
         {sessionBox as never}
-        <Text bold>Tools</Text>
-        {groups}
-        {skillList.shown.length > 0 && plainList('group:skills', 'Skills', [skillList.scroller, ...skillList.shown].filter(Boolean))}
-        {prompts.length > 0 && plainList('group:prompts', 'Prompts · click to put it in the prompt box', [promptList.scroller, ...promptList.shown].filter(Boolean))}
-        <Text dimColor>$ = spends model tokens</Text>
         {btwBox as never}
+        {toolCards}
+        {skillCard as never}
+        {promptCard as never}
+        <Text dimColor wrap="truncate-end">
+          green on · red off · click a name · $ = spends model tokens
+        </Text>
       </Box>
     )
   })

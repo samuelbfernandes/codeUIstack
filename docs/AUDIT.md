@@ -18,7 +18,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | diagram | no | none | no | no | command.run, session.end, session.start, turn.complete, ui.render |
 | filetree | no | git | no | no | command.run, session.start, tool.call, ui.render |
 | long-run-ping | no | none | no | no | command.run, prompt.submit, session.start, tool.call, turn.complete |
-| moddeck | yes | git, pipx, uvx | no | yes | command.run, session.compact, session.measure, session.start, tool.call, turn.complete, turn.step, ui.render |
+| moddeck | yes | git, pipx, uvx | no | yes | command.run, session.compact, session.measure, session.start, tool.call, turn.complete, turn.step, ui.render, ui.scroll |
 | prompt-library | no | none | no | no | command.run, session.start |
 | reflect | no | none | yes | yes | command.run, prompt.submit, session.start, ui.render |
 | replay-theater | no | none | no | no | command.run, prompt.submit, session.end, session.start, tool.call, turn.complete, turn.start, ui.render |
