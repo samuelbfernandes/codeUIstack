@@ -1,12 +1,15 @@
 # Moddeck
 
 **Safety and productivity mods for Claude Code, built for scientists.**
-Twenty-one small add-ons (mods), five skills and a set of git guards that protect your work, keep your token bill visible, and
+Thirty small add-ons (mods), five skills and a set of git guards that protect your work, keep your token bill visible, and
 stay quiet until they have something useful to say.
 
 > **Credit where it is due.** Not everything here is my own creation. Some mods and skills are adapted from other people's
 > ideas and guides, and some features already exist inside Claude Code or as
 > Anthropic's official plugins: Moddeck simply switches them on and makes them easier to reach.
+> Seven mods (staged-review, color-lab, csv-table, test-ledger, scope-watch, error-inbox, decision-log) are adapted from
+> [whyashthakker/awesome-claude-code-mods](https://github.com/whyashthakker/awesome-claude-code-mods) (MIT, © 2026 Yash
+> Thakker and contributors), rewritten for moddeck; each keeps the original licence and says what changed in its README.
 
 ## Install
 
@@ -76,6 +79,7 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 
 **Guards**
 - `secret-guard`: hides keys, tokens and passwords from what Claude reads.
+- `scope-watch`*: `/scope-watch <folder>`; a note when Claude edits a file outside it.
 - `data-guard`: asks before a commit holds large files, data files, personal-looking column names or notebook outputs.
 - `big-file-guard`: reads only the first lines of a big csv, json or log.
 - `repro-log`: `/repro` writes a re-runnable recipe of the session (commands, versions, seeds).
@@ -83,6 +87,8 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 **Automation**
 - `auto-test`: runs your tests after a turn that changed code (off until you switch it on).
 - `long-run-ping`: a toast, sound and notification when a long run finishes.
+- `format-on-edit`: formats each file Claude edits with Air (R), Ruff (Python), or the project's Prettier or Biome (off until you switch it on).
+- `test-ledger`*: every test, lint and build run of the session with its result (R, Python, Rust and JS tools).
 
 **Workspace utilities**
 - `checkpoint`: `/checkpoint` snapshots your working tree; a restore shows what would change first.
@@ -93,10 +99,21 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 - `filetree`: a live folder tree beside the chat.
 - `replay-theater`: replays Claude's edits one diff at a time.
 - `diagram`: draws Claude's mermaid diagrams as box art, offline.
+- `staged-review`*: the staged diff, before you commit.
+- `error-inbox`*: the last 30 failed or refused tool calls, secrets scrubbed, with an "ask Claude" button.
+- `decision-log`*: `/decision <text>` adds a dated row to `docs/DECISIONS.md`.
+- `csv-table`*: `/csv-table data.csv` previews a table: delimiter, column types, first rows.
+
+**UI development** (more in [docs/UI-DEV.md](docs/UI-DEV.md))
+- `ui-preview`: runs the app in this project (plumber API first, then a JS dev server, Shiny, Streamlit), lists the
+  plumber routes, takes a screenshot and asks Claude to review the page.
+- `color-lab`*: colour formats and WCAG contrast, with the nearest passing shade.
 
 **Look and feel**
 - `moddeck`: the side bar above.
 - `tool-skins`: colour themes for tool calls.
+
+\* adapted from [awesome-claude-code-mods](https://github.com/whyashthakker/awesome-claude-code-mods) (see the credit note above).
 
 ### Skills (Claude loads them by itself)
 
@@ -114,6 +131,10 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 - **Claude Code's own features**, switched on for you if you tick them: You Should Know tips, the sandbox, telemetry off.
 - **Anthropic's official plugins** (optional): Rust and Python diagnostics, security review, CLAUDE.md upkeep, code
   simplifier, PubMed, bioRxiv, Context7.
+- **UI development extras** (optional, third-party, never on by default): Chrome DevTools MCP (pinned, usage statistics
+  off), Posit's btw and mcptools for R, Posit's Shiny, Quarto and R-package skills, Plotly Cloud MCP, Anthropic's
+  frontend-design. Pick them with `--with <id>`; the list and the programs to install yourself (Air, Ruff, jarl, the
+  Shiny for Python, Streamlit, Gradio and Panel skills) are in [docs/UI-DEV.md](docs/UI-DEV.md).
 
 ## Try it
 
@@ -142,7 +163,7 @@ Each mod's own README (`mods/<name>/README.md`) has its settings and limits.
 ## Why you can trust the installer
 
 - It shows the full plan first (`--plan`) and asks before applying.
-- No network, no `sudo`, no third-party code: standard-library Python, checked by CI.
+- No network, no `sudo`, no third-party code unless you tick it in the UI development list: standard-library Python, checked by CI.
 - `uninstall` removes exactly what it recorded and leaves your own settings alone.
 - [docs/AUDIT.md](docs/AUDIT.md) lists, for every mod, the programs it starts and whether it writes files or spends tokens.
 - [docs/SAFETY.md](docs/SAFETY.md) lists what it touches, what it never does, and the real caveats.
@@ -161,4 +182,4 @@ The installer never installs these. Each has a cost or catch worth reading first
 - **wshobson/agents, davila7/claude-code-templates**: catalogs of 100+ agents and skills; browse, do not bulk-install.
 
 Worth a look if you want them: trailofbits/claude-code-config, kenryu42/cc-safety-net, K-Dense-AI/claude-scientific-skills
-(install a subset), posit-dev/skills (R packages), ccusage and claude-hud / ccstatusline.
+(install a subset), ccusage and claude-hud / ccstatusline. posit-dev/skills is now an optional installer item (see above).

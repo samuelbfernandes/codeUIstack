@@ -1,0 +1,17 @@
+{
+  "name": "csv-table",
+  "version": "0.1.0",
+  "description": "Previews a csv, tsv or txt table in a pane: delimiter, columns with simple types, row count and the first 20 rows. Reads only the file you name.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "maxKb": {
+      "type": "number",
+      "title": "Largest file (KB)",
+      "description": "A file bigger than this is refused rather than read (the mod reads whole files; 4096 at most).",
+      "default": 2048,
+      "min": 1,
+      "max": 4096
+    }
+  }
+}

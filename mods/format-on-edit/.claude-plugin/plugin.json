@@ -1,0 +1,15 @@
+{
+  "name": "format-on-edit",
+  "version": "0.1.0",
+  "description": "After Claude edits a file, formats just that file with the project's formatter (Air for R, Ruff for Python, Prettier or Biome for JS when the project uses one) and tells Claude to read it again. Off until you type /format-on-edit on.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "lint": {
+      "type": "boolean",
+      "title": "Also apply lint fixes",
+      "description": "When on, also runs `ruff check --fix` on Python files and `jarl check --fix` on R files before formatting. Off by default.",
+      "default": false
+    }
+  }
+}

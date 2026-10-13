@@ -35,15 +35,25 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "moddeck": {"git", "pipx", "uvx"},         # git: read-only for the Session box, and `git ls-remote --tags` for the update check; pipx/uvx: the installer's own one-liner, only after you answer "Update now"
     "data-guard": {"git"},
     "big-file-guard": set(),
-    "repro-log": {"git", "python3", "node"},          # only `--version` probes, for runtimes that appeared in the session
-    "auto-test": {"npm", "python3", "sh"},           # runs the project's own tests (pytest, npm test); `sh -c` only for a command the person set; off until switched on
+    "repro-log": {"git", "python3", "node", "R"},          # only `--version` probes, for runtimes that appeared in the session
+    "auto-test": {"npm", "python3", "sh", "Rscript"},           # runs the project's own tests (pytest, npm test); `sh -c` only for a command the person set; off until switched on
     "prompt-library": set(),
     "checkpoint": {"git", "rm", "cmd"},          # rm / del only on a confirmed restore, only paths the dialog listed
     "long-run-ping": set(),
+    # Adapted from whyashthakker/awesome-claude-code-mods (MIT): read-only git for staged-review, nothing else.
+    "staged-review": {"git"},
+    "color-lab": set(),
+    "csv-table": set(),
+    "test-ledger": set(),
+    "scope-watch": set(),
+    "error-inbox": set(),
+    "decision-log": set(),
+    "format-on-edit": {"air", "ruff", "jarl", "prettier", "biome"},   # only when switched on, on the one file Claude just edited, if the tool is installed
+    "ui-preview": {"Rscript", "npm", "shiny", "streamlit", "google-chrome", "chromium", "chromium-browser"},   # your app's own server, and a headless browser for a screenshot; only on /ui-preview start|shot
 }
-ALLOW_NETWORK: set[str] = {"moddeck"}      # moddeck names the GitHub repo for `git ls-remote --tags` (the update check); it never calls $.http
+ALLOW_NETWORK: set[str] = {"moddeck", "ui-preview"}      # moddeck names the GitHub repo for `git ls-remote --tags` (the update check), it never calls $.http; ui-preview fetches only http://127.0.0.1 / localhost (refused in code otherwise)
 NEVER_PROGRAMS = {"curl", "wget", "ssh", "scp", "nc", "ncat", "telnet", "sudo", "powershell", "pwsh", "bash", "sh", "zsh", "cmd", "python", "python3", "node", "npm", "npx", "pip", "rm", "mv", "chmod"}
-KNOWN_PROGRAMS = {"git", "gh", "codex", "claude", "du", "find", "pipx", "uvx"} | NEVER_PROGRAMS
+KNOWN_PROGRAMS = {"git", "gh", "codex", "claude", "du", "find", "pipx", "uvx", "air", "ruff", "jarl", "prettier", "biome", "Rscript", "R", "shiny", "streamlit", "google-chrome", "chromium", "chromium-browser"} | NEVER_PROGRAMS
 
 NETWORK_RE = re.compile(r"\$\.http\b|\.http\.fetch|\bfetch\s*\(|XMLHttpRequest|WebSocket|https?://")
 DYNAMIC_RE = re.compile(r"\beval\s*\(|new\s+Function\s*\(|\bimport\s*\(|\brequire\s*\(|child_process")

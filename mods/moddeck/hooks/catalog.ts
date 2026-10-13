@@ -12,9 +12,9 @@ export type Action = { text: string; run: boolean }
 
 export type Option = { label: string; costs?: boolean } & Action
 
-export type Group = 'Prompt helpers' | 'Guards' | 'Automation' | 'Model controls' | 'Workspace utilities'
+export type Group = 'Prompt helpers' | 'Guards' | 'Automation' | 'Model controls' | 'Workspace utilities' | 'UI development'
 /** In drawing order, one card under the other. */
-export const GROUPS: Group[] = ['Prompt helpers', 'Model controls', 'Guards', 'Automation', 'Workspace utilities']
+export const GROUPS: Group[] = ['Prompt helpers', 'Model controls', 'Guards', 'Automation', 'Workspace utilities', 'UI development']
 
 export type Tool = {
   id: string
@@ -93,6 +93,38 @@ export const TOOLS: Tool[] = [
     ],
   },
   { id: 'long-run-ping', label: 'long-run-ping', group: 'Automation', icon: '◷', desc: 'Pings when a long run ends', isSwitch: true, command: 'long-run-ping' },
+  {
+    id: 'format-on-edit',
+    label: 'format-on-edit',
+    group: 'Automation',
+    icon: '¶',
+    desc: 'Formats edited files (Air, Ruff, Prettier)',
+    isSwitch: true,
+    command: 'format-on-edit',
+    options: [{ label: 'status', text: '/format-on-edit status', run: true }],
+  },
+  {
+    id: 'test-ledger',
+    label: 'test-ledger',
+    group: 'Automation',
+    icon: '≡',
+    desc: 'Test, lint and build runs and results',
+    isSwitch: true,
+    command: 'test-ledger',
+    options: [{ label: 'open', text: '/test-ledger', run: true }],
+  },
+  {
+    id: 'scope-watch',
+    label: 'scope-watch',
+    group: 'Guards',
+    icon: '⌖',
+    desc: 'Flags edits outside your folder',
+    click: { text: '/scope-watch ', run: false },
+    options: [
+      { label: 'status', text: '/scope-watch status', run: true },
+      { label: 'off', text: '/scope-watch off', run: false },
+    ],
+  },
   { id: 'blast-radius', label: 'blast-radius', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
   { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', isSwitch: true, command: 'review-cost' },
   {
@@ -136,6 +168,40 @@ export const TOOLS: Tool[] = [
   { id: 'filetree', label: 'filetree', group: 'Workspace utilities', icon: '⌥', desc: 'File tree beside the chat', click: { text: '/filetree', run: true } },
   { id: 'replay-theater', label: 'replay-theater', group: 'Workspace utilities', icon: '▶', desc: 'Step through the last edits', click: { text: '/replay', run: true } },
   { id: 'diagram', label: 'diagram', group: 'Workspace utilities', icon: '◇', desc: 'Draws the last mermaid diagram', click: { text: '/diagram', run: true } },
+  { id: 'staged-review', label: 'staged-review', group: 'Workspace utilities', icon: '±', desc: 'What the next commit holds', click: { text: '/staged-review', run: true } },
+  {
+    id: 'error-inbox',
+    label: 'error-inbox',
+    group: 'Workspace utilities',
+    icon: '!',
+    desc: 'The last failed tool calls',
+    isSwitch: true,
+    command: 'error-inbox',
+    options: [{ label: 'open', text: '/error-inbox', run: true }],
+  },
+  {
+    id: 'decision-log',
+    label: 'decision-log',
+    group: 'Workspace utilities',
+    icon: '✎',
+    desc: 'docs/DECISIONS.md, one row per decision',
+    click: { text: '/decision-log', run: true },
+    options: [{ label: 'add', text: '/decision ', run: false }],
+  },
+  { id: 'csv-table', label: 'csv-table', group: 'Workspace utilities', icon: '▦', desc: 'Preview a csv or tsv file', click: { text: '/csv-table ', run: false } },
+  {
+    id: 'ui-preview',
+    label: 'ui-preview',
+    group: 'UI development',
+    icon: '▣',
+    desc: 'Run the app, list plumber routes, screenshot',
+    click: { text: '/ui-preview', run: true },
+    options: [
+      { label: 'start', text: '/ui-preview start', run: false },
+      { label: 'shot', text: '/ui-preview shot', run: true },
+    ],
+  },
+  { id: 'color-lab', label: 'color-lab', group: 'UI development', icon: '◐', desc: 'Contrast and colour formats', click: { text: '/color-lab ', run: false } },
 ]
 
 export type Skill = { id: string; label: string; desc: string; text: string }

@@ -139,6 +139,9 @@ const PING_OFF = { plugin: 'long-run-ping', key: 'isOff' } as const
 const PROMPTS = { plugin: 'prompt-library', key: 'items' } as const
 const BLAST_LEVEL = { plugin: 'blast-radius', key: 'level' } as const
 const REVIEW_OFF = { plugin: 'review-cost', key: 'isOff' } as const
+const FORMAT_OFF = { plugin: 'format-on-edit', key: 'isOff' } as const
+const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
+const INBOX_OFF = { plugin: 'error-inbox', key: 'isOff' } as const
 
 async function valueOf(read: Promise<unknown>): Promise<unknown> {
   try {
@@ -908,6 +911,9 @@ export const register: Register = (on, options) => {
       'auto-test': flag(await valueOf($.state.get(AUTOTEST_OFF as never)), true),
       'long-run-ping': flag(await valueOf($.state.get(PING_OFF as never)), true),
       'review-cost': flag(await valueOf($.state.get(REVIEW_OFF as never)), true),
+      'format-on-edit': flag(await valueOf($.state.get(FORMAT_OFF as never)), true),
+      'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
+      'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
     }
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)

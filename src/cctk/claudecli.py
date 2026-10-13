@@ -68,3 +68,10 @@ class ClaudeCLI:
 
     def update(self, plugin_id: str, scope: str, cwd: str | None) -> tuple[int, str]:
         return self.run(["plugin", "update", plugin_id, "--scope", scope], cwd=cwd)
+
+    def mcp_add(self, spec: list[str], scope: str, cwd: str | None) -> tuple[int, str]:
+        """spec = the server's name, then its options and command (catalog.Item.mcp)."""
+        return self.run(["mcp", "add", "-s", scope, *spec], cwd=cwd, timeout=60)
+
+    def mcp_remove(self, name: str, scope: str, cwd: str | None) -> tuple[int, str]:
+        return self.run(["mcp", "remove", name, "-s", scope], cwd=cwd, timeout=60)

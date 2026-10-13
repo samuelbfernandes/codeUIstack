@@ -36,8 +36,19 @@ if a[:1] == ["--version"]:
 elif a[:3] == ["plugin", "marketplace", "list"]:
     out = json.dumps([{"name": k, "source": "directory", "path": v} for k, v in db["markets"].items()])
 elif a[:3] == ["plugin", "marketplace", "add"]:
-    name = json.load(open(os.path.join(a[3], ".claude-plugin", "marketplace.json")))["name"]
+    if os.path.isdir(a[3]):
+        name = json.load(open(os.path.join(a[3], ".claude-plugin", "marketplace.json")))["name"]
+    else:
+        name = a[3].replace("/", "-")      # owner/repo: the fake names it like posit-dev/skills -> posit-dev-skills
     db["markets"][name] = a[3]; out = "added"
+elif a[:2] == ["mcp", "add"]:
+    scope, rest = opt(["-s", "--scope"], "local"), [x for i, x in enumerate(a[2:]) if x not in ("-s", "--scope") and (i == 0 or a[2:][i - 1] not in ("-s", "--scope"))]
+    mcp = db.setdefault("mcp", {})
+    if rest[0] in mcp: out, rc = f"MCP server {rest[0]} already exists in {scope} config", 1
+    else:
+        mcp[rest[0]] = {"scope": scope, "args": rest[1:]}; out = "added"
+elif a[:2] == ["mcp", "remove"]:
+    db.setdefault("mcp", {}).pop(a[2], None); out = "removed"
 elif a[:3] == ["plugin", "marketplace", "remove"]:
     db["markets"].pop(a[3], None); out = "removed"
 elif a[:3] == ["plugin", "list", "--available"] or (a[:2] == ["plugin", "list"] and "--available" in a):

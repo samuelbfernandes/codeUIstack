@@ -30,8 +30,15 @@ command it would run, then stops. Nothing is changed. (From a checkout: `sh inst
 
 - **No network.** The installer is Python standard library only and imports no networking module (CI fails if one appears).
   The only downloads are the official Anthropic plugins you tick in the checklist, and Claude Code itself downloads those.
-- **No third-party code.** The installer never installs anything from outside this repository except Anthropic's own
-  official plugins. Popular third-party projects are only listed in `docs/SUGGESTIONS.md`.
+- **No third-party code unless you ask for it.** By default the installer installs nothing from outside this repository
+  except Anthropic's own official plugins. The one exception is the **UI development** list (`docs/UI-DEV.md`): Chrome
+  DevTools MCP, Posit's btw, mcptools and skills marketplace, Plotly Cloud MCP. Those are never on by default, never
+  picked by `--standard` or `--all`, shown in `--plan` with their source, and removed by `uninstall` (a marketplace or MCP
+  server you already had under the same name is left alone). Chrome DevTools MCP is pinned to one version and runs with
+  `--no-usage-statistics --no-performance-crux`. mcptools runs any R code Claude sends to your session.
+  Other popular projects are only listed in `docs/SUGGESTIONS.md`.
+- **ui-preview talks to your own computer only.** It starts your app and reads `http://127.0.0.1:<port>`; any other
+  address is refused in code.
 - **No administrator rights, no `sudo`, no shell strings.** Other programs are started in one function
   (`src/cctk/proc.py`) as an argument list with a timeout.
 - **No reading of your code, keys or history.** It reads only the files it edits, and the git settings it changes.

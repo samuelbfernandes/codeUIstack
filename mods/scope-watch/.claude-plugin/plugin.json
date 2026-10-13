@@ -1,0 +1,7 @@
+{
+  "name": "scope-watch",
+  "version": "0.1.0",
+  "description": "Set the folder you are working in; when Claude edits a file outside it, you get a toast and Claude gets a short note to check the edit was intended. Never blocks.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

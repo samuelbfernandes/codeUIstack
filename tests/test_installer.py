@@ -187,6 +187,58 @@ class UserScope(Base):
         run_cli(["uninstall", "--yes"])
         self.assertEqual(self.plugins(), set())
 
+    def test_all_preset_never_picks_the_ui_group(self):
+        rc, out, err = run_cli(["install", "--all", "--scope", "user", *SKIP_PLUGINS])
+        self.assertEqual(rc, 0, out + err)
+        self.assertFalse([p for p in self.plugins() if "posit" in p])
+        self.assertEqual(self.sb.fake_db().get("mcp", {}), {})
+
+    def test_third_party_plugin_adds_its_marketplace_and_uninstall_removes_both(self):
+        out = self.install("--scope", "user", "--with", "posit:shiny,posit:quarto")
+        self.assertIn("shiny@posit-dev-skills", self.plugins())
+        self.assertIn("quarto@posit-dev-skills", self.plugins())
+        self.assertEqual(self.sb.fake_db()["markets"]["posit-dev-skills"], "posit-dev/skills")
+        self.assertEqual(sum(1 for a in self.sb.fake_db()["log"] if a[:4] == ["plugin", "marketplace", "add", "posit-dev/skills"]), 1)
+        self.install("--scope", "user", "--with", "posit:shiny")         # quarto dropped, marketplace kept for shiny
+        self.assertNotIn("quarto@posit-dev-skills", self.plugins())
+        self.assertIn("posit-dev-skills", self.sb.fake_db()["markets"])
+        run_cli(["uninstall", "--yes"])
+        self.assertEqual(self.plugins(), set())
+        self.assertNotIn("posit-dev-skills", self.sb.fake_db()["markets"])
+
+    def test_a_marketplace_the_person_already_had_is_left_alone(self):
+        db = self.sb.fake_db(); db["markets"]["posit-dev-skills"] = "posit-dev/skills"
+        (self.home / ".fake-claude.json").write_text(json.dumps(db))
+        self.install("--scope", "user", "--with", "posit:r-lib")
+        run_cli(["uninstall", "--yes"])
+        self.assertIn("posit-dev-skills", self.sb.fake_db()["markets"])
+
+    def test_mcp_servers_are_added_recorded_and_removed(self):
+        out = self.install("--scope", "user", "--with", "mcp:chrome-devtools,mcp:plotly-cloud")
+        mcp = self.sb.fake_db()["mcp"]
+        self.assertEqual(set(mcp), {"chrome-devtools", "plotly-cloud"})
+        self.assertIn("--no-usage-statistics", mcp["chrome-devtools"]["args"])
+        self.assertEqual(mcp["chrome-devtools"]["scope"], "user")
+        self.install("--scope", "user", "--with", "mcp:chrome-devtools")    # plotly dropped on a re-run
+        self.assertEqual(set(self.sb.fake_db()["mcp"]), {"chrome-devtools"})
+        run_cli(["uninstall", "--yes"])
+        self.assertEqual(self.sb.fake_db()["mcp"], {})
+
+    def test_an_existing_mcp_server_of_the_same_name_is_kept(self):
+        db = self.sb.fake_db(); db["mcp"] = {"chrome-devtools": {"scope": "user", "args": ["mine"]}}
+        (self.home / ".fake-claude.json").write_text(json.dumps(db))
+        out = self.install("--scope", "user", "--with", "mcp:chrome-devtools")
+        self.assertIn("already have one with that name", out)
+        run_cli(["uninstall", "--yes"])
+        self.assertEqual(self.sb.fake_db()["mcp"]["chrome-devtools"]["args"], ["mine"])
+
+    def test_plan_names_the_third_party_sources(self):
+        rc, out, _ = run_cli(["install", "--plan", "--scope", "user", "--with", "posit:shiny,mcp:chrome-devtools", *SKIP_PLUGINS])
+        self.assertEqual(rc, 0)
+        self.assertIn("claude plugin marketplace add posit-dev/skills", out)
+        self.assertIn("--no-usage-statistics", out)
+        self.assertEqual(self.sb.fake_db()["log"].count(["mcp", "add"]), 0)
+
     def test_verify_detects_a_modified_hook(self):
         self.install("--scope", "user")
         self.assertEqual(run_cli(["verify"])[0], 0)
@@ -264,17 +316,17 @@ class Interactive(Base):
             self.assertEqual(q, [], "unused answers")
 
     def test_questions_toggle_and_confirm(self):
-        # scope=1 (user), rules=Enter (neutral), mods: toggle blast-radius then Enter, rules: Enter, add-ons: Enter, confirm y
+        # scope=1 (user), rules=Enter (neutral), mods: toggle blast-radius then Enter, rules: Enter, add-ons: Enter, UI: Enter, confirm y
         names = [m["name"] for m in payload.mods()]
         number = str(names.index("blast-radius") + 1)  # the list follows marketplace.json, so look the number up
-        rc, out, err = self.run_with(["1", "", number, "", "", "", "y"])
+        rc, out, err = self.run_with(["1", "", number, "", "", "", "", "y"])
         self.assertEqual(rc, 0, out + err)
         self.assertNotIn(f"blast-radius@{MP}", self.plugins())
         self.assertIn(f"suggest-model@{MP}", self.plugins())
 
     def test_saying_no_changes_nothing(self):
         before = self.sb.tree()
-        rc, out, _ = self.run_with(["1", "", "", "", "", "n"])
+        rc, out, _ = self.run_with(["1", "", "", "", "", "", "n"])
         self.assertEqual(rc, 1)
         self.assertEqual(self.sb.tree(), before)
 
@@ -305,10 +357,21 @@ class CatalogRules(unittest.TestCase):
         ids = {i.id for i in catalog.available(catalog.Detected(platform="windows", tools={}))}
         self.assertNotIn("sandbox", ids)
 
-    def test_no_third_party_install_anywhere(self):
-        for i in catalog.items(catalog.Detected(platform="linux", tools={})):
-            if i.plugin:
-                self.assertTrue(i.plugin.endswith(("@anthropic-plugin-directory", "@builtin")), i.id)
+    def test_third_party_only_in_the_ui_group_and_never_on_by_default(self):
+        for tools in ({}, {"npx": True, "Rscript": True}):
+            det = catalog.Detected(platform="linux", tools=tools)
+            d = catalog.defaults(det)
+            for i in catalog.items(det):
+                third = i.source or i.mcp or (i.plugin and not i.plugin.endswith(("@anthropic-plugin-directory", "@builtin")))
+                if third:
+                    self.assertEqual(i.group, catalog.GROUP_UI, i.id)
+                if i.group == catalog.GROUP_UI:
+                    self.assertNotIn(i.id, d, i.id)
+
+    def test_chrome_devtools_is_pinned_and_sends_no_usage_statistics(self):
+        i = {i.id: i for i in catalog.items(catalog.Detected(platform="linux", tools={}))}["mcp:chrome-devtools"]
+        self.assertIn("--no-usage-statistics", i.mcp)
+        self.assertRegex(next(x for x in i.mcp if x.startswith("chrome-devtools-mcp@")), r"@\d+\.\d+\.\d+$")
 
     def test_normalize_drops_dependents_of_missing_git_guards(self):
         det = catalog.Detected(platform="linux", tools={"codex": True})
