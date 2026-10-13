@@ -193,7 +193,7 @@ for (const surface of SURFACES) {
     const ask = w.asks[0]!
     expect(ask.question.split('\n')[0]).toBe("Don't use Sonnet for this task")
     expect(ask.question.split('\n')[1]).toMatch(/^Deep task · .+/)
-    expect(ask.question).toContain('Haiku 1x weak · Sonnet 3x weak · Opus 5x best')
+    expect(ask.question).toContain('Haiku 1x weak · Sonnet 20x weak · Opus 40x best')
     expect(ask.question).toContain('Opus is the cheapest model that should handle it')
     expect(ask.header).toBe('Model choice')
     expect(ask.options).toEqual([
@@ -231,9 +231,9 @@ test('a light task on opus offers haiku', async ($, on) => {
   expect(w.asks[0]!.options[1]).toBe('Switch session to Haiku')
   expect(w.asks[0]!.question.split('\n')[0]).toBe('Opus is overkill for this')
   expect(w.asks[0]!.question.split('\n')[1]).toBe('Light task · typo or spelling')
-  expect(w.asks[0]!.question).toContain('Haiku 1x ok · Sonnet 3x ok · Opus 5x best')
-  expect(w.asks[0]!.question).toContain('Haiku would do · ~5x cheaper')
-  expect(w.statuses).toEqual(['suggest-model: overkill, Haiku would do (~5x cheaper)'])
+  expect(w.asks[0]!.question).toContain('Haiku 1x ok · Sonnet 20x ok · Opus 40x best')
+  expect(w.asks[0]!.question).toContain('Haiku would do · ~40x cheaper')
+  expect(w.statuses).toEqual(['suggest-model: overkill, Haiku would do (~40x cheaper)'])
 })
 
 test('no cheaper offer is made when already on haiku, and no stronger one on opus', async ($, on) => {
@@ -533,7 +533,7 @@ test('/suggest-model explain is a dry run: cues, per-model table, costs, recomme
   const text = await command($, 'explain derive the BLUP variance of the genomic breeding value under REML')
   expect(text).toContain('Deep task')
   expect(text).toContain('Because proof or derivation')
-  expect(text).toContain('Haiku 1x weak · Sonnet 3x weak · Opus 5x best')
+  expect(text).toContain('Haiku 1x weak · Sonnet 20x weak · Opus 40x best')
   expect(text).toContain('Cheapest good enough: Opus')
   expect(text).toContain(`blocks with "Don't use Sonnet for this task" and offers Opus`)
   expect(text).toContain('not measurements')
@@ -553,7 +553,7 @@ test('/suggest-model explain is a dry run: cues, per-model table, costs, recomme
 test('explain with the cost setting: shows the user ratios and names the pieces it ignored', { options: { costRatios: 'haiku=2,sonnet=abc,opus=9,gpt=1' } }, async ($, on) => {
   world(on)
   const text = await command($, 'explain write a testthat test for foo()')
-  expect(text).toContain('Haiku 2x weak · Sonnet 3x ok · Opus 9x best') // sonnet=abc ignored: default 3
+  expect(text).toContain('Haiku 2x weak · Sonnet 20x ok · Opus 9x best') // sonnet=abc ignored: default 3
   expect(text).toContain('Ignored in costRatios: sonnet=abc, gpt=1.')
   expect(await command($, '')).toContain('Ignored in costRatios: sonnet=abc, gpt=1')
 })
@@ -635,7 +635,7 @@ test('every prompt is evaluated locally: each checked prompt refreshes the statu
   await submit($, 'please help me with my analysis of the field trial') // cannot be placed: silent, line cleared
   expect(w.statuses).toEqual([
     'suggest-model: Sonnet fits',
-    'suggest-model: overkill, Haiku would do (~3x cheaper)',
+    'suggest-model: overkill, Haiku would do (~20x cheaper)',
     'suggest-model: weak for this, use Opus',
     undefined,
   ])
@@ -650,11 +650,11 @@ for (const surface of SURFACES) {
   test(`status line on ${surface}: fits, overkill and weak wording, set on every checked prompt`, async ($, on) => {
     const w = world(on, { surfaces: [surface], model: 'claude-opus-4-1' })
     await submit($, 'write a testthat test for foo()')
-    expect(w.statuses.at(-1)).toBe('suggest-model: Sonnet would do (~1.7x cheaper)')
+    expect(w.statuses.at(-1)).toBe('suggest-model: Sonnet would do (~2x cheaper)')
     await submit($, DEEP)
     expect(w.statuses.at(-1)).toBe('suggest-model: Opus fits')
     await submit($, LIGHT)
-    expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do (~5x cheaper)')
+    expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do (~40x cheaper)')
     expect(w.asks).toHaveLength(1) // only the mismatch asked
     w.model = 'claude-haiku-4-5'
     await submit($, 'write a testthat test for foo()')
@@ -701,7 +701,7 @@ test('fable as the current model: light work warns (overkill) and shows Fable in
   await submit($, LIGHT)
   const ask = w.asks[0]!
   expect(ask.question.split('\n')[0]).toMatch(/^Fable is overkill for this/)
-  expect(ask.question).toContain('Haiku 1x ok · Sonnet 3x ok · Opus 5x best · Fable best')
+  expect(ask.question).toContain('Haiku 1x ok · Sonnet 20x ok · Opus 40x best · Fable best')
   expect(ask.question).toContain('Haiku would do.') // no ratio is invented for fable
   expect(ask.options).toEqual(['Keep Fable', 'Switch session to Haiku', 'Run this task as a subagent on Haiku', "Keep Fable and don't suggest again this session"])
   expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do')
@@ -756,7 +756,7 @@ test('garbage in the cost setting is ignored and the defaults apply', { options:
   const w = world(on)
   const out = await submit($, DEEP)
   expect(out.text).toBe(DEEP)
-  expect(w.asks[0]!.question).toContain('Haiku 1x weak · Sonnet 3x weak · Opus 5x best')
+  expect(w.asks[0]!.question).toContain('Haiku 1x weak · Sonnet 20x weak · Opus 40x best')
 })
 
 // ------------------------------------------------------------------- typed words need the slash
@@ -823,4 +823,30 @@ test('a failing status line never blocks the prompt or the dialog', async ($, on
 test('a failing /suggest-model off says nothing changed', async ($, on) => {
   world(on, { breaks: new Set(['storeSet']) })
   expect(await command($, 'off')).toBe('suggest-model · that did not work, nothing changed')
+})
+
+// ------------------------------------------------------------------- effort-watch
+
+test('effort-watch: max effort on a light task adds a note to the status line, and never blocks', { }, async ($, on) => {
+  const w = world(on, { model: 'claude-haiku-5-5' })
+  on('turn.step', async function* () {
+    return { turnId: 't1', index: 0, answer: '', toolUses: [], stopReason: 'end_turn' } as never
+  })
+  for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-haiku-5-5', effort: 'max', messageCount: 1 } as never)) void _
+  await w.clock.advance(5)
+  await submit($, LIGHT)
+  expect(w.statuses.at(-1)).toBe('suggest-model: Haiku fits · effort max is more than this needs · /effort medium')
+  expect(w.asks).toHaveLength(0)
+  expect(w.arrived).toHaveLength(1) // the prompt went through
+})
+
+test('effort-watch: medium effort says nothing extra; the effortWatch setting off silences it', { options: { effortWatch: false } }, async ($, on) => {
+  const w = world(on, { model: 'claude-haiku-5-5' })
+  on('turn.step', async function* () {
+    return { turnId: 't1', index: 0, answer: '', toolUses: [], stopReason: 'end_turn' } as never
+  })
+  for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-haiku-5-5', effort: 'max', messageCount: 1 } as never)) void _
+  await w.clock.advance(5)
+  await submit($, LIGHT)
+  expect(w.statuses.at(-1)).toBe('suggest-model: Haiku fits')
 })

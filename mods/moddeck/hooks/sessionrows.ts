@@ -5,8 +5,8 @@ import type { Pace } from './pace'
 import { isDirty } from './gitinfo'
 import type { GitInfo } from './gitinfo'
 
-export type RowId = 'model' | 'context' | 'usage' | 'cost' | 'cache' | 'git' | 'tokens' | 'activity' | 'environment'
-export const ROW_IDS: readonly RowId[] = ['model', 'context', 'usage', 'cost', 'cache', 'git', 'tokens', 'activity', 'environment']
+export type RowId = 'model' | 'mode' | 'context' | 'usage' | 'cost' | 'cache' | 'git' | 'backup' | 'tokens' | 'activity' | 'environment'
+export const ROW_IDS: readonly RowId[] = ['model', 'mode', 'context', 'usage', 'cost', 'cache', 'git', 'backup', 'tokens', 'activity', 'environment']
 export const DEFAULT_ROWS = ROW_IDS.join(',')
 export type Layout = 'expanded' | 'compact'
 
@@ -25,6 +25,12 @@ export type Snapshot = {
   model?: string
   provider?: string
   effort?: string | number
+  /** suggest-model's advice when the effort level does not fit the last task (`medium would do`), else absent. */
+  effortAdvice?: string
+  /** The configured permission mode (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). */
+  permissionMode?: string
+  /** When the newest commit or checkpoint was made (ms); null = none; absent = not read. */
+  backupAt?: number | null
   startedAt?: number
   context?: { tokens?: number; window?: number; percent?: number }
   /** The biggest categories of the window, only held while it is nearly full. */
@@ -106,9 +112,42 @@ function modelRow(s: Snapshot): Row | undefined {
   const parts: Part[] = []
   if (s.model) parts.push({ text: s.model, bold: true })
   if (s.provider) parts.push(sep(), { text: s.provider, dim: true })
-  if (s.effort !== undefined && s.effort !== '') parts.push(sep(), { text: String(s.effort), dim: true })
+  if (s.effort !== undefined && s.effort !== '') parts.push(sep(), { text: String(s.effort), dim: s.effortAdvice === undefined, color: s.effortAdvice === undefined ? undefined : 'warning' })
+  if (s.effortAdvice) parts.push({ text: ` ⚠ ${s.effortAdvice}`, color: 'warning' })
   if (isNum(s.startedAt) && s.now >= s.startedAt) parts.push(...(parts.length > 0 ? [sep()] : []), { text: fmtDuration(s.now - s.startedAt), dim: true })
   return parts.length > 0 ? { id: 'model', parts } : undefined
+}
+
+const MODE_LABEL: Record<string, { text: string; color?: string; dim?: boolean }> = {
+  default: { text: 'asks before edits', dim: true },
+  acceptEdits: { text: 'accepts edits', color: 'warning' },
+  plan: { text: 'plan mode', color: 'success' },
+  auto: { text: 'auto mode', color: 'success' },
+  dontAsk: { text: 'denies unless allowed', color: 'warning' },
+  bypassPermissions: { text: 'permissions bypassed !', color: 'error' },
+}
+
+/** The permission mode in plain words; red for bypass, since nothing then asks before a command runs. */
+function modeRow(s: Snapshot): Row | undefined {
+  if (!s.permissionMode) return undefined
+  const m = MODE_LABEL[s.permissionMode] ?? { text: s.permissionMode, dim: true }
+  return { id: 'mode', parts: [{ text: 'Mode ', dim: true }, { text: m.text, color: m.color, dim: m.dim }] }
+}
+
+export const BACKUP_WARN_MS = 2 * 60 * 60_000
+export const BACKUP_ERROR_MS = 8 * 60 * 60_000
+
+/** Time since the newest commit or checkpoint; amber once files are unsaved for 2 hours, red from 8 (rewind covers only Claude's own edits). */
+function backupRow(s: Snapshot): Row | undefined {
+  const g = s.git
+  if (!g || s.backupAt === undefined) return undefined
+  const unsaved = g.modified + g.added + g.deleted + g.untracked
+  if (s.backupAt === null) return unsaved > 0 ? { id: 'backup', parts: [{ text: 'Backup ', dim: true }, { text: `none · ${unsaved} unsaved`, color: 'warning' }] } : undefined
+  const age = Math.max(0, s.now - s.backupAt)
+  const color = unsaved === 0 ? 'success' : age >= BACKUP_ERROR_MS ? 'error' : age >= BACKUP_WARN_MS ? 'warning' : 'success'
+  const parts: Part[] = [{ text: 'Backup ', dim: true }, { text: age < 60_000 ? 'just now' : `${fmtDuration(age)} ago`, color }]
+  if (unsaved > 0) parts.push({ text: ` · ${unsaved} unsaved`, color: color === 'success' ? undefined : color, dim: color === 'success' })
+  return { id: 'backup', parts }
 }
 
 function contextRow(s: Snapshot, o: BoxSettings): Row | undefined {
@@ -227,11 +266,13 @@ function environmentRow(s: Snapshot, o: BoxSettings): Row | undefined {
 export function buildRows(s: Snapshot, o: BoxSettings = DEFAULT_BOX): Record<RowId, Row | undefined> {
   return {
     model: modelRow(s),
+    mode: modeRow(s),
     context: contextRow(s, o),
     usage: usageRow(s, o),
     cost: costRow(s),
     cache: cacheRow(s),
     git: gitRow(s, o),
+    backup: backupRow(s),
     tokens: tokensRow(s),
     activity: activityRow(s, o),
     environment: environmentRow(s, o),

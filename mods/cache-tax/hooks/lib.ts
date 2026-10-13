@@ -11,21 +11,28 @@ export const SAFETY_MS = 5 * MIN
 /** USD per million tokens. */
 export type Rate = { in: number; out: number; write5m: number; write1h: number; read: number }
 
-const rate = (input: number, output: number): Rate => ({
+/** A cache read is 0.1x the input price, 0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.1 (Anthropic's pricing page). */
+const rate = (input: number, output: number, readMul = 0.1): Rate => ({
   in: input,
   out: output,
   write5m: input * 1.25,
   write1h: input * 2,
-  read: input * 0.1,
+  read: input * readMul,
 })
 
 // Built-in list prices (est.): they drift, so every figure shown is labelled "est.".
 // First match wins; an unknown model falls back to Sonnet rates and says so.
+// Checked against the pricing page on 2026-10-12. Haiku 5.5 is priced for prompts up to 100K tokens (5x above that).
 const PRICES: ReadonlyArray<readonly [RegExp, string, Rate]> = [
+  [/fable|mythos/, 'Fable', rate(10, 50, 0.025)],
+  [/opus-5-5/, 'Opus 5.5', rate(4, 20, 0.05)],
   [/opus-4(-1)?(-\d{8})?$/, 'Opus 4/4.1', rate(15, 75)],
   [/opus/, 'Opus', rate(5, 25)],
+  [/haiku-5-5/, 'Haiku 5.5', rate(0.1, 0.5)],
   [/haiku-3/, 'Haiku 3.x', rate(0.8, 4)],
   [/haiku/, 'Haiku', rate(1, 5)],
+  [/sonnet-5-5/, 'Sonnet 5.5', rate(2, 10, 0.05)],
+  [/sonnet-5/, 'Sonnet 5', rate(2, 10, 0.1)],
   [/sonnet/, 'Sonnet', rate(3, 15)],
 ]
 const FALLBACK = { label: 'Sonnet rates (model unknown)', rate: rate(3, 15) }

@@ -23,7 +23,7 @@ import { codexContext, manualSwitchHint, probeCodex, runCodex, spawnSubagent, sw
 import { buildDialog, choiceOf, compactTable } from './dialog'
 import { dropWith } from './reply'
 import type { Choice } from './dialog'
-import { cheaperBy, judge, nameOf, parseCosts, ratingTable, recommend, statusText } from './fit'
+import { cheaperBy, effortAdvice, effortNote, judge, nameOf, parseCosts, ratingTable, recommend, statusText } from './fit'
 import type { Costs, Fit } from './fit'
 import { canRunAlone, familyOf, pushHistory, snippet } from './gate'
 import type { Alias, Family } from './gate'
@@ -40,6 +40,10 @@ const isMuted = atom({ plugin: 'suggest-model', key: 'isMuted' } as const, false
 const isOff = atom({ plugin: 'suggest-model', key: 'isOff' } as const, false)
 const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
 const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
+/** The session's effort level as the last model request named it (empty: none seen, or a model without effort). */
+/** What the side bar's model row shows beside the effort when it does not fit the last task (`medium would do`). */
+const effortHint = atom({ plugin: 'suggest-model', key: 'effortAdvice' } as const, '')
+const effortNow = atom({ plugin: 'suggest-model', key: 'effort' } as const, '')
 
 // Only the person typing is ever analysed. 'bridge' is the same person on a phone or the web.
 const PERSON = new Set(['composer', 'bridge'])
@@ -56,6 +60,8 @@ type Cfg = {
   useClassifier: boolean
   isEnabled: boolean
   statusLine: boolean
+  /** Add a short note to the status line when the effort level does not match the task. */
+  effortWatch: boolean
   /** Draw the on/off button in the band above the prompt. */
   costs: Costs
   /** Pieces of the cost setting that were ignored (shown by explain and status). */
@@ -76,6 +82,7 @@ export function readConfig(o: Readonly<Record<string, unknown>>): Cfg {
     useClassifier: o.useClassifier === true,
     isEnabled: o.enabled !== false,
     statusLine: o.statusLine !== false,
+    effortWatch: o.effortWatch !== false,
     costs,
     costProblems: problems,
   }
@@ -188,7 +195,11 @@ async function review($: Dollar, e: { text: string; origin: { kind: string }; tu
   // A review on a model that fits is only worth a word when Codex can really do it; the probe runs once.
   if (fit.kind === 'review' && !(await quietly(() => hasCodex($)))) fit = { kind: 'fits' }
   await note($, text, p, 'not suggested')
-  await showStatus($, cfg, statusText(fit, current, cfg.costs)) // a prompt the rules cannot place clears the line
+  const verdict = statusText(fit, current, cfg.costs)
+  const effortLevel = await read($, effortNow)
+  const effort = cfg.effortWatch && p.confidence >= minConfidence ? effortNote(p.tier, effortLevel) : undefined
+  await quietly(() => update($, effortHint, () => (cfg.effortWatch && p.confidence >= minConfidence ? (effortAdvice(p.tier, effortLevel) ?? '') : '')))
+  await showStatus($, cfg, verdict !== undefined && effort !== undefined ? `${verdict} · ${effort}` : (verdict ?? (effort !== undefined ? `suggest-model: ${effort}` : undefined))) // a prompt the rules cannot place clears the line
   if (fit.kind !== 'mismatch' && fit.kind !== 'review') {
     return await skip($, fit.kind === 'none' ? `no: ${fit.why}` : fit.kind === 'fits' ? 'fits: no dialog' : 'hint on the status line only')
   }
@@ -380,6 +391,15 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'suggest-model' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
     text: 'suggest-model · that did not work, nothing changed',
   }))
+
+  // Effort-watch only reads: the level of each main-thread request is kept (off the request's path) for the next prompt's status line.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) {
+      const level = typeof e.effort === 'string' ? e.effort : '' // state holds JSON data: empty means none
+      $.clock.after(1, () => void quietly(() => update($, effortNow, () => level)))
+    }
+    return yield* next(e)
+  })
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started
   // (the current model must not also answer).

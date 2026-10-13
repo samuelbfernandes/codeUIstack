@@ -19,6 +19,10 @@ declare module 'claude-code' {
       isOff: boolean
       /** Result of the one `codex --version` probe; null = not probed yet. */
       codexOk: boolean | null
+      /** The session's effort level as the last main-thread request named it; empty = none seen. Read by effort-watch. */
+      effort: string
+      /** Short effort advice for the moddeck's model row (`medium would do`, `try high`); empty = the effort fits. */
+      effortAdvice: string
       /** The last predictions, newest last (at most 5). */
       recent: SuggestModelEntry[]
     }

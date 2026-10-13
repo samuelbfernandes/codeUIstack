@@ -11,23 +11,28 @@ export type Action = { text: string; run: boolean }
 
 export type Option = { label: string; costs?: boolean } & Action
 
+export type Group = 'Prompt helpers' | 'Guards' | 'Automation' | 'Model controls' | 'Workspace utilities'
+export const GROUPS: Group[] = ['Prompt helpers', 'Guards', 'Automation', 'Model controls', 'Workspace utilities']
+
 export type Tool = {
   id: string
   label: string
+  /** Presentation only: the card the row sits in, a one-glyph icon and a short description. None of it changes behaviour. */
+  group: Group
+  icon: string
+  desc?: string
   /** Spends model tokens: drawn with a "$". */
   costs?: boolean
   /** A switch: the command to run with `on` / `off` (`/suggest-model on`). */
   command?: string
   isSwitch?: boolean
-  /** The row is the skin dropdown. */
-  isSkin?: boolean
   /** What a click does (rows that are not switches). */
   click?: Action
   /** A dropdown of levels, one of them `off`: green while on, red while off. The pick runs `/<command> <level>` at once. */
   levels?: string[]
   /** A row with nothing to type says when it appears instead. */
   note?: string
-  /** Indented under the row: only while a switch is on, always for the others. Two or more, never one. */
+  /** Under the row: only while a switch is on, always for the others. */
   options?: Option[]
 }
 
@@ -35,6 +40,9 @@ export const TOOLS: Tool[] = [
   {
     id: 'suggest',
     label: 'suggest',
+    group: 'Prompt helpers',
+    icon: '✦',
+    desc: 'Checks each prompt against the model',
     isSwitch: true,
     command: 'suggest-model',
     options: [
@@ -42,16 +50,26 @@ export const TOOLS: Tool[] = [
       { label: 'explain a prompt', text: '/suggest-model explain ', run: false },
     ],
   },
-  { id: 'aside', label: 'aside', costs: true, click: { text: '/aside ', run: false } },
-  // These two work by themselves with no command, so their state is what matters: a green/red switch (a click flips it).
-  { id: 'reflect', label: 'reflect', costs: true, isSwitch: true, command: 'reflect' },
-  { id: 'secret-guard', label: 'secret-guard', isSwitch: true, command: 'secret-guard' },
-  // New switches: each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
-  { id: 'data-guard', label: 'data-guard', isSwitch: true, command: 'data-guard' },
-  { id: 'big-file-guard', label: 'big-file-guard', isSwitch: true, command: 'big-file-guard' },
+  {
+    id: 'reflect',
+    label: 'reflect',
+    group: 'Prompt helpers',
+    icon: '◌',
+    desc: 'Turns corrections into rules',
+    costs: true,
+    isSwitch: true,
+    command: 'reflect',
+  },
+  // Each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
+  { id: 'secret-guard', label: 'secret-guard', group: 'Guards', icon: '🔒', desc: 'Keeps secrets out of the context', isSwitch: true, command: 'secret-guard' },
+  { id: 'data-guard', label: 'data-guard', group: 'Guards', icon: '▤', desc: 'Asks before data files are committed', isSwitch: true, command: 'data-guard' },
+  { id: 'big-file-guard', label: 'big-file-guard', group: 'Guards', icon: '▢', desc: 'Cuts large files to their first lines', isSwitch: true, command: 'big-file-guard' },
   {
     id: 'repro-log',
     label: 'repro-log',
+    group: 'Guards',
+    icon: '☰',
+    desc: 'Records a reproducibility recipe',
     isSwitch: true,
     command: 'repro',
     options: [
@@ -62,6 +80,9 @@ export const TOOLS: Tool[] = [
   {
     id: 'auto-test',
     label: 'auto-test',
+    group: 'Automation',
+    icon: '✓',
+    desc: 'Runs the tests after edits',
     isSwitch: true,
     command: 'auto-test',
     options: [
@@ -69,13 +90,15 @@ export const TOOLS: Tool[] = [
       { label: 'status', text: '/auto-test status', run: true },
     ],
   },
-  { id: 'long-run-ping', label: 'long-run-ping', isSwitch: true, command: 'long-run-ping' },
-  { id: 'skin', label: 'skin', isSkin: true },
-  { id: 'blast-radius', label: 'blast-radius', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
-  { id: 'review-cost', label: 'review-cost', command: 'review-cost', levels: ['off', 'on'] },
+  { id: 'long-run-ping', label: 'long-run-ping', group: 'Automation', icon: '◷', desc: 'Pings when a long run ends', isSwitch: true, command: 'long-run-ping' },
+  { id: 'blast-radius', label: 'blast-radius', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
+  { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', command: 'review-cost', levels: ['off', 'on'] },
   {
     id: 'checkpoint',
     label: 'checkpoint',
+    group: 'Workspace utilities',
+    icon: '⛁',
+    desc: 'Snapshots of the working tree',
     click: { text: '/checkpoint', run: true },
     options: [
       { label: 'list', text: '/checkpoint list', run: true },
@@ -85,6 +108,9 @@ export const TOOLS: Tool[] = [
   {
     id: 'branch-janitor',
     label: 'branch-janitor',
+    group: 'Workspace utilities',
+    icon: '⑂',
+    desc: 'Offers to delete finished branches',
     click: { text: '/branch-janitor', run: true },
     options: [
       { label: 'clean', text: '/branch-janitor clean', run: false },
@@ -94,17 +120,20 @@ export const TOOLS: Tool[] = [
   {
     id: 'cache-tax',
     label: 'cache-tax',
+    group: 'Workspace utilities',
+    icon: '♨',
+    desc: 'Warns before a cold cache is re-written',
     click: { text: '/cache-tax', run: true },
     options: [
       { label: 'keep the cache warm', costs: true, text: '/keepwarm 90m', run: false },
       { label: 'stop keeping it warm', text: '/keepwarm off', run: false },
     ],
   },
-  { id: 'budget-guard', label: 'budget-guard', click: { text: '/budget-guard', run: true } },
-  { id: 'savvy-progress', label: 'savvy-progress', click: { text: '/agents-info', run: true } },
-  { id: 'filetree', label: 'filetree', click: { text: '/filetree', run: true } },
-  { id: 'replay-theater', label: 'replay-theater', click: { text: '/replay', run: true } },
-  { id: 'diagram', label: 'diagram', click: { text: '/diagram', run: true } },
+  { id: 'budget-guard', label: 'budget-guard', group: 'Workspace utilities', icon: '▥', desc: 'Usage line and limits', click: { text: '/budget-guard', run: true } },
+  { id: 'savvy-progress', label: 'savvy-progress', group: 'Workspace utilities', icon: '▰', desc: 'Plan tasks and subagents', click: { text: '/agents-info', run: true } },
+  { id: 'filetree', label: 'filetree', group: 'Workspace utilities', icon: '⌥', desc: 'File tree beside the chat', click: { text: '/filetree', run: true } },
+  { id: 'replay-theater', label: 'replay-theater', group: 'Workspace utilities', icon: '▶', desc: 'Step through the last edits', click: { text: '/replay', run: true } },
+  { id: 'diagram', label: 'diagram', group: 'Workspace utilities', icon: '◇', desc: 'Draws the last mermaid diagram', click: { text: '/diagram', run: true } },
 ]
 
 export type Skill = { id: string; label: string; text: string }
@@ -112,10 +141,10 @@ export type Skill = { id: string; label: string; text: string }
 export const SKILLS: Skill[] = [
   { id: 'dual-model-review', label: 'dual-model-review', text: 'Use the dual-model-review skill to review my last change' },
   { id: 'agents-md-scaffold', label: 'agents-md-scaffold', text: 'Use the agents-md-scaffold skill to set up AGENTS.md for this repo' },
+  { id: 'align', label: 'align', text: 'Use the align skill: interview me before we build ' },
+  { id: 'burst', label: 'burst', text: 'Use the burst skill: three versions of ' },
+  { id: 'assess-plugin', label: 'assess-plugin', text: 'Use the assess-plugin skill to assess ' },
 ]
-
-/** tool-skins' theme names, in its own order. */
-export const SKINS = ['noir', 'tokyo-night', 'dracula', 'catppuccin', 'gruvbox', 'nord', 'solarized-dark']
 
 export const priced = (label: string, costs: boolean | undefined): string => (costs ? `$ ${label}` : label)
 

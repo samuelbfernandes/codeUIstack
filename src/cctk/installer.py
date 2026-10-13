@@ -15,7 +15,7 @@ from .claudecli import ClaudeCLI, MIN_VERSION
 from .errors import InstallError
 from .gitcfg import GitConfig, git_dir, is_git_repo
 
-MOD_SKILLS = ["dual-model-review", "agents-md-scaffold"]
+MOD_SKILLS = ["dual-model-review", "agents-md-scaffold", "align", "burst", "assess-plugin"]
 
 
 @dataclass

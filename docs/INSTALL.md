@@ -25,7 +25,7 @@ No prior install, no questions (replace `v0.4.1` with the release you want):
 pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.4.1 moddeck install --standard
 ```
 
-`--standard` is the recommended set; `--all` adds every mod (including the ones that spend credit, such as aside) and every rule, skill and git guard.
+`--standard` is the recommended set; `--all` adds every mod and every rule, skill and git guard.
 Built-in features and third-party plugins stay at their defaults in both. Add `--plan` to only look. With uv: `uvx --from git+https://github.com/samuelbfernandes/moddeck@v0.4.1 moddeck install --standard`.
 Then start a new Claude Code session.
 

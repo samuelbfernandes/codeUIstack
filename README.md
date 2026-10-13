@@ -1,7 +1,7 @@
 # Moddeck
 
 **Safety and productivity mods for Claude Code, built for scientists.**
-Fifteen small add-ons (mods), two skills and a set of git guards that protect your work, keep your token bill visible, and stay quiet until
+Twenty-one small add-ons (mods), five skills and a set of git guards that protect your work, keep your token bill visible, and stay quiet until
 they have something useful to say. Install everywhere or in a single project, tick only what you want, and undo it exactly.
 
 > Status: first release, not yet used by anyone but its author. Written and tested without a live Claude Code session; see
@@ -30,7 +30,7 @@ These are the author's picks, chosen for how often the problem they solve comes 
 | **Git guards** | A `.env` or a private key committed, a force-push to main | Refused at commit or push, in every repository (or just one) |
 | **Hardened settings** | A cloned repo or a prompt-injected page tries to read your SSH keys | Claude's file tools cannot read SSH, cloud, GPG, registry or `.env` files (shell commands need the sandbox option) |
 
-Everything else (`reflect`, `savvy-progress`, `filetree`, `replay-theater`, `tool-skins`, `diagram`, `aside`) is in [docs/TOOLS.md](docs/TOOLS.md), one page on every tool.
+Everything else (`reflect`, `savvy-progress`, `filetree`, `replay-theater`, `tool-skins`, `diagram`) is in [docs/TOOLS.md](docs/TOOLS.md), one page on every tool.
 
 ## Install
 
@@ -73,7 +73,7 @@ commit; Codex sends code to OpenAI when you enable it).
 
 | Mod | One line |
 |---|---|
-| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity) and every mod and skill: green/red switches flip at once, a skin dropdown, other items fill the prompt box |
+| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity), a **Side Question** panel (`/btw`), an update check and every mod and skill: green/red switches flip at once, other items fill the prompt box |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
 | `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
@@ -87,7 +87,6 @@ commit; Codex sends code to OpenAI when you enable it).
 | `secret-guard` | Hides keys, tokens and passwords from what Claude reads |
 | `budget-guard` | A quiet usage line and an optional spending limit |
 | `diagram` | Draws Claude's mermaid diagrams as box art, offline |
-| `aside` | A quick side question in a pane, kept out of the conversation (uses a little credit) |
 | `data-guard` | Asks before a commit holds large files, data files (csv, parquet, rds…), personal-looking column names, or notebooks with outputs (it can strip them) |
 | `big-file-guard` | Reads only the first lines of a big csv, json or log, so it costs fewer tokens |
 | `repro-log` | `/repro` writes a re-runnable recipe of what the session ran (commands, versions, seeds, files) |
@@ -96,14 +95,14 @@ commit; Codex sends code to OpenAI when you enable it).
 | `checkpoint` | `/checkpoint`: safety snapshots of your working tree; restoring shows what you would lose first |
 | `long-run-ping` | A toast, sound and notification when a long turn or command finishes |
 
-**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/skin`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
+**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
 Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
 Turn any mod off with `/plugin disable <name>`.
 
 ## Try each item (about a minute each)
 
-Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git init`) so nothing real is at risk. `/commands` are answered on your computer and never sent to Claude, so they cost nothing (except `/aside` and `/keepwarm`).
+Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git init`) so nothing real is at risk. `/commands` are answered on your computer and never sent to Claude, so they cost nothing (except `/btw` and `/keepwarm`).
 
 ### Mods
 
@@ -123,7 +122,6 @@ Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git 
 | **secret-guard** | Type: `my token is ghp_0123456789abcdefghijklmnopqrstuvwxyz, remember it` (a made-up token). Then type `/secret-guard` | A dialog "Send redacted / Send as typed / Hold it". The word shows how many secrets were hidden, by kind, never the secrets |
 | **budget-guard** | Type `/budget-guard 80` (ask once any plan window reaches 80/100 used; `/budget-guard $10` for a dollar limit with an API key), chat, then type `/budget-guard` for the report | A usage line appears above the prompt only when cost, context or your plan window gets high; at the limit one dialog asks **Continue (+50%) / Continue without limit / Hold it**. The word prints cost, tokens, cache hits and turn times |
 | **diagram** | Ask: `explain the steps of a GBLUP analysis as a mermaid flowchart`, then type `/diagram` | A toast "/diagram to see it"; the command opens a pane with the flowchart drawn as boxes and arrows. `/diagram close` closes it |
-| $ **aside** | Type: `/aside what does REML stand for?` (a little credit) | A pane with the answer; it is not added to the conversation. Off by default: tick it in the installer |
 
 ### Skills (Claude loads them by itself)
 

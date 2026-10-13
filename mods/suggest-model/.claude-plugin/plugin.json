@@ -1,6 +1,6 @@
 {
   "name": "suggest-model",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost.",
   "author": {
     "name": "Samuel Fernandes"
@@ -56,8 +56,14 @@
     "costRatios": {
       "type": "string",
       "title": "Relative model costs",
-      "description": "A ROUGH ratio of list prices, comma separated, for example haiku=1,sonnet=3,opus=5 (fable=8 is optional). It goes stale when prices change: edit it. Used only to pick the cheapest model predicted to be good enough. Bad pieces are ignored.",
-      "default": "haiku=1,sonnet=3,opus=5"
+      "description": "A ROUGH ratio of list prices, comma separated, for example haiku=1,sonnet=20,opus=40 (fable=100 is optional; these are the Haiku 5.5, Sonnet 5.5 and Opus 5.5 input prices, $0.10, $2 and $4 per million tokens). It goes stale when prices change: edit it. Used only to pick the cheapest model predicted to be good enough. Bad pieces are ignored.",
+      "default": "haiku=1,sonnet=20,opus=40"
+    },
+    "effortWatch": {
+      "type": "boolean",
+      "title": "Effort watch",
+      "description": "Add a short note to the status line when the effort level does not fit the task: max or xhigh for a light task (medium is usually enough), low for a hard one. Advice only; it never blocks.",
+      "default": true
     }
   }
 }

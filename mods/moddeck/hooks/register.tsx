@@ -1,11 +1,13 @@
 // moddeck: a side bar with the toolkit's mods and skills, one boxed row each. A switch (green on, red off) flips at once by
-// running the mod's own command; the skin dropdown switches at once through /skin; a row runs its command at once when
+// running the mod's own command; a row runs its command at once when
 // that is harmless, or puts it in the prompt box (`$.prompt.fill`) when it needs your text or changes something.
 // Nothing here spends tokens or sends a prompt by itself.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { SKILLS, SKINS, TOOLS, priced, splitCommand } from './catalog'
+import type { BtwEntry } from '../types'
+import { addEntry, buildPrompt, cutAnswer, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
+import { GROUPS, SKILLS, TOOLS, priced, splitCommand } from './catalog'
 import type { Action, SavedPrompt, Tool } from './catalog'
 import { linkedWorktree, parseStatusV2 } from './gitinfo'
 import type { GitInfo } from './gitinfo'
@@ -26,11 +28,14 @@ import {
 } from './sessionrows'
 import type { Activity, BoxSettings, EnvCounts, Layout, RowId, Snapshot, TokenTotals } from './sessionrows'
 
+import { ASK_HEADER, CHECK_EVERY_MS, LATER, RELEASE, REMOTE, SKIP, UPDATE_NOW, askText, installArgv, isNewer, latestRelease, manualCommand } from './update'
+
 type Dollar = EngineInterface
 
 const PANE = 'moddeck'
 const TITLE = 'Moddeck'
 const COLUMNS = 40
+const WIDE_COLUMNS = 64
 const HINT = 'Side panel · use /tui fullscreen'
 const FAILED = 'Moddeck · could not open'
 const PANE_SURFACES = new Set(['terminal', 'desktop'])
@@ -38,8 +43,18 @@ const PANE_SURFACES = new Set(['terminal', 'desktop'])
 const autoOpen = atom({ plugin: 'moddeck', key: 'autoOpen' } as const, 'new')
 /** First row shown in each scrolling list (`skills`, `prompts`): a list scrolls a few rows at a time when it has many. */
 const tops = atom({ plugin: 'moddeck', key: 'tops' } as const, {} as Record<string, number>)
+/** The updateCheck setting, set once by `register` (the open path in `toggle` reads it). */
+let updateCheckOn = true
+/** The Side Question panel: the last few side questions and answers, newest first (in memory only). */
+/** The Side Question panel: collapsed to one button until clicked (or until /btw is used). */
+const btwOpen = atom({ plugin: 'moddeck', key: 'btwOpen' } as const, false)
+const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[])
+/** A newer release the person has not updated to yet (null = none known); the side bar shows a one-line button for it. */
+const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
+/** The expand button: the pane is drawn wide (`WIDE_COLUMNS`) instead of `COLUMNS`. */
+const wide = atom({ plugin: 'moddeck', key: 'wide' } as const, false)
 const DEFAULT_SKILL_ROWS = 4
-/** What the person last picked in a dropdown here (`skin`, `blast-radius`, `review-cost`): the pick shows at once, even where the other mod's state is not watched for redraws. */
+/** What the person last picked in a dropdown here (`blast-radius`, `review-cost`): the pick shows at once, even where the other mod's state is not watched for redraws. */
 const picks = atom({ plugin: 'moddeck', key: 'picks' } as const, {} as Record<string, string>)
 
 // ---- the Session box: what is kept in memory (never in the transcript), and read by the pane ---------------------------------
@@ -56,6 +71,11 @@ const meta = atom({ plugin: 'moddeck', key: 'meta' } as const, {} as MetaAtom)
 const gitState = atom({ plugin: 'moddeck', key: 'git' } as const, null as GitInfo | null)
 const tokenTotals = atom({ plugin: 'moddeck', key: 'tokens' } as const, null as TokenTotals | null)
 const activity = atom({ plugin: 'moddeck', key: 'activity' } as const, EMPTY_ACTIVITY as Activity)
+/** The newest commit or checkpoint, ms; null = none, undefined (never set) = not read. */
+const backupAt = atom({ plugin: 'moddeck', key: 'backupAt' } as const, undefined as number | null | undefined) // state is JSON data: only a number or null is ever written
+/** The configured permission mode. */
+const permMode = atom({ plugin: 'moddeck', key: 'permMode' } as const, undefined as string | undefined)
+const EFFORT_ADVICE = { plugin: 'suggest-model', key: 'effortAdvice' } as const
 const envCounts = atom({ plugin: 'moddeck', key: 'env' } as const, null as EnvCounts | null)
 /** The rows shown (a comma list in display order) and the layout, as /moddeck rows set them; null = not set by the person (the settings apply). */
 const rowsList = atom({ plugin: 'moddeck', key: 'rows' } as const, null as string | null)
@@ -66,6 +86,7 @@ const CACHE = { plugin: 'cache-tax', key: 'cache' } as const
 
 const HELP = [
   'Moddeck · /moddeck shows or hides the side bar',
+  '/moddeck update checks for a newer release · /btw <question> asks in the side bar',
   `/moddeck rows list · hide <id> · show <id> · compact · expanded`,
   `ids: ${ROW_IDS.join(', ')}`,
 ].join('\n')
@@ -85,7 +106,6 @@ function defer($: Dollar, work: () => Promise<void>): void {
 const SUGGEST_OFF = { plugin: 'suggest-model', key: 'isOff' } as const
 const REFLECT_OFF = { plugin: 'reflect', key: 'isOff' } as const
 const SECRET_ON = { plugin: 'secret-guard', key: 'isOn' } as const
-const SKIN = { plugin: 'tool-skins', key: 'theme' } as const
 const DATA_OFF = { plugin: 'data-guard', key: 'isOff' } as const
 const BIGFILE_OFF = { plugin: 'big-file-guard', key: 'isOff' } as const
 const REPRO_OFF = { plugin: 'repro-log', key: 'isOff' } as const
@@ -169,7 +189,126 @@ async function toggle($: Dollar): Promise<string> {
     return 'Moddeck · closed'
   }
   const opened = await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
+  if (opened.isPlaced && updateCheckOn) defer($, async () => void (await checkForUpdate($, false)))
   return opened.isPlaced ? 'Moddeck · open' : 'Moddeck · waiting for room\nTry /tui fullscreen, or a wider window.'
+}
+
+// ---- Side Question: a side question answered over the cached context, shown in the side bar and never added to the chat -------
+/** Opens the side bar if it is not up (a /btw typed with it closed brings it), without taking over its auto-open. */
+async function ensurePane($: Dollar): Promise<boolean> {
+  if (await isPaneOpen($)) return true
+  await update($, autoOpen, () => 'done')
+  const opened = await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
+  return opened.isPlaced
+}
+
+async function askBtw($: Dollar, maxChars: number, text: string): Promise<string> {
+  const question = text.trim()
+  if (question === '') {
+    await safe(() => update($, btwOpen, () => true))
+    await ensurePane($)
+    return 'Side Question · type it in the box at the bottom of the side bar, or /btw <question>'
+  }
+  const now = await $.clock.now()
+  if (isRunning(await read($, btwList), now)) return 'Side Question · one is still thinking'
+  if (!(await ensurePane($))) return 'Side Question · no room for the side bar\nTry /tui fullscreen, or a wider window.'
+  await safe(() => update($, btwOpen, () => true)) // asking opens the panel
+  const id = nextId(await read($, btwList))
+  await update($, btwList, l => addEntry(l, { id, at: now, question, status: 'thinking', answer: '', isCut: false, tokens: null, note: '' }))
+  defer($, async () => {
+    let patch: Partial<BtwEntry>
+    try {
+      const r = await $.model.fork({ prompt: buildPrompt(question) })
+      if (!r.isAnswered) patch = { status: 'failed', note: whyNot(r) }
+      else if (r.text.trim() === '') patch = { status: 'failed', note: whyNot({ reason: 'empty-reply' }) }
+      else {
+        const cut = cutAnswer(r.text, maxChars)
+        patch = { status: 'done', answer: cut.text, isCut: cut.isCut, tokens: tokensOf(r.usage) }
+      }
+    } catch {
+      patch = { status: 'failed', note: 'The request could not be sent' }
+    }
+    await update($, btwList, l => patchEntry(l, id, patch))
+  })
+  return 'Side Question · thinking · the answer is in the side bar'
+}
+
+// ---- update check: `git ls-remote --tags` for the newest release, asked once per window; nothing is installed without a yes ----
+async function stored<T>($: Dollar, key: string): Promise<T | undefined> {
+  try {
+    return (await $.store.get(key)) as T | undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Looks the newest release tag up (at most every CHECK_EVERY_MS unless forced) and, when it is newer and not skipped, asks. */
+async function checkForUpdate($: Dollar, isForced: boolean): Promise<string> {
+  const now = await $.clock.now()
+  let latest = await stored<string>($, 'latest')
+  const at = (await stored<number>($, 'checkedAt')) ?? 0
+  if (isForced || latest === undefined || now - at >= CHECK_EVERY_MS || now < at) {
+    try {
+      const r = await $.process.run(['git', 'ls-remote', '--tags', '--refs', REMOTE], { timeoutMs: 20_000 })
+      if (r.exitCode !== 0) return 'Moddeck · could not check for updates'
+      latest = latestRelease(r.stdout)
+      await $.store.set('checkedAt', now)
+      if (latest !== undefined) await $.store.set('latest', latest)
+    } catch {
+      return 'Moddeck · could not check for updates' // offline or no git: stay quiet at start, say so on a forced check
+    }
+  }
+  if (latest === undefined || !isNewer(latest, RELEASE)) {
+    await update($, updateAvail, () => null)
+    return `Moddeck ${RELEASE} · up to date`
+  }
+  await update($, updateAvail, () => latest ?? null)
+  if (!isForced && (await stored<string>($, 'skipped')) === latest) return `Moddeck ${latest} is available (skipped)`
+  await offerUpdate($, latest)
+  return `Moddeck ${latest} is available`
+}
+
+async function offerUpdate($: Dollar, latest: string): Promise<void> {
+  let answer: string
+  try {
+    answer = await $.ui.ask(askText(latest, RELEASE), { options: [UPDATE_NOW, LATER, SKIP], header: ASK_HEADER })
+  } catch {
+    return // Esc: ask again next time
+  }
+  if (answer === SKIP) {
+    await $.store.set('skipped', latest)
+    await update($, updateAvail, () => null)
+  } else if (answer === UPDATE_NOW) await runUpdate($, latest)
+}
+
+/** The installer's documented one-liner through pipx (else uvx); the result is told in a toast and the log. */
+async function runUpdate($: Dollar, latest: string): Promise<void> {
+  const manual = `Moddeck · update by hand: ${manualCommand(latest)}`
+  try {
+    let runner: 'pipx' | 'uvx' | undefined
+    for (const r of ['pipx', 'uvx'] as const) {
+      try {
+        if ((await $.process.run([r, '--version'], { timeoutMs: 10_000 })).exitCode === 0) {
+          runner = r
+          break
+        }
+      } catch {
+        // not installed: try the next
+      }
+    }
+    if (runner === undefined) return void $.ui.toast(manual, { timeoutMs: 15_000 })
+    $.ui.toast(`Moddeck · updating to ${latest}…`)
+    const out = await $.process.run(installArgv(runner, latest), { timeoutMs: 300_000 })
+    if (out.exitCode === 0) {
+      await update($, updateAvail, () => null)
+      $.ui.toast(`Moddeck ${latest} installed · restart Claude Code to use it`, { timeoutMs: 15_000 })
+    } else {
+      $.ui.log(`Moddeck update failed (exit ${out.exitCode})\n${(out.stderr || out.stdout).split('\n').slice(-8).join('\n')}`)
+      $.ui.toast(manual, { timeoutMs: 15_000 })
+    }
+  } catch {
+    $.ui.toast(manual, { timeoutMs: 15_000 })
+  }
 }
 
 /** Once per session, from a timer: open where there is room; whether it docked is settled by its first drawing. */
@@ -180,6 +319,24 @@ async function autoOpenPane($: Dollar): Promise<void> {
   const opened = await $.ui.open({ id: PANE, title: TITLE, columns: COLUMNS })
   if (opened.isPlaced) await update($, autoOpen, () => 'checking')
   else await $.ui.close({ id: PANE })
+}
+
+/** The expand button: close and reopen the pane at the other width; if there is no room for it, put it back as it was. */
+async function expand($: Dollar): Promise<void> {
+  try {
+    const isWide = await read($, wide)
+    await $.ui.close({ id: PANE })
+    const opened = await $.ui.open({ id: PANE, title: TITLE, columns: isWide ? COLUMNS : WIDE_COLUMNS })
+    if (opened.isPlaced) {
+      await update($, wide, () => !isWide)
+      return
+    }
+    await $.ui.close({ id: PANE })
+    await $.ui.open({ id: PANE, title: TITLE, columns: isWide ? WIDE_COLUMNS : COLUMNS })
+    $.ui.toast('Moddeck · no room to resize')
+  } catch {
+    $.ui.toast('Moddeck · could not resize')
+  }
 }
 
 async function settleAutoOpen($: Dollar, placement: 'dock' | 'inline'): Promise<void> {
@@ -227,6 +384,26 @@ async function refreshGit($: Dollar): Promise<void> {
     info = null
   }
   await safe(() => update($, gitState, () => info))
+  if (info === null) return // no repository: the backup row needs git anyway
+  // The newest of the last commit and the last checkpoint: what a dirty tree could be recovered from.
+  const stamp = async (argv: string[]) => {
+    const r = await attempt(() => $.process.run(argv, { timeoutMs: 3000 }))
+    const n = r && r.exitCode === 0 ? Number(r.stdout.trim().split('\n')[0]) : NaN
+    return Number.isFinite(n) && n > 0 ? n * 1000 : undefined
+  }
+  const times = [await stamp(['git', '--no-optional-locks', 'log', '-1', '--format=%ct']), await stamp(['git', '--no-optional-locks', 'for-each-ref', '--sort=-creatordate', '--count=1', '--format=%(creatordate:unix)', 'refs/moddeck/checkpoints'])].filter((t): t is number => t !== undefined)
+  await safe(() => update($, backupAt, () => (times.length > 0 ? Math.max(...times) : null)))
+}
+
+/** The permission mode set in the settings (or a config row, where the menu has one). The mode Shift+Tab switches to mid-session is not readable by a mod. */
+async function readPermissionMode($: Dollar): Promise<string | undefined> {
+  const ok = (v: unknown): v is string => typeof v === 'string' && v !== ''
+  const rows = await attempt(() => $.config.list())
+  const row = rows?.find(r => /permission.?mode|default.?mode/i.test(r.key))
+  if (row && ok(row.value)) return row.value
+  const settings = (await attempt(() => $.settings.read())) as { permissions?: { defaultMode?: unknown }; defaultMode?: unknown } | undefined
+  const fromSettings = settings?.permissions?.defaultMode ?? settings?.defaultMode
+  return ok(fromSettings) && fromSettings !== 'default' ? fromSettings : undefined // the ordinary mode is not worth a row
 }
 
 /** CLAUDE.md files (the project root and its parents up to home, plus ~/.claude/CLAUDE.md), rules, MCP servers, hooks, plugins. */
@@ -296,6 +473,8 @@ async function primeSession($: Dollar): Promise<void> {
   if (usage) await safe(() => update($, measure, m => m ?? { context: contextOf(usage.context), rateLimits: usage.rateLimits ?? [], cost: usage.cost?.usd }))
   const counts = await attempt(() => countEnvironment($))
   if (counts) await safe(() => update($, envCounts, () => counts))
+  const mode = await readPermissionMode($)
+  if (mode !== undefined) await safe(() => update($, permMode, () => mode))
   await refreshGit($)
 }
 
@@ -393,6 +572,9 @@ async function snapshotOf($: Dollar): Promise<Snapshot> {
     ledger: l ? { today: nn(l.today) ?? undefined, week: nn(l.week) } : undefined,
     cache: c ? { expiresAt: nn(c.expiresAt), hitRate: nn(c.hitRate) } : undefined,
     git: await read($, gitState),
+    permissionMode: await read($, permMode),
+    backupAt: await read($, backupAt),
+    effortAdvice: ((v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined))(await valueOf($.state.get(EFFORT_ADVICE as never))),
     tokens: await read($, tokenTotals),
     activity: await read($, activity),
     env: await read($, envCounts),
@@ -415,6 +597,8 @@ export const register: Register = (on, options) => {
     },
   }
   const showSession = conf.showSession
+  updateCheckOn = options.updateCheck !== false
+  const btwMax = maxCharsOf(options.btwMaxChars)
 
   on('session.start', async ($, e, next) => {
     try {
@@ -422,6 +606,12 @@ export const register: Register = (on, options) => {
     } catch {
       // the side bar can still be opened another way
     }
+    try {
+      await $.command.register({ name: 'btw', description: 'Ask a side question in the moddeck side bar; the answer is not added to the conversation: /btw <question>', argumentHint: '<question>', immediate: true })
+    } catch {
+      // without it the box at the bottom of the side bar still takes questions
+    }
+    if (updateCheckOn) defer($, async () => void (await checkForUpdate($, false))) // every time it is turned on: a quiet look at the newest release
     if (showSession) defer($, () => primeSession($)) // reading only: never blocks the start
     if (isAutoOpen && e.isInteractive && e.surface !== null && PANE_SURFACES.has(e.surface)) defer($, () => autoOpenPane($))
     return next(e)
@@ -430,9 +620,12 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'moddeck' }, async ($, e) => {
     const words = String((e as { args?: unknown }).args ?? '').trim().split(/\s+/).filter(Boolean)
     if (words.length === 0) return { text: await toggle($) }
+    if (words[0]!.toLowerCase() === 'update') return { text: await checkForUpdate($, true) }
     if (words[0]!.toLowerCase() === 'rows') return { text: await rowsCommand($, conf, words.slice(1).map(w => w.toLowerCase())) }
     return { text: HELP }
   }).catch(() => ({ text: FAILED }))
+
+  on('command.run', { command: 'btw' }, async ($, e) => ({ text: await askBtw($, btwMax, String((e as { args?: unknown }).args ?? '')) })).catch(() => ({ text: 'Side Question · could not ask' }))
 
   // ---- observers for the Session box: each lets the event through first (or, for a step, before it), and only keeps books ----
   on('session.measure', async ($, e, next) => {
@@ -514,7 +707,9 @@ export const register: Register = (on, options) => {
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Button, Select, Text } = $.ui.resolve(e)
+    const R = $.ui.resolve(e) as ReturnType<typeof $.ui.resolve> & { Input?: (p: Record<string, unknown>) => unknown }
+    const { Box, Button, Select, Text } = R
+    const Input = R.Input
     if ((await read($, autoOpen)) === 'checking') defer($, () => settleAutoOpen($, e.props.placement))
     const isInline = e.props.placement === 'inline' || e.viewport?.isFullscreen === false
     if (e.surface === 'terminal' && isInline) return <Text dimColor>{HINT}</Text>
@@ -561,7 +756,6 @@ export const register: Register = (on, options) => {
       'auto-test': flag(await valueOf($.state.get(AUTOTEST_OFF as never)), true),
       'long-run-ping': flag(await valueOf($.state.get(PING_OFF as never)), true),
     }
-    const skin = await valueOf($.state.get(SKIN as never))
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const reviewOff = await valueOf($.state.get(REVIEW_OFF as never))
     const chosen = await read($, picks)
@@ -571,70 +765,112 @@ export const register: Register = (on, options) => {
       'review-cost': chosen['review-cost'] ?? (typeof reviewOff === 'boolean' ? (reviewOff ? 'off' : 'on') : undefined),
     }
 
-    // A press lands on the text of a Button, so the text is padded to the row's width and a click anywhere on the row works.
-    // (A desktop draws narrower spaces than a terminal does, so it gets more.)
-    const room = Math.max(0, Math.round((e.props.bodyColumns - 6) * (e.surface === 'desktop' ? 1.35 : 1)))
-    const fill = (text: string) => text + '\u00a0'.repeat(Math.max(0, room - text.length))
-
-    // Every row is a box with a round border, one per row.
-    const row = (key: string, child: unknown, color?: string) => (
-      <Box key={key} borderStyle="round" borderColor={color} paddingX={1}>
-        {child as never}
+    // One column of grouped cards, in the style of a settings page. Every row: icon, name, short description on the left, its
+    // switch or dropdown on the right, and (wrapping inside the row) its action buttons underneath. Only the look is new:
+    // every press runs the same handler as before.
+    const wideNow = await read($, wide)
+    const room = Math.max(10, e.props.bodyColumns - 6)
+    const rule = (key: string) => (
+      <Text key={key} dimColor wrap="truncate-end">
+        {'─'.repeat(300)}
+      </Text>
+    )
+    const card = (key: string, title: string, rowsOf: unknown[]) => (
+      <Box key={key} flexDirection="column">
+        <Text bold>{title}</Text>
+        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1}>
+          {rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r])) as never}
+        </Box>
       </Box>
     )
-    const button = (key: string, label: string, action: Action, costs?: boolean) => (
-      <Button key={key} plain onPress={() => act($, action)}>
-        <Text wrap="truncate-end">{fill(priced(label, costs))}</Text>
+    // Skills and saved prompts: a bold title and plain rows, no box and no lines; the blank line between sections is the parent's gap.
+    const plainList = (key: string, title: string, rowsOf: unknown[]) => (
+      <Box key={key} flexDirection="column">
+        <Text bold>{title}</Text>
+        {rowsOf as never}
+      </Box>
+    )
+    // An action button: blue text, wrapping with its neighbours; `$` marks what spends model tokens.
+    const action = (key: string, label: string, act1: Action, costs?: boolean) => (
+      <Button key={key} plain onPress={() => act($, act1)}>
+        <Text color="suggestion" wrap="truncate-end">{`[${priced(label, costs)}]`}</Text>
       </Button>
     )
-    // Options sit right under their row, indented. Two or more, never one: a lone task is the row itself.
-    const optionsOf = (t: Tool) =>
+    const actionsOf = (t: Tool) =>
       (t.options ?? []).length > 0 && (
-        <Box key={`options:${t.id}`} flexDirection="column" paddingLeft={4}>
-          {(t.options ?? []).map(o => button(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
+        <Box key={`options:${t.id}`} flexWrap="wrap" columnGap={1} paddingLeft={2} width={room}>
+          {(t.options ?? []).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
         </Box>
       )
+    // The row itself: left side (icon, name, description), right side (the control).
+    const line = (t: Tool, name: unknown, control: unknown, extra?: unknown) => (
+      <Box key={`row:${t.id}`} flexDirection="column">
+        <Box justifyContent="space-between" columnGap={1}>
+          <Box flexDirection="column" flexShrink={1}>
+            <Box columnGap={1}>
+              <Text dimColor>{t.icon}</Text>
+              {name as never}
+            </Box>
+            {t.desc && (
+              <Text dimColor wrap="truncate-end">
+                {`  ${t.desc}`}
+              </Text>
+            )}
+          </Box>
+          {control as never}
+        </Box>
+        {extra as never}
+      </Box>
+    )
+    const title = (t: Tool) => (
+      <Text bold wrap="truncate-end">
+        {priced(t.label, t.costs)}
+      </Text>
+    )
+    // A switch is a small pill: green and "on", or gray and "off". The pill is the button.
+    const pill = (t: Tool, isOn: boolean) => (
+      <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={() => flip($, t, isOn)}>
+        <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'inactive'}>
+          {isOn ? ' on ●' : '● off'}
+        </Text>
+      </Button>
+    )
 
-    const tools = TOOLS.flatMap(t => {
-      if (t.isSkin) {
-        // tool-skins keeps its theme in state only once one has been picked, so an unset one reads as the default.
-        const theme = chosen.skin ?? (typeof skin === 'string' ? skin : SKINS[0]!)
-        return [
-          row(
-            'row:skin',
-            <Select key="skin" label="Skin " value={SKINS.includes(theme) ? theme : SKINS[0]!} options={SKINS.map(name => ({ value: name }))} onSelect={(name: string) => pick($, 'skin', 'skin', name)} />,
-          ),
-        ]
-      }
+    const drawn = (t: Tool): unknown => {
       if (t.levels !== undefined) {
-        // blast-radius and review-cost work by themselves: a dropdown of levels, one of them off; green while on, red while off.
+        // blast-radius and review-cost work by themselves: a dropdown of levels, one of them off.
         const level = levelOf[t.id]
-        if (level === undefined) return [] // not installed, or not readable: not drawn
-        const bg = level === 'off' ? 'error' : 'success'
-        return [
-          <Box key={`row:${t.id}`} borderStyle="round" borderColor={bg} backgroundColor={bg} paddingX={1}>
-            <Select key={`level:${t.id}`} label={`${t.label} `} value={level} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
-          </Box>,
-        ]
+        if (level === undefined) return undefined // not installed, or not readable: not drawn
+        return line(t, title(t), <Select key={`level:${t.id}`} value={level} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />)
       }
       if (t.isSwitch) {
         const isOn = ons[t.id]
-        if (isOn === undefined) return [] // not installed, or not readable: not drawn
-        const bg = isOn ? 'success' : 'error'
-        return [
-          <Box key={`row:${t.id}`} borderStyle="round" borderColor={bg} backgroundColor={bg} paddingX={1}>
-            <Button key={`switch:${t.id}`} plain onPress={() => flip($, t, isOn)}>
-              <Text bold color="inverseText" backgroundColor={bg} wrap="truncate-end">
-                {fill(`${priced(t.label, t.costs)} · ${isOn ? 'on' : 'off'}`)}
-              </Text>
-            </Button>
-          </Box>,
-          ...(isOn ? [optionsOf(t)] : []), // the options show only while the switch is green
-        ]
+        if (isOn === undefined) return undefined // not installed, or not readable: not drawn
+        // Options show only while the switch is on, unless the tool says they always show.
+        return line(t, title(t), pill(t, isOn), isOn ? actionsOf(t) : undefined)
       }
-      if (t.click !== undefined) return [row(`row:${t.id}`, button(`tool:${t.id}`, t.label, t.click, t.costs)), optionsOf(t)]
-      return [row(`row:${t.id}`, <Text dimColor>{`${t.label} · ${t.note ?? 'runs by itself'}`}</Text>)]
+      if (t.click !== undefined) {
+        const click = t.click
+        const name = (
+          <Button key={`tool:${t.id}`} plain onPress={() => act($, click)}>
+            <Text bold wrap="truncate-end">{priced(t.label, t.costs)}</Text>
+          </Button>
+        )
+        return line(t, name, <Text dimColor>›</Text>, actionsOf(t))
+      }
+      return line(t, title(t), <Text dimColor>{t.note ?? 'runs by itself'}</Text>)
+    }
+    const groups = GROUPS.flatMap(g => {
+      const rowsOf = TOOLS.filter(t => t.group === g).map(drawn).filter(r => r !== undefined)
+      return rowsOf.length > 0 ? [card(`group:${g}`, g, rowsOf)] : []
     })
+
+    // Skills and saved prompts are plain one-line rows in the same card style.
+    const listRow = (key: string, label: string, text: string) => (
+      <Button key={key} plain onPress={() => act($, { text, run: false })}>
+        <Text wrap="truncate-end">{label}</Text>
+      </Button>
+    )
 
     // A list with its own scroll: `rows` rows at a time, with ▲ / ▼ buttons, only when there are more.
     const scrolled = await read($, tops)
@@ -656,38 +892,66 @@ export const register: Register = (on, options) => {
       )
       return { shown, scroller }
     }
-    const skillList = windowed('skills', SKILLS, ((k: (typeof SKILLS)[number]) => row(`row:skill:${k.id}`, button(`skill:${k.id}`, k.label, { text: k.text, run: false }))) as never)
+    const skillList = windowed('skills', SKILLS, ((k: (typeof SKILLS)[number]) => listRow(`skill:${k.id}`, k.label, k.text)) as never)
 
     // Saved prompts (prompt-library): a click puts the text in the prompt box. Not drawn while that mod is not readable.
     const saved = await valueOf($.state.get(PROMPTS as never))
     const prompts: SavedPrompt[] = Array.isArray(saved)
       ? (saved as unknown[]).filter((p): p is SavedPrompt => typeof (p as SavedPrompt)?.name === 'string' && typeof (p as SavedPrompt)?.text === 'string')
       : []
-    const promptList = windowed('prompts', prompts, ((p: SavedPrompt) => row(`row:prompt:${p.name}`, button(`prompt:${p.name}`, p.name, { text: p.text, run: false }))) as never)
+    const promptList = windowed('prompts', prompts, ((p: SavedPrompt) => listRow(`prompt:${p.name}`, p.name, p.text)) as never)
+
+    // The Side Question panel at the bottom: the last answers, then a field. Enter asks; nothing enters the conversation.
+    const updateNow = await read($, updateAvail)
+    const btws = await read($, btwList)
+    const isBtwOpen = await read($, btwOpen)
+    const btwHead = (
+      <Button key="btw:toggle" plain onPress={() => void update($, btwOpen, o => !o)}>
+        <Text bold>{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
+      </Button>
+    )
+    const btwBox = !isBtwOpen ? (
+      <Box key="btw" borderStyle="round" paddingX={1}>
+        {btwHead}
+      </Box>
+    ) : (
+      <Box key="btw" flexDirection="column" borderStyle="round" paddingX={1}>
+        {btwHead}
+        {btws.slice(0, 2).map(b => (
+          <Box key={`btw:${b.id}`} flexDirection="column">
+            <Text color="suggestion" wrap="truncate-end">{`› ${headline(b.question, room)}`}</Text>
+            {b.answer !== '' && <Text wrap="wrap">{b.answer}</Text>}
+            <Text dimColor wrap="truncate-end">{footer(b)}</Text>
+          </Box>
+        ))}
+        {Input !== undefined ? (
+          <Input key="btw:input" label="› " placeholder="ask without touching the chat" submitLabel="ask" onSubmit={(v: string) => void askBtw($, btwMax, v).then(t => $.ui.toast(t.split('\n')[0] ?? t))} />
+        ) : (
+          <Text dimColor>type /btw your question</Text>
+        )}
+      </Box>
+    )
 
     return (
       <Box flexDirection="column" gap={1}>
-        {sessionBox as never}
-        <Box flexDirection="column">
-          <Text bold>Tools</Text>
-          <Text dimColor>Green or red: click to switch (dropdowns pick a level). Others: click to run, or to put it in the prompt box when it needs your text</Text>
-          {tools}
+        <Box justifyContent="space-between">
+          <Text bold>Moddeck</Text>
+          <Button key="expand" plain label={wideNow ? 'Narrow the panel' : 'Expand the panel'} onPress={() => expand($)}>
+            <Text color="suggestion">{wideNow ? '⤡' : '⤢'}</Text>
+          </Button>
         </Box>
-        <Text dimColor wrap="truncate-end">{'─'.repeat(300)}</Text>
-        <Box flexDirection="column">
-          <Text bold>Skills</Text>
-          {skillList.scroller}
-          {skillList.shown}
-        </Box>
-        {prompts.length > 0 && (
-          <Box flexDirection="column">
-            <Text bold>Prompts</Text>
-            <Text dimColor>Click to put it in the prompt box · /prompts to add or remove</Text>
-            {promptList.scroller}
-            {promptList.shown}
-          </Box>
+        {updateNow !== null && (
+          <Button key="update" plain onPress={() => void offerUpdate($, updateNow)}>
+            <Text color="warning" wrap="truncate-end">{`⬆ Moddeck ${updateNow} is available · click to update`}</Text>
+          </Button>
         )}
+        {sessionBox as never}
+        <Text bold>Tools</Text>
+        {groups}
+        {skillList.shown.length > 0 && plainList('group:skills', 'Skills', [skillList.scroller, ...skillList.shown].filter(Boolean))}
+        {prompts.length > 0 && plainList('group:prompts', 'Prompts · click to put it in the prompt box', [promptList.scroller, ...promptList.shown].filter(Boolean))}
         <Text dimColor>$ = spends model tokens</Text>
+        {btwBox as never}
       </Box>
     )
   })

@@ -65,7 +65,7 @@ Star counts are from the catalogue pages; most of these have almost none. None w
 | **cache-keepalive** | Pings the cache every 50 minutes | Already covered by `/keepwarm`, which asks and shows the cost; `cache-tax` now only mentions it |
 | **cc-pr-tracker**, **gh-ci-status** | Pull requests and CI runs pinned above the prompt (network) | Folded into the `branch-janitor` report when `gh` is there; open-PR branches are never offered for deletion |
 | **claude-mermaid** | Mermaid blocks as box art | Rebuilt as `diagram` |
-| **aside** (JayDoubleu) | A read-only side chat pane | Rebuilt as `aside` (explicit, uses a little credit) |
+| **aside** (JayDoubleu) | A read-only side chat pane | Rebuilt as `/btw` inside the moddeck side bar (explicit, uses a little credit) |
 | **time** (diegorv) | Shows when each message was sent | Turn durations are in the `usage` report instead |
 | **terminal-browser** (zenbu-labs, 3.6k stars) | A Chromium pane beside the chat | Not added: a full browser is a wide reach, and the Claude desktop app already has a built-in browser |
 | **Context7** (official marketplace) | Live, version-specific package docs | Offered as an optional official plugin in the installer (adds tool definitions to every session) |

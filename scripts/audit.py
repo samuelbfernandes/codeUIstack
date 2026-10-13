@@ -32,8 +32,7 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "secret-guard": set(),
     "budget-guard": set(),
     "diagram": set(),
-    "aside": set(),
-    "moddeck": {"git"},                        # read-only git for the Session box (branch, dirty, ahead/behind, file counts, worktree)
+    "moddeck": {"git", "pipx", "uvx"},         # git: read-only for the Session box, and `git ls-remote --tags` for the update check; pipx/uvx: the installer's own one-liner, only after you answer "Update now"
     "data-guard": {"git"},
     "big-file-guard": set(),
     "repro-log": {"git", "python3", "node"},          # only `--version` probes, for runtimes that appeared in the session
@@ -42,9 +41,9 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "checkpoint": {"git", "rm", "cmd"},          # rm / del only on a confirmed restore, only paths the dialog listed
     "long-run-ping": set(),
 }
-ALLOW_NETWORK: set[str] = set()            # mods allowed to call $.http (none)
+ALLOW_NETWORK: set[str] = {"moddeck"}      # moddeck names the GitHub repo for `git ls-remote --tags` (the update check); it never calls $.http
 NEVER_PROGRAMS = {"curl", "wget", "ssh", "scp", "nc", "ncat", "telnet", "sudo", "powershell", "pwsh", "bash", "sh", "zsh", "cmd", "python", "python3", "node", "npm", "npx", "pip", "rm", "mv", "chmod"}
-KNOWN_PROGRAMS = {"git", "gh", "codex", "claude", "du", "find"} | NEVER_PROGRAMS
+KNOWN_PROGRAMS = {"git", "gh", "codex", "claude", "du", "find", "pipx", "uvx"} | NEVER_PROGRAMS
 
 NETWORK_RE = re.compile(r"\$\.http\b|\.http\.fetch|\bfetch\s*\(|XMLHttpRequest|WebSocket|https?://")
 DYNAMIC_RE = re.compile(r"\beval\s*\(|new\s+Function\s*\(|\bimport\s*\(|\brequire\s*\(|child_process")

@@ -1,6 +1,6 @@
 import { test, expect } from 'claude-code/testing'
 
-import { cheaperBy, fmtRatio, judge, parseCosts, ratingOf, ratingTable, recommend, statusText, tableText } from '../hooks/fit'
+import { cheaperBy, effortAdvice, effortNote, fmtRatio, judge, parseCosts, ratingOf, ratingTable, recommend, statusText, tableText } from '../hooks/fit'
 import type { Prediction } from '../hooks/predict'
 
 const P = (tier: Prediction['tier'], confidence = 0.9): Prediction => ({ tier, score: 4, confidence, reasons: ['r'] })
@@ -10,15 +10,15 @@ const COSTS = parseCosts(undefined).costs
 
 test('ratings by tier: weak / ok / best per model; review is rated like deep', () => {
   const row = (tier: Prediction['tier']) => tableText(ratingTable(tier, 'sonnet', COSTS))
-  expect(row('light')).toBe('Haiku: ok, 1x; Sonnet: ok, 3x; Opus: best, 5x')
-  expect(row('standard')).toBe('Haiku: weak, 1x; Sonnet: ok, 3x; Opus: best, 5x')
-  expect(row('deep')).toBe('Haiku: weak, 1x; Sonnet: weak, 3x; Opus: best, 5x')
+  expect(row('light')).toBe('Haiku: ok, 1x; Sonnet: ok, 20x; Opus: best, 40x')
+  expect(row('standard')).toBe('Haiku: weak, 1x; Sonnet: ok, 20x; Opus: best, 40x')
+  expect(row('deep')).toBe('Haiku: weak, 1x; Sonnet: weak, 20x; Opus: best, 40x')
   expect(row('review')).toBe(row('deep'))
   expect(ratingOf('deep', 'fable')).toBe('best')
 })
 
 test('the fable row appears only when fable is the current model; no cost set says so', () => {
-  expect(tableText(ratingTable('standard', 'fable', COSTS))).toBe('Haiku: weak, 1x; Sonnet: ok, 3x; Opus: best, 5x; Fable: best, cost not set')
+  expect(tableText(ratingTable('standard', 'fable', COSTS))).toBe('Haiku: weak, 1x; Sonnet: ok, 20x; Opus: best, 40x; Fable: best, cost not set')
   expect(tableText(ratingTable('standard', 'fable', parseCosts('fable=8').costs))).toContain('Fable: best, 8x')
   expect(tableText(ratingTable('standard', 'opus', parseCosts('fable=8').costs))).not.toContain('Fable')
 })
@@ -42,15 +42,15 @@ test('recommendation follows the cost setting, and never recommends fable', () =
 // ------------------------------------------------------------------- cost parsing
 
 test('parseCosts: defaults, fable, case, separators and the "x" suffix', () => {
-  expect(parseCosts(undefined)).toEqual({ costs: { haiku: 1, sonnet: 3, opus: 5 }, problems: [] })
+  expect(parseCosts(undefined)).toEqual({ costs: { haiku: 1, sonnet: 20, opus: 40 }, problems: [] })
   expect(parseCosts('haiku=1,sonnet=3,opus=5').costs).toEqual({ haiku: 1, sonnet: 3, opus: 5 })
   expect(parseCosts('Haiku=1x; SONNET=2.5 opus=10 fable=20').costs).toEqual({ haiku: 1, sonnet: 2.5, opus: 10, fable: 20 })
-  expect(parseCosts('opus=7').costs).toEqual({ haiku: 1, sonnet: 3, opus: 7 }) // missing ones keep their default
+  expect(parseCosts('opus=7').costs).toEqual({ haiku: 1, sonnet: 20, opus: 7 }) // missing ones keep their default
 })
 
 test('parseCosts: bad input is ignored piece by piece, reported, and never throws', () => {
   const r = parseCosts('haiku=abc,sonnet=-2,opus=0,gpt=3,sonnet,=4,opus=5,haiku==2')
-  expect(r.costs).toEqual({ haiku: 1, sonnet: 3, opus: 5 })
+  expect(r.costs).toEqual({ haiku: 1, sonnet: 20, opus: 5 })
   expect(r.problems).toEqual(['haiku=abc', 'sonnet=-2', 'opus=0', 'gpt=3', 'sonnet', '=4', 'haiku==2'])
   for (const raw of [42, null, {}, [], '', '   ', ',,;;', 'x'.repeat(5000), 'opus=1e9', 'opus=99999', 'opus=NaN', 'opus=Infinity']) {
     const out = parseCosts(raw)
@@ -62,8 +62,8 @@ test('parseCosts: bad input is ignored piece by piece, reported, and never throw
 test('cost formatting and the saving wording', () => {
   expect(fmtRatio(5)).toBe('5x')
   expect(fmtRatio(1.5)).toBe('1.5x')
-  expect(cheaperBy(COSTS, 'opus', 'haiku')).toBe('~5x cheaper')
-  expect(cheaperBy(COSTS, 'opus', 'sonnet')).toBe('~1.7x cheaper')
+  expect(cheaperBy(COSTS, 'opus', 'haiku')).toBe('~40x cheaper')
+  expect(cheaperBy(COSTS, 'opus', 'sonnet')).toBe('~2x cheaper')
   expect(cheaperBy(COSTS, 'haiku', 'opus')).toBe('') // not cheaper: nothing is claimed
   expect(cheaperBy(COSTS, 'fable', 'haiku')).toBe('') // fable has no cost: no ratio is invented
   expect(cheaperBy(parseCosts('fable=10').costs, 'fable', 'haiku')).toBe('~10x cheaper')
@@ -129,11 +129,30 @@ test('a cost setting that makes the recommendation no cheaper turns "overkill" i
 test('status line wording for every verdict', () => {
   const s = (fit: Parameters<typeof statusText>[0], cur: Parameters<typeof statusText>[1]) => statusText(fit, cur, COSTS)
   expect(s({ kind: 'fits' }, 'opus')).toBe('suggest-model: Opus fits')
-  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'opus')).toBe('suggest-model: overkill, Haiku would do (~5x cheaper)')
+  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'opus')).toBe('suggest-model: overkill, Haiku would do (~40x cheaper)')
   expect(s({ kind: 'mismatch', risk: 'under', recommended: 'opus' }, 'sonnet')).toBe('suggest-model: weak for this, use Opus')
-  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'spare' }, 'opus')).toBe('suggest-model: Sonnet would do (~1.7x cheaper)')
+  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'spare' }, 'opus')).toBe('suggest-model: Sonnet would do (~2x cheaper)')
   expect(s({ kind: 'hint', recommended: 'sonnet', why: 'borderline' }, 'haiku')).toBe('suggest-model: Haiku is borderline for this, Sonnet is safer')
   expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'fable')).toBe('suggest-model: overkill, Haiku would do') // no cost known for fable: no ratio
   expect(s({ kind: 'none', why: 'x' }, 'opus')).toBeUndefined() // clears the line
   expect(s({ kind: 'fits' }, undefined)).toBeUndefined()
+})
+
+test('effortNote: max or xhigh for light work and low for hard work are flagged; the rest is silent', () => {
+  expect(effortNote('light', 'max')).toBe('effort max is more than this needs · /effort medium')
+  expect(effortNote('standard', 'max')).toBe('effort max is more than this needs · /effort medium')
+  expect(effortNote('deep', 'max')).toBeUndefined() // max for hard work is the one place it is meant for
+  expect(effortNote('light', 'xhigh')).toBe('effort xhigh is more than this needs · /effort medium')
+  expect(effortNote('standard', 'xhigh')).toBeUndefined()
+  expect(effortNote('deep', 'low')).toBe('effort low may be too little for this · /effort high')
+  expect(effortNote('review', 'low')).toBe('effort low may be too little for this · /effort high')
+  expect(effortNote('light', 'medium')).toBeUndefined()
+  expect(effortNote('light', undefined)).toBeUndefined()
+  expect(effortNote('light', 5)).toBeUndefined()
+})
+
+test('effortAdvice: the short form moddeck shows beside the effort', () => {
+  expect(effortAdvice('light', 'max')).toBe('medium would do')
+  expect(effortAdvice('deep', 'low')).toBe('try high')
+  expect(effortAdvice('standard', 'medium')).toBeUndefined()
 })

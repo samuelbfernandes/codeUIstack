@@ -24,6 +24,15 @@ const MODS = {
       },
     },
     {
+      name: 'suggest-model',
+      register(on: On) {
+        on('command.run', { command: 'seed-effort' }, async ($, e) => {
+          await $.state.set({ plugin: 'suggest-model', key: 'effortAdvice' } as never, (e.args === 'none' ? '' : e.args) as never)
+          return { text: 'seeded' }
+        })
+      },
+    },
+    {
       name: 'cache-tax',
       register(on: On) {
         on('command.run', { command: 'seed-cache-tax' }, async ($, e) => {
@@ -40,6 +49,9 @@ type Data = {
   usageThrows?: boolean
   gitStatus?: string
   gitRev?: string
+  /** Epoch seconds `git log -1` and the newest checkpoint ref answer with. */
+  commitAt?: number
+  checkpointAt?: number
   gitThrows?: boolean
   tools?: { name: string; description: string; mcp: boolean }[]
   settings?: Record<string, unknown>
@@ -95,6 +107,8 @@ function world(on: On, d: Data = {}) {
   on('process.run', (_$, e) => {
     if (d.gitThrows) throw new Error('git missing')
     const argv = e.argv.join(' ')
+    if (argv.includes('for-each-ref')) return { value: { exitCode: 0, stdout: d.checkpointAt === undefined ? '' : `${d.checkpointAt}\n`, stderr: '' } } as never
+    if (argv.includes(' log ')) return { value: { exitCode: d.commitAt === undefined ? 128 : 0, stdout: d.commitAt === undefined ? '' : `${d.commitAt}\n`, stderr: '' } } as never
     if (argv.includes('status')) {
       return { value: d.gitStatus === undefined ? { exitCode: 128, stdout: '', stderr: 'fatal: not a git repository' } : { exitCode: 0, stdout: d.gitStatus, stderr: '' } } as never
     }
@@ -164,7 +178,7 @@ test('with nothing known the Session box is not drawn and the side bar is the ol
   expect(shown).not.toContain('Session')
   expect(shown).toContain('Tools')
   expect(shown).toContain('Skills')
-  expect(await pane.find({ key: 'row:aside' })).toBeDefined()
+  expect(await pane.find({ key: 'row:checkpoint' })).toBeDefined()
 })
 
 test('every row draws from the data it is given, in order, above the tools', MODS, async ($, on) => {
@@ -227,7 +241,7 @@ test('every row draws from the data it is given, in order, above the tools', MOD
   expect(shown).toContain('MCP: github')
   expect(shown).toContain('Compactions: 1')
   expect(shown).toContain('3 CLAUDE.md · 2 rules · 2 MCP · 3 hooks · 2 plugins')
-  // order: the Session box sits above Tools, and its rows keep the setting's order
+  // order: the Session box sits above Plugins, and its rows keep the setting's order
   expect(shown.indexOf('Session')).toBeLessThan(shown.indexOf('Tools'))
   const order = ['claude-opus-4-5', 'Context', '5h ', '$1.23', 'Cache until', 'main*', 'in 1.2k', '✓ Read', '3 CLAUDE.md'].map(t => shown.indexOf(t))
   expect([...order].sort((a, b) => a - b)).toEqual(order)
@@ -263,7 +277,7 @@ test('context goes green, yellow at 70% and red at 85%, and at 85% the biggest c
   expect(await texts(await mount($))).not.toContain('Messages 120k')
 })
 
-test('usage pace: amber and red get a ▲, a window under 10% or on pace gets none', MODS, async ($, on) => {
+test('usage pace: amber and red get a ▲, a window under 10% or on pace gets none', { ...MODS, options: { skillRows: 5 } }, async ($, on) => {
   const w = world(on)
   await start($, w)
   const at = (kind: string, percentUsed: number, leftMs: number) => ({ kind, percentUsed, resetsAt: new Date(w.clock.now() + leftMs).toISOString() })
@@ -424,11 +438,11 @@ test('/moddeck rows hide and show change the box, keep the choice in the store, 
   await start($, w)
   expect(await texts(await mount($))).toContain('$1.23')
   expect((await run($, 'moddeck', 'rows hide cost')).text).toContain('hid cost')
-  expect(w.store.get('rows')).toBe('model,context,usage,cache,git,tokens,activity,environment')
+  expect(w.store.get('rows')).toBe('model,mode,context,usage,cache,git,backup,tokens,activity,environment')
   expect(await texts(await mount($))).not.toContain('$1.23')
   expect((await run($, 'moddeck', 'rows list')).text).toContain('Hidden: cost')
   expect((await run($, 'moddeck', 'rows show cost')).text).toContain('showing cost')
-  expect(w.store.get('rows')).toBe('model,context,usage,cost,cache,git,tokens,activity,environment') // back in its place
+  expect(w.store.get('rows')).toBe('model,mode,context,usage,cost,cache,git,backup,tokens,activity,environment') // back in its place
   expect(await texts(await mount($))).toContain('$1.23')
   expect(w.panes).toEqual([]) // none of this opened or closed the pane
 })
@@ -490,7 +504,7 @@ test('fail-open: every data source throwing leaves the start, the events and the
   await w.clock.settle()
   const pane = await mount($)
   expect(await texts(pane)).toContain('Tools')
-  expect(await pane.find({ key: 'row:aside' })).toBeDefined()
+  expect(await pane.find({ key: 'row:checkpoint' })).toBeDefined()
 })
 
 // ---- the pure parts, directly ----
@@ -532,4 +546,65 @@ test('groupRuns merges finished calls of one tool, keeps running ones apart, and
 test('buildRows draws nothing for a snapshot with no figures', async () => {
   const rows = buildRows({ now: T0 }, DEFAULT_BOX)
   expect(Object.values(rows).filter(Boolean)).toEqual([])
+})
+
+// ---- mode, backup and effort-fit rows ---------------------------------------------------------------------------------------
+const DIRTY = '# branch.oid abc\n# branch.head main\n1 .M N... 1 1 1 a b f.ts\n? n.txt\n'
+const CLEAN = '# branch.oid abc\n# branch.head main\n'
+
+test('the permission mode shows only when it is not the ordinary one, red for bypass', MODS, async ($, on) => {
+  const w = world(on, { usage: GOOD_USAGE, settings: { permissions: { defaultMode: 'bypassPermissions' } } })
+  await start($, w)
+  const pane = await mount($)
+  expect(await texts(pane)).toContain('permissions bypassed !')
+  expect(await colorOf(pane, 'permissions bypassed !')).toContain('error')
+})
+
+test('no mode row for the default mode', MODS, async ($, on) => {
+  const w = world(on, { usage: GOOD_USAGE, settings: { permissions: { defaultMode: 'default' } } })
+  await start($, w)
+  expect(await texts(await mount($))).not.toContain('Mode')
+})
+
+test('backup: time since the newest commit or checkpoint; amber after 2 h with files unsaved, red after 8 h', MODS, async ($, on) => {
+  const now = T0 / 1000
+  const w = world(on, { usage: GOOD_USAGE, gitStatus: DIRTY, commitAt: now - 3 * 3600 })
+  await start($, w)
+  let pane = await mount($)
+  expect(await texts(pane)).toContain('3h ago')
+  expect(await texts(pane)).toContain('2 unsaved')
+  expect(await colorOf(pane, '3h ago')).toContain('warning')
+})
+
+test('backup: a checkpoint newer than the last commit counts; a clean tree is green; a dirty tree with nothing saved says none', MODS, async ($, on) => {
+  const now = T0 / 1000
+  const a = world(on, { usage: GOOD_USAGE, gitStatus: DIRTY, commitAt: now - 10 * 3600, checkpointAt: now - 600 })
+  await start($, a)
+  const pane = await mount($)
+  expect(await texts(pane)).toContain('10m ago')
+  expect(await colorOf(pane, '10m ago')).toContain('success')
+})
+
+test('backup: nothing saved and files changed says so; a clean repository with no commit shows no row', MODS, async ($, on) => {
+  const w = world(on, { usage: GOOD_USAGE, gitStatus: DIRTY })
+  await start($, w)
+  expect(await texts(await mount($))).toContain('none · 2 unsaved')
+})
+
+test('backup: a clean tree is green however old the commit', MODS, async ($, on) => {
+  const w = world(on, { usage: GOOD_USAGE, gitStatus: CLEAN, commitAt: T0 / 1000 - 30 * 3600 })
+  await start($, w)
+  const pane = await mount($)
+  expect(await colorOf(pane, '1d 6h ago')).toContain('success')
+})
+
+test('effort fit: the model row shows suggest-model\'s advice beside the effort, in the warning colour, and nothing when it fits', MODS, async ($, on) => {
+  const w = world(on, { usage: GOOD_USAGE })
+  await start($, w)
+  await run($, 'seed-effort', 'medium would do')
+  const pane = await mount($)
+  expect(await texts(pane)).toContain('⚠ medium would do')
+  expect(await colorOf(pane, ' ⚠ medium would do')).toContain('warning')
+  await run($, 'seed-effort', 'none')
+  expect(await texts(await mount($))).not.toContain('⚠')
 })
