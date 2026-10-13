@@ -7,6 +7,17 @@ they have something useful to say. Install everywhere or in a single project, ti
 > Status: first release, not yet used by anyone but its author. Written and tested without a live Claude Code session; see
 > [what is verified](docs/SAFETY.md#6-what-has-not-been-verified).
 
+## Install (one line)
+
+```bash
+pipx run --spec git+https://github.com/samuelbfernandes/moddeck@main moddeck install --standard
+```
+
+The recommended set, no questions, always the newest code on `main` (needs `pipx`, `git`, Python 3.9+ and Claude Code 2.1.287+).
+Add `--plan` to only look, or drop `--standard` to be asked. Update later with
+`pipx run --spec git+https://github.com/samuelbfernandes/moddeck@main moddeck update --scope user -y`, or answer **Update now** when moddeck offers it. The
+installer's own label (`Moddeck installer 0.4.1`) is its package version; the mods it installs are the ones in `main`. Then start a new Claude Code session.
+
 ## Start here: the tools most people will want
 
 These are the author's picks, chosen for how often the problem they solve comes up. They are editorial, not usage data.
@@ -37,13 +48,13 @@ Everything else (`reflect`, `savvy-progress`, `filetree`, `replay-theater`, `too
 Look first, then decide. Nothing changes until you confirm.
 
 ```bash
-pipx install git+https://github.com/samuelbfernandes/moddeck@v0.4.1
+pipx install git+https://github.com/samuelbfernandes/moddeck@main
 moddeck install --plan     # prints every change it would make, then stops
 moddeck install --standard # one line, no questions: the recommended set (or --all: every mod, rule and guard)
 moddeck                    # asks a few questions, shows the plan, applies it
 ```
 
-Or from a clone: `git clone https://github.com/samuelbfernandes/moddeck && cd Moddeck && sh install.sh` (Windows: `install.cmd`).
+Or from a clone: `git clone https://github.com/samuelbfernandes/moddeck && cd moddeck && sh install.sh` (Windows: `install.cmd`).
 Only the mods, inside Claude Code: `/plugin marketplace add samuelbfernandes/moddeck`, then `/plugin install <mod>@moddeck`.
 Other routes (uv, pip, conda, a plain download, or only the mods through Claude Code's own `/plugin` command) are in
 [docs/INSTALL.md](docs/INSTALL.md). You need Claude Code 2.1.287 or newer, `git`, and Python 3.9+ (not for the plugin-only route).
@@ -76,7 +87,7 @@ commit; Codex sends code to OpenAI when you enable it).
 | `moddeck` | A side bar with a live Session box (model, context, plan usage, cost, cache, git, backup, tokens, activity, environment), a **Side Question** panel (`/btw`) right under it, every mod in grouped cards (a switch is the mod's name, green on and red off: click it), the skills and saved prompts with a scroll bar, and an update check |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
-| `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
+| `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it, and flags an effort level that does not fit the task |
 | `branch-janitor` | Notices a finished branch, verifies it is safe to delete, offers to delete it |
 | `review-cost` | Shows the token cost of a Codex review before a push |
 | `reflect` | Offers to save a rule when you correct Claude |
@@ -95,7 +106,7 @@ commit; Codex sends code to OpenAI when you enable it).
 | `checkpoint` | `/checkpoint`: safety snapshots of your working tree; restoring shows what you would lose first |
 | `long-run-ping` | A toast, sound and notification when a long turn or command finishes |
 
-**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
+**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`, `/btw`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
 Skills: `dual-model-review` (a second model tries to prove a change wrong), `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric), `align` (interviews you before a big build, then writes a spec), `burst` (three independent versions of a text or idea, graded) and `assess-plugin` (what a plugin installs, costs and risks, before you install it).
 Turn any mod off with `/plugin disable <name>`.

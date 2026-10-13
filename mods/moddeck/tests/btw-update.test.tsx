@@ -73,9 +73,9 @@ test('versions: only plain releases count, and 0.10.0 is newer than 0.4.1', () =
 })
 
 test('the update command is the installer\'s own one-liner for that tag, through pipx or uvx', () => {
-  expect(installArgv('pipx', '0.5.0')).toEqual(['pipx', 'run', '--spec', 'git+https://github.com/samuelbfernandes/moddeck@v0.5.0', 'moddeck', 'update'])
+  expect(installArgv('pipx', '0.5.0')).toEqual(['pipx', 'run', '--spec', 'git+https://github.com/samuelbfernandes/moddeck@v0.5.0', 'moddeck', 'update', '--scope', 'user', '-y'])
   expect(installArgv('uvx', '0.5.0')[0]).toBe('uvx')
-  expect(manualCommand('0.5.0')).toBe('pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.5.0 moddeck update')
+  expect(manualCommand('0.5.0')).toBe('pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.5.0 moddeck update --scope user -y')
 })
 
 test('btw helpers: newest first, at most five, a stale question stops blocking, answers are cut and say so', () => {
@@ -111,7 +111,7 @@ test('Update now runs the installer one-liner and says to restart; no runner or 
   const ok = world(on, { answer: 'Update now' })
   await start($)
   await ok.clock.advance(5)
-  expect(ok.ran.some(a => a.join(' ') === 'pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.10.0 moddeck update')).toBe(true)
+  expect(ok.ran.some(a => a.join(' ') === 'pipx run --spec git+https://github.com/samuelbfernandes/moddeck@v0.10.0 moddeck update --scope user -y')).toBe(true)
   expect(ok.toasts.at(-1)).toContain('restart Claude Code')
 })
 

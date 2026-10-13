@@ -38,10 +38,10 @@ export function latestRelease(lsRemote: string): string | undefined {
 
 export type Runner = 'pipx' | 'uvx'
 
-/** The installer's own documented one-liner (docs/INSTALL.md) for a given release, with `update` so the recorded choices are kept. */
+/** The installer's own documented one-liner (docs/INSTALL.md) for a given release, with `update --scope user -y` so the recorded choices are kept and nothing asks a question (there is no terminal to answer in). */
 export function installArgv(runner: Runner, version: string): string[] {
   const from = `git+https://github.com/${REPO}@v${version}`
-  return runner === 'pipx' ? ['pipx', 'run', '--spec', from, 'moddeck', 'update'] : ['uvx', '--from', from, 'moddeck', 'update']
+  return runner === 'pipx' ? ['pipx', 'run', '--spec', from, 'moddeck', 'update', '--scope', 'user', '-y'] : ['uvx', '--from', from, 'moddeck', 'update', '--scope', 'user', '-y']
 }
 
 export const manualCommand = (version: string): string => installArgv('pipx', version).join(' ')
