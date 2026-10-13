@@ -1,6 +1,6 @@
 {
   "name": "budget-guard",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /budget-guard for a short report.",
   "author": {
     "name": "Samuel Fernandes"

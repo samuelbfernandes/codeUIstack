@@ -109,7 +109,9 @@ function depsOf($: EngineInterface, settings: Deps['settings']): Deps {
     ask: (question, o) => $.ui.ask(question, { options: o.options, header: o.header }),
     toast: text => {
       $.ui.toast(text, { timeoutMs: 20_000 })
-      $.ui.log(text) // the toast fades; the restore commands should stay in the transcript
+      // The toast fades; the restore commands stay in the transcript, one `$.ui.log` call per line so each can be
+      // copied (a newline inside one call draws as a stray glyph).
+      for (const line of text.split('\n')) if (line.trim() !== '') $.ui.log(line)
     },
     now: () => $.clock.now(),
     store: { get: key => $.store.get(key), set: (key, value) => $.store.set(key, value) },
