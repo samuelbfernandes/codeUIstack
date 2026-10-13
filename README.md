@@ -7,6 +7,17 @@ they have something useful to say. Install everywhere or in a single project, ti
 > Status: first release, not yet used by anyone but its author. Written and tested without a live Claude Code session; see
 > [what is verified](docs/SAFETY.md#6-what-has-not-been-verified).
 
+## Install (one line)
+
+```bash
+pipx run --spec git+https://github.com/samuelbfernandes/moddeck@main moddeck install --standard
+```
+
+The recommended set, no questions, always the newest code on `main` (needs `pipx`, `git`, Python 3.9+ and Claude Code 2.1.287+).
+Add `--plan` to only look, or drop `--standard` to be asked. Update later with
+`pipx run --spec git+https://github.com/samuelbfernandes/moddeck@main moddeck update --scope user -y`, or answer **Update now** when moddeck offers it. The
+installer's own label (`Moddeck installer 0.4.1`) is its package version; the mods it installs are the ones in `main`. Then start a new Claude Code session.
+
 ## Start here: the tools most people will want
 
 These are the author's picks, chosen for how often the problem they solve comes up. They are editorial, not usage data.
@@ -37,13 +48,13 @@ Everything else (`reflect`, `savvy-progress`, `filetree`, `replay-theater`, `too
 Look first, then decide. Nothing changes until you confirm.
 
 ```bash
-pipx install git+https://github.com/samuelbfernandes/moddeck@v0.4.1
+pipx install git+https://github.com/samuelbfernandes/moddeck@main
 moddeck install --plan     # prints every change it would make, then stops
 moddeck install --standard # one line, no questions: the recommended set (or --all: every mod, rule and guard)
 moddeck                    # asks a few questions, shows the plan, applies it
 ```
 
-Or from a clone: `git clone https://github.com/samuelbfernandes/moddeck && cd Moddeck && sh install.sh` (Windows: `install.cmd`).
+Or from a clone: `git clone https://github.com/samuelbfernandes/moddeck && cd moddeck && sh install.sh` (Windows: `install.cmd`).
 Only the mods, inside Claude Code: `/plugin marketplace add samuelbfernandes/moddeck`, then `/plugin install <mod>@moddeck`.
 Other routes (uv, pip, conda, a plain download, or only the mods through Claude Code's own `/plugin` command) are in
 [docs/INSTALL.md](docs/INSTALL.md). You need Claude Code 2.1.287 or newer, `git`, and Python 3.9+ (not for the plugin-only route).
@@ -69,14 +80,14 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
 
-## The twenty-two mods
+## The twenty-one mods
 
 | Mod | One line |
 |---|---|
-| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity), a **Side Question** panel (`/btw`), an update check and every mod and skill: green/red switches flip at once, other items fill the prompt box |
+| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity), a **Side Question** panel (`/btw`), an update check, rows for permission mode, backup age and effort fit, and every mod and skill: green/red switches flip at once, other items fill the prompt box |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
-| `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
+| `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it, and flags an effort level that does not fit the task |
 | `branch-janitor` | Notices a finished branch, verifies it is safe to delete, offers to delete it |
 | `review-cost` | Shows the token cost of a Codex review before a push |
 | `reflect` | Offers to save a rule when you correct Claude |
@@ -95,9 +106,9 @@ commit; Codex sends code to OpenAI when you enable it).
 | `checkpoint` | `/checkpoint`: safety snapshots of your working tree; restoring shows what you would lose first |
 | `long-run-ping` | A toast, sound and notification when a long turn or command finishes |
 
-**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
+**Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`, `/btw`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
-Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
+Skills: `dual-model-review` (a second model tries to prove a change wrong), `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric), `align` (interview before a big build, then a spec), `burst` (three graded versions of short writing) and `assess-plugin` (check a plugin before installing it).
 Turn any mod off with `/plugin disable <name>`.
 
 ## Try each item (about a minute each)
@@ -108,7 +119,7 @@ Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git 
 
 | Item | Try this | You should see |
 |---|---|---|
-| **moddeck** | Type `/moddeck` (wide window or desktop app), click the green `suggest` switch, then click `branch-janitor` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent |
+| **moddeck** | Type `/moddeck` (wide window or desktop app), click the green `suggest` switch, then click `branch-janitor`. Then click `▸ Side Question` and ask something, or type `/btw what is REML?` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent; the Side Question panel expands and shows the answer, which is not added to the conversation. `/moddeck update` checks for a newer release |
 | **blast-radius** | Ask Claude: `create a folder build with a file a.txt, then delete the build folder` | Before `rm -rf build`: a box with the risk level, what is in the folder, what git could restore, "Recoverable: yes / partly / no", and **Cancel** as the first answer |
 | **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `/cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
 | **suggest-model** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **suggest-model on** chip above the prompt; `suggest-model off` / `suggest-model on` / `suggest-model explain <text>` |
@@ -129,6 +140,9 @@ Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git 
 |---|---|---|
 | **dual-model-review** | Ask: `I changed the variance component equation in R/vc.R, review the change with a second model` | A read-only review by a different model with a verdict: PASS, FAIL or UNVERIFIABLE |
 | **agents-md-scaffold** | Ask: `set up AGENTS.md for this project` | `AGENTS.md`, a decisions log and a review rubric are created |
+| **align** | Ask: `use the align skill: interview me before we build a data-cleaning pipeline` | Numbered questions with lettered choices, then a `SPEC.md` and a line to start a fresh session |
+| **burst** | Ask: `use the burst skill: three versions of a title for my abstract` | Three differently angled versions, graded, with one recommended |
+| **assess-plugin** | Ask: `use the assess-plugin skill to assess <a plugin repo link>` | What it installs, its per-turn cost, safety, fit and a verdict; nothing is installed |
 
 ### Rules, git guards and settings
 
