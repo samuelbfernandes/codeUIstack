@@ -55,7 +55,6 @@ class UserScope(Base):
         rc, out, err = run_cli(["install", "--standard", "--scope", "user", *SKIP_PLUGINS])
         self.assertEqual(rc, 0, out + err)
         self.assertIn(f"blast-radius@{MP}", self.plugins())
-        self.assertNotIn(f"aside@{MP}", self.plugins())          # costs credit: not in the standard set
 
     def test_all_installs_every_mod_including_the_ones_that_start_off(self):
         rc, out, err = run_cli(["install", "--all", "--scope", "user", *SKIP_PLUGINS])
@@ -348,8 +347,16 @@ if __name__ == "__main__":
 
 
 class NewModDefaults(unittest.TestCase):
-    def test_aside_costs_credit_so_it_starts_off(self):
+    def test_safety_mods_start_on(self):
         by_name = {i.id: i for i in catalog.items(catalog.Detected())}
-        self.assertFalse(by_name["aside"].default)
         self.assertTrue(by_name["secret-guard"].default)
         self.assertTrue(by_name["budget-guard"].default)
+
+
+class ReleaseConstant(unittest.TestCase):
+    def test_moddeck_update_check_knows_this_release(self):
+        import re
+        root = __import__("pathlib").Path(__file__).resolve().parent.parent
+        py = re.search(r'^version = "([^"]+)"', (root / "pyproject.toml").read_text(), re.M).group(1)
+        ts = re.search(r"RELEASE = '([^']+)'", (root / "mods/moddeck/hooks/update.ts").read_text()).group(1)
+        self.assertEqual(ts, py, "mods/moddeck/hooks/update.ts RELEASE must equal the pyproject version (bump both at release)")

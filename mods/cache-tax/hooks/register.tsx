@@ -179,6 +179,20 @@ async function fillPrompt($: Dollar, text: string): Promise<boolean> {
   }
 }
 
+/** Compact, then send `text` again; when the compaction cannot run, leave `/compact` in the prompt box instead. */
+async function compactThenSend($: Dollar, text: string): Promise<void> {
+  let isDone = false
+  try {
+    isDone = (await $.session.compact()).skip === undefined
+  } catch {
+    isDone = false
+  }
+  if (isDone) return void (await $.prompt.submit({ text }))
+  await update($, held, () => null)
+  const isFilled = await fillPrompt($, '/compact')
+  $.ui.toast(isFilled ? 'cache-tax · compaction did not run: press Enter for /compact, then send again' : 'cache-tax · compaction did not run: type /compact, then send again', { timeoutMs: 8000 })
+}
+
 /**
  * `ask` (default): one small dialog, answered in place, so there is no second send. Esc holds the message.
  * `stop`: the older behaviour, a one-line stop and the same text sent again to pay.
@@ -206,8 +220,16 @@ async function guard(cfg: Cfg, $: Dollar, text: string): Promise<{ drop: string 
     return undefined
   }
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
-  if (picked === COMPACT || picked === CLEAR) {
-    const command = COMMAND[picked === COMPACT ? 'compact' : 'clear']
+  if (picked === COMPACT) {
+    // The engine refuses a compaction under a prompt.submit hook, so hold the message, compact on the next tick and
+    // send the same text again (marked as already judged). If the compaction fails, the one-Enter way below applies.
+    await update($, held, () => ({ text }))
+    $.ui.toast('cache-tax · compacting, then sending your message', { timeoutMs: 6000 })
+    $.clock.after(0, () => void quietly(() => compactThenSend($, text)))
+    return dropWith(note => $.ui.log(note), `cache-tax held your prompt · compacting first, it is sent right after\n${text.length > 2000 ? `${text.slice(0, 2000)}...` : text}`)
+  }
+  if (picked === CLEAR) {
+    const command = COMMAND.clear
     const isFilled = await fillPrompt($, command)
     const how = isFilled ? `press Enter to run ${command}` : `type ${command}`
     return dropWith(note => $.ui.log(note), `cache-tax blocked your prompt · ${how}, then send your message again\n${shown}`)

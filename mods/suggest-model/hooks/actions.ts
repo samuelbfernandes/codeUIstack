@@ -20,6 +20,17 @@ export const CODEX_INSTRUCTIONS =
   'Please review the following request. Try to falsify it rather than confirm it. Cite file:line for every finding, ' +
   'and give PASS, FAIL or UNVERIFIABLE for each claim. Do not edit anything.'
 
+/**
+ * The auto-mode classifier sometimes answers an action started by a hook (not by a model request) with "gave no verdict ...
+ * Issue the action again once, as-is". That is a transient refusal: the same action is tried once more, never a third time.
+ */
+export const isNoVerdict = (why: string | undefined): boolean => why !== undefined && /no verdict|issue the action again/i.test(why)
+
+async function retriedOnce<T extends { deny?: string }>(attempt: () => Promise<T>): Promise<T> {
+  const first = await attempt()
+  return isNoVerdict(first.deny) ? await attempt() : first
+}
+
 // ------------------------------------------------------------------- model switch
 
 /**
@@ -60,7 +71,7 @@ export async function switchModel(config: ConfigApi, alias: Alias): Promise<Swit
     if (row.isLocked) return { isSwitched: false, why: 'the model is set by policy' }
     const value = valueFor(row, alias)
     if (value === undefined) return { isSwitched: false, why: `no ${alias} option in /config` }
-    const result = await config.set(row.key, value)
+    const result = await retriedOnce(() => config.set(row.key, value))
     return result.deny === undefined ? { isSwitched: true } : { isSwitched: false, why: result.deny }
   } catch (error) {
     return { isSwitched: false, why: error instanceof Error ? error.message : 'the change was refused' }
@@ -75,7 +86,7 @@ export const manualSwitchHint = (alias: Alias): string =>
 /** Starts the subagent in the background. Never throws: `ok`, or `why` (the engine's own reason, cut short). */
 export async function spawnSubagent(spawn: Spawn, text: string, alias: Alias): Promise<{ ok: true } | { ok: false; why: string }> {
   try {
-    const r = await spawn({ prompt: text, description: describeTask(text), model: alias })
+    const r = await retriedOnce(() => spawn({ prompt: text, description: describeTask(text), model: alias }))
     return r.deny === undefined ? { ok: true } : { ok: false, why: String(r.deny).slice(0, 160) }
   } catch (error) {
     return { ok: false, why: (error instanceof Error ? error.message : 'the call failed').slice(0, 160) }

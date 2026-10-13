@@ -7,7 +7,6 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 
 | Mod | Network | Starts these programs | Writes files | Spends model tokens | Hooks into |
 |---|---|---|---|---|---|
-| aside | no | none | no | yes | command.run, session.end, session.start, ui.render |
 | auto-test | no | npm, python3, sh | no | no | command.run, session.start, tool.call, turn.complete |
 | big-file-guard | no | none | no | no | command.run, session.start, tool.call |
 | blast-radius | no | du, find, git | no | no | command.run, session.start, tool.call |
@@ -19,7 +18,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | diagram | no | none | no | no | command.run, session.end, session.start, turn.complete, ui.render |
 | filetree | no | git | no | no | command.run, session.start, tool.call, ui.render |
 | long-run-ping | no | none | no | no | command.run, prompt.submit, session.start, tool.call, turn.complete |
-| moddeck | no | git | no | no | command.run, session.compact, session.measure, session.start, tool.call, turn.complete, turn.step, ui.render |
+| moddeck | yes | git, pipx, uvx | no | yes | command.run, session.compact, session.measure, session.start, tool.call, turn.complete, turn.step, ui.render |
 | prompt-library | no | none | no | no | command.run, session.start |
 | reflect | no | none | yes | yes | command.run, prompt.submit, session.start, ui.render |
 | replay-theater | no | none | no | no | command.run, prompt.submit, session.end, session.start, tool.call, turn.complete, turn.start, ui.render |
@@ -27,7 +26,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | review-cost | no | git | no | no | command.run, session.start, tool.call, ui.render |
 | savvy-progress | no | none | no | no | agent.spawn, command.run, session.start, tool.call, turn.complete, turn.step, ui.render |
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
-| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start |
+| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start, turn.step |
 | tool-skins | no | none | no | no | command.run, session.start, ui.render |
 
 "Writes files" means the mod can write through Claude Code's file API (reflect does, only when you press Save).

@@ -63,7 +63,7 @@ test('dialog, under-powered: headline "Don\'t use <Current> for this task", the 
   const lines = d.question.split('\n')
   expect(lines[0]).toBe("Don't use Sonnet for this task")
   expect(lines[1]).toBe('Deep task · r1, r2, r3')
-  expect(lines[2]).toBe('Haiku 1x weak · Sonnet 3x weak · Opus 5x best')
+  expect(lines[2]).toBe('Haiku 1x weak · Sonnet 20x weak · Opus 40x best')
   expect(lines[3]).toContain('Opus is the cheapest model that should handle it')
   expect(d.question.split('\n').length).toBeLessThanOrEqual(7) // short: headline, cues, table, advice, one note
   expect(d.order.map(c => d.labels[c])).toEqual([
@@ -80,7 +80,7 @@ test('dialog, over-powered: "<Current> is overkill for this" and the saving', ()
   const lines = d.question.split('\n')
   expect(lines[0]).toBe('Sonnet is overkill for this')
   expect(lines[1]).toBe('Light task · typo or spelling')
-  expect(lines[2]).toBe('Haiku 1x ok · Sonnet 3x ok · Opus 5x best')
+  expect(lines[2]).toBe('Haiku 1x ok · Sonnet 20x ok · Opus 40x best')
   expect(lines[3]).toBe('Haiku would do · ~3x cheaper.')
   expect(d.order[1]).toBe('switch')
   expect(d.labels.switch).toBe('Switch session to Haiku')

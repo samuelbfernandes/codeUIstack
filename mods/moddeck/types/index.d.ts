@@ -1,5 +1,7 @@
 /** One saved prompt, as prompt-library keeps it. */
 export type SavedPrompt = { name: string; text: string }
+/** One side question in the Side Question panel. */
+export type BtwEntry = { id: number; at: number; question: string; status: 'thinking' | 'done' | 'failed'; answer: string; isCut: boolean; tokens: number | null; note: string }
 /** The automatic open of the side bar, once per session. */
 export type AutoOpen = 'new' | 'checking' | 'done'
 /** How the Session box lays its rows out. */
@@ -45,7 +47,7 @@ declare module 'claude-code' {
       autoOpen: AutoOpen
       /** Index of the first row shown in each scrolling list (`skills`, `prompts`). */
       tops: Record<string, number>
-      /** What the person last picked in each dropdown (`skin`, `blast-radius`, `review-cost`), shown at once. */
+      /** What the person last picked in each dropdown (`blast-radius`, `review-cost`), shown at once. */
       picks: Record<string, string>
       /** The Session box's latest figures; null before any. */
       measure: DeckMeasure | null
@@ -61,6 +63,18 @@ declare module 'claude-code' {
       env: DeckEnv | null
       /** Rows shown, a comma list in display order, as `/moddeck rows` set it (also kept in the store as `rows`); null = the settings apply. */
       rows: string | null
+      /** The last few side questions and answers of the Side Question panel, newest first (in memory only). */
+      btw: BtwEntry[]
+      /** A newer release than the installed one, not yet updated to; null = none known. */
+      updateAvail: string | null
+      /** The newest commit or checkpoint (ms); null = none; undefined = not read. */
+      backupAt: number | null | undefined
+      /** The permission mode from the settings. */
+      permMode: string | undefined
+      /** The Side Question panel is expanded. */
+      btwOpen: boolean
+      /** The pane is shown wide (the expand button); false = its usual width. */
+      wide: boolean
       /** The Session box layout as `/moddeck rows compact|expanded` set it (also kept in the store as `layout`); null = the settings apply. */
       layout: DeckLayout | null
     }

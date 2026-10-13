@@ -8,11 +8,6 @@
   },
   "plugins": [
     {
-      "name": "aside",
-      "source": "./mods/aside",
-      "description": "/aside <question> asks a quick side question over your current context and shows the answer in a pane, without adding anything to the conversation."
-    },
-    {
       "name": "auto-test",
       "source": "./mods/auto-test",
       "description": "Runs the project's tests once at the end of a turn in which Claude edited files, and shows a green or red result. Off until you type /auto-test on."
@@ -70,7 +65,7 @@
     {
       "name": "moddeck",
       "source": "./mods/moddeck",
-      "description": "A side bar listing every mod and skill, one boxed row each, topped by a live Session box (model, context, usage pace, cost, cache, git, tokens, activity, environment); the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
+      "description": "A side bar with a live Session box, every mod and skill, a Side Question panel for side questions (/btw) and an update check. The suggest switch is green or red, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
     },
     {
       "name": "prompt-library",

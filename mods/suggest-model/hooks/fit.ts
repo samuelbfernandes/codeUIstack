@@ -11,8 +11,8 @@ export type Rating = 'weak' | 'ok' | 'best'
 export type Costs = Partial<Record<Family, number>>
 
 export const CANDIDATES: readonly Alias[] = ['haiku', 'sonnet', 'opus']
-export const DEFAULT_COSTS_TEXT = 'haiku=1,sonnet=3,opus=5'
-const DEFAULT_COSTS: Costs = { haiku: 1, sonnet: 3, opus: 5 }
+export const DEFAULT_COSTS_TEXT = 'haiku=1,sonnet=20,opus=40'
+const DEFAULT_COSTS: Costs = { haiku: 1, sonnet: 20, opus: 40 }
 
 /** best = the most capable model; ok = predicted good enough; weak = likely to struggle. Review work is rated like deep work. */
 const RATING: Record<Exclude<Tier, 'review'>, Record<Family, Rating>> = {
@@ -30,7 +30,7 @@ export const nameOf = (f: Family): string => f.charAt(0).toUpperCase() + f.slice
 const FAMILIES: readonly Family[] = ['haiku', 'sonnet', 'opus', 'fable']
 
 /**
- * Parses "haiku=1,sonnet=3,opus=5" (fable optional; commas, semicolons or spaces; "3x" is fine).
+ * Parses "haiku=1,sonnet=20,opus=40" (fable optional; commas, semicolons or spaces; "3x" is fine).
  * Bad pieces are ignored, one by one, and reported in `problems`; a missing or bad model keeps its
  * default (fable has none: its cost is simply unknown).
  */
@@ -78,7 +78,7 @@ export function recommend(tier: Tier, costs: Costs): Alias {
   return [...fit].sort((a, b) => costOf(costs, a) - costOf(costs, b) || RANK[a] - RANK[b])[0] ?? 'opus'
 }
 
-/** "~5x cheaper", or '' when it cannot be said (unknown cost, or not actually cheaper). */
+/** "~40x cheaper", or '' when it cannot be said (unknown cost, or not actually cheaper). */
 export function cheaperBy(costs: Costs, from: Family, to: Family): string {
   const a = costOf(costs, from)
   const b = costOf(costs, to)
@@ -125,6 +125,29 @@ export function judge(p: Prediction, current: Family | undefined, minConfidence:
   if (rating === 'weak') return strict ? { kind: 'mismatch', risk: 'under', recommended } : { kind: 'hint', recommended, why: 'borderline' }
   if (!isCheaper) return { kind: 'fits' }
   return strict ? { kind: 'mismatch', risk: 'over', recommended } : { kind: 'hint', recommended, why: 'spare' }
+}
+
+// ------------------------------------------------------------------------- effort
+
+/**
+ * Effort-watch: a short note when the session's effort level does not match the task, or undefined. Advice only, on the status
+ * line, never a dialog. On Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1 changing effort keeps the prompt cache, so /effort is
+ * a cheap move there; on older models it re-reads the conversation once. Anthropic's guidance is medium for most work, high or
+ * xhigh when it matters, and max rarely (it "may show diminishing returns and is prone to overthinking").
+ */
+export function effortNote(tier: Tier, effort: unknown): string | undefined {
+  if (typeof effort !== 'string') return undefined
+  const level = effort.toLowerCase()
+  if (level === 'max' && (tier === 'light' || tier === 'standard')) return 'effort max is more than this needs · /effort medium'
+  if (level === 'xhigh' && tier === 'light') return 'effort xhigh is more than this needs · /effort medium'
+  if (level === 'low' && (tier === 'deep' || tier === 'review')) return 'effort low may be too little for this · /effort high'
+  return undefined
+}
+
+/** The same check as a few words for the moddeck's model row ("medium would do", "try high"), or undefined when the effort fits. */
+export function effortAdvice(tier: Tier, effort: unknown): string | undefined {
+  const note = effortNote(tier, effort)
+  return note === undefined ? undefined : note.includes('/effort high') ? 'try high' : 'medium would do'
 }
 
 // ------------------------------------------------------------------------- status line

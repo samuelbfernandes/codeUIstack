@@ -23,6 +23,8 @@ type World = {
   asks: { question: string; options: string[]; header: string }[]
   answer: string
   filled: string[]
+  compacts: number
+  compactSkip?: string
   state: Map<string, unknown>
 }
 
@@ -46,6 +48,7 @@ function world(on: On, tokens = 150_000): World {
     asks: [],
     answer: 'Send anyway',
     filled: [],
+    compacts: 0,
     state: new Map(),
     tokens,
     forkResult: () => ({ isAnswered: true, text: 'ok', usage: usage(150_000, 0) }),
@@ -73,6 +76,7 @@ function world(on: On, tokens = 150_000): World {
   on('ui.log', (_, e) => (w.logs.push(e.text), { value: undefined }))
   on('ui.toast', (_, e) => (w.toasts.push(e.text), { value: undefined }))
   on('model.fork', () => (w.forks += 1, { value: w.forkResult() as never }))
+  on('session.compact', () => (w.compacts += 1, (w.compactSkip ? { skip: w.compactSkip } : { messages: [{ role: 'user', text: 'summary', toolUses: [] }] }) as never))
   on('prompt.fill', (_, e) => (w.filled.push((e as { text: string }).text), { isFilled: true } as never))
   on('prompt.submit', (_, e) => ({ text: e.text }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
@@ -557,16 +561,33 @@ test('a small context suggests sending, first in the list', async ($, on) => {
   expect(w.asks[0]?.options[0]).toBe('Send anyway (suggested)')
 })
 
-test('picking the suggested Compact first holds the message and puts /compact in the prompt box', async ($, on) => {
+test('Compact first holds the message, compacts, then sends the same text without asking again', async ($, on) => {
   const w = world(on)
   await start($)
   await turn($, 't1')
   await w.clock.advance(61 * MIN)
   w.answer = 'Compact first (suggested)'
   const r = await submit($, 'summarise the repo')
-  expect(r.drop).toBe('cache-tax blocked your prompt · press Enter to run /compact, then send your message again')
+  expect(r.drop).toContain('compacting first')
+  await w.clock.advance(1)
+  await new Promise(r => setTimeout(r, 20))
+  expect(w.compacts).toBe(1)
+  expect(w.asks.length).toBe(1) // the resend passed without a second question
+  expect(w.filled).toEqual([])
+})
+
+test('Compact first falls back to /compact in the prompt box when the compaction is vetoed', async ($, on) => {
+  const w = world(on)
+  w.compactSkip = 'off'
+  await start($)
+  await turn($, 't1')
+  await w.clock.advance(61 * MIN)
+  w.answer = 'Compact first (suggested)'
+  await submit($, 'summarise the repo')
+  await w.clock.advance(1)
+  await new Promise(r => setTimeout(r, 20))
+  expect(w.compacts).toBe(1)
   expect(w.filled).toEqual(['/compact'])
-  expect(w.logs).toEqual(['summarise the repo'])
 })
 
 test('Start fresh puts /clear in the prompt box', async ($, on) => {

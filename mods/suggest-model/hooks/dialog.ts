@@ -16,7 +16,7 @@ export type DialogInput = {
   target?: Alias
   /** Per-model fit and rough relative cost, as shown in the question. */
   table: readonly Row[]
-  /** "~5x cheaper" or ''. */
+  /** "~40x cheaper" or ''. */
   cheaper: string
   contextTokens: number
   canSubagent: boolean
@@ -53,7 +53,7 @@ function available(c: Choice, d: DialogInput): boolean {
 
 const taskWord = (p: Prediction): string => `${TIER_WORD[p.tier].charAt(0)}${TIER_WORD[p.tier].slice(1).toLowerCase()} task`
 
-/** "Haiku 1x weak · Sonnet 3x weak · Opus 5x best": one quiet line instead of a sentence. */
+/** "Haiku 1x weak · Sonnet 20x weak · Opus 40x best": one quiet line instead of a sentence. */
 export function compactTable(rows: readonly Row[]): string {
   return rows.map(r => `${nameOf(r.family)} ${r.cost === undefined ? '' : `${fmtRatio(r.cost)} `}${r.rating}`).join(' · ')
 }

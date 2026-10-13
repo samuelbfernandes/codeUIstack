@@ -9,7 +9,13 @@ import type { AgentRow, TaskItem, TaskStatus, Usage } from '../types'
 // ---------------------------------------------------------------------------
 export type Price = { match: readonly string[]; in: number; out: number; cacheRead: number; cacheWrite: number }
 
+// Checked against the pricing page on 2026-10-12; the specific 5.x rows come first. Haiku 5.5 is the up-to-100K-token price.
 export const PRICES: readonly Price[] = [
+  { match: ['fable', 'mythos'], in: 10, out: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+  { match: ['opus-5-5'], in: 4, out: 20, cacheRead: 0.2, cacheWrite: 5 },
+  { match: ['sonnet-5-5'], in: 2, out: 10, cacheRead: 0.1, cacheWrite: 2.5 },
+  { match: ['sonnet-5'], in: 2, out: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  { match: ['haiku-5-5'], in: 0.1, out: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
   { match: ['opus-4-1', 'opus-4-0', 'opus-4-2025', '3-opus', 'opus-3'], in: 15, out: 75, cacheRead: 1.5, cacheWrite: 18.75 },
   { match: ['opus'], in: 5, out: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   { match: ['sonnet'], in: 3, out: 15, cacheRead: 0.3, cacheWrite: 3.75 },

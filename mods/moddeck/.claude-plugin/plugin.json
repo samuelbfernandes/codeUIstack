@@ -1,7 +1,7 @@
 {
   "name": "moddeck",
-  "version": "0.4.0",
-  "description": "A side bar listing every mod and skill, one boxed row each, topped by a live Session box (model, context, usage pace, cost, cache, git, tokens, activity, environment); the suggest switch is green or red, a skin dropdown, and every other row runs its /command (or puts it in the prompt box when it needs your text).",
+  "version": "0.6.0",
+  "description": "A side bar with a live Session box, every mod and skill, a Side Question panel for side questions (/btw) and an update check. The suggest switch is green or red, and every other row runs its /command (or puts it in the prompt box when it needs your text).",
   "author": {
     "name": "Samuel Fernandes"
   },
@@ -35,7 +35,7 @@
       "type": "string",
       "title": "Session box rows",
       "description": "Comma list of row ids in display order; an id left out is hidden. /moddeck rows hide|show <id> changes and keeps it.",
-      "default": "model,context,usage,cost,cache,git,tokens,activity,environment"
+      "default": "model,mode,context,usage,cost,cache,git,backup,tokens,activity,environment"
     },
     "usageSevenDayAt": {
       "type": "number",
@@ -60,6 +60,20 @@
       "title": "Environment row from (count)",
       "description": "The environment row shows only when its counts add up to at least this many; 0 = always.",
       "default": 0
+    },
+    "updateCheck": {
+      "type": "boolean",
+      "title": "Check for updates",
+      "description": "Every time the side bar is turned on (session start, or opened again), look up the newest release with `git ls-remote --tags` (at most every 6 hours) and, if there is one, ask whether to update. Nothing is installed without your yes. Off: no look-up.",
+      "default": true
+    },
+    "btwMaxChars": {
+      "type": "number",
+      "title": "Longest Side Question answer (characters)",
+      "description": "A longer answer is cut and says so.",
+      "default": 1500,
+      "min": 200,
+      "max": 20000
     }
   }
 }
