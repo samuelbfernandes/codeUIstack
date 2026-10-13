@@ -45,9 +45,9 @@ declare module 'claude-code' {
     moddeck: {
       /** The one automatic open: 'new' until tried, 'checking' until the first drawing says whether it docked, then 'done'. */
       autoOpen: AutoOpen
-      /** Index of the first row shown in each scrolling list (`skills`, `prompts`). */
+      /** Index of the first row shown in each scrolling list (`skills`, `prompts`): moved by the scroll bar and the wheel. */
       tops: Record<string, number>
-      /** What the person last picked in each dropdown (`blast-radius`, `review-cost`), shown at once. */
+      /** What the person last picked in the dropdown (`blast-radius`), and the level its switch goes back to (`blast-radius:last`). */
       picks: Record<string, string>
       /** The Session box's latest figures; null before any. */
       measure: DeckMeasure | null

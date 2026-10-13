@@ -29,30 +29,42 @@ absent and the side bar is exactly the old one. Nothing here sends a prompt or c
 still shows or hides the pane. `expanded` is one row per line; `compact` joins rows with ` │ ` on as few lines as fit.
 
 ## What is in it
-One column at every width: a top bar (title and an expand button that reopens the pane wider, and again narrower), the Session
-card, then **Tools** in grouped cards. Each plugin is one row: icon, name and a short description on the left, its control on
-the right, and its action buttons (blue, `[like this]`, wrapping inside the row) underneath. The descriptions, icons and groups
-are presentation only (`hooks/catalog.ts`); no command or state changed.
-- **Prompt helpers**: **suggest** and **reflect** are switches (a pill: green `on ●`, gray `● off`). A click runs
-  `/<mod> on|off` at once and shows the reply as a toast. suggest's actions (`status`, `explain a prompt`) show while it is on;
-- **Guards**: secret-guard, data-guard, big-file-guard, repro-log (its `write the recipe` and `status` show while on).
-- **Automation**: auto-test (`run the tests now`, `status` while on), long-run-ping.
-- **Model controls**: blast-radius (`off|low|medium|high`) and review-cost
-  (`on|off`) as dropdowns that read the mod's own level.
+Top to bottom, at every width: a top bar (title and an expand button that reopens the pane wider, and again narrower), the
+**Session** box, the **Side Question** panel, the mods in grouped cards, then **Skills** and **Prompts** in cards of their own.
+Every line is one row: text that does not fit the pane is cut with "…", never wrapped onto a second line (a Side Question
+answer is the one thing that wraps).
+
+**One line per mod**: its name first, then its controls, then a short description, always last, which takes the room left.
+Inside a card the lines are parted by thin rules. The descriptions and groups are presentation only (`hooks/catalog.ts`);
+no command or state changed.
+- **A switch is the mod's name**: a pill, green while on and red while off. A click runs `/<mod> on|off` at once and shows
+  the reply as a toast. Its action buttons (blue, `[like this]`) sit right after the name and show while it is on.
+- **Prompt helpers**: suggest (`[status]`, `[explain]`) and `$ reflect`.
+- **Model controls**: blast-radius, whose name is a switch (off, or back to the level it had; medium the first time) with
+  its `off|low|medium|high` dropdown right after the name; review-cost, a plain switch (it has only on and off).
+- **Guards**: secret-guard, data-guard, big-file-guard, repro-log (`[recipe]`, `[status]` while on).
+- **Automation**: auto-test (`[run]`, `[status]` while on), long-run-ping.
 - **Workspace utilities**: checkpoint, branch-janitor, cache-tax, budget-guard, savvy-progress, filetree, replay-theater,
-  diagram. Clicking the name runs the command (`/checkpoint`, `/cache-tax`, `/budget-guard`, ...; the first line of the reply
-  is a toast, the whole reply goes in the transcript). Commands that need your text or change something (`/branch-janitor clean`,
-  `/keepwarm 90m`, `/checkpoint restore `) are put in the prompt box; nothing is sent until you press Enter.
-  budget-guard keeps its old behaviour (a click shows its report); it is not a switch.
-- A card with no readable row is not drawn (a mod that is not installed has no row). **Skills** and **Prompts** are cards too.
-- A `$` marks what spends model tokens (reflect, `/btw`, `/keepwarm`).
+  diagram. Their names are plain (not switches): a click runs the command (`/checkpoint`, `/cache-tax`, ...; the first line
+  of the reply is a toast, the whole reply goes in the transcript). Commands that need your text or change something
+  (`[clean]` for `/branch-janitor clean`, `[$ warm]` for `/keepwarm 90m`, `[restore]` for `/checkpoint restore `) are put in
+  the prompt box; nothing is sent until you press Enter.
+- **Columns**: when the pane is wide enough for every card on a line to keep its names, controls and a few cells of
+  description, the cards share the line, each still its own box (Prompt helpers beside Model controls, Guards beside
+  Automation). The expand button opens the pane 96 columns wide, enough for that; a narrow pane is one column.
+- A card with no readable line is not drawn (a mod that is not installed has no line).
+- **Skills** and **Prompts** (prompt-library's saved prompts): name and description per line; a click puts the text in the
+  prompt box. With more than `skillRows` items the card shows that many and gets a **scroll bar** on its right (the thumb
+  shows where you are): a click on the track moves a page, and the mouse wheel over the list moves it a line (the wheel
+  anywhere else scrolls the pane as usual). The card's title then shows the count (`Skills · 5`).
+- A `$` marks what spends model tokens (reflect, the Side Question, `/keepwarm`).
 
 ## Use
 It opens by itself at session start where the screen can dock it (fullscreen terminal, desktop app), once per session.
 `/moddeck` shows or hides it; `/moddeck rows ...` sets the Session box. Commands are always typed with their `/`; a bare word is an ordinary prompt.
 
 ## Settings
-`autoOpen` (default on), `skillRows` (4), `showSession` (true), `sessionLayout` (`expanded` or `compact`), `sessionRows` (comma list of
+`autoOpen` (default on), `skillRows` (4: lines a Skills or Prompts card shows before its scroll bar), `showSession` (true), `sessionLayout` (`expanded` or `compact`), `sessionRows` (comma list of
 row ids in display order, default `model,context,usage,cost,cache,git,tokens,activity,environment`; ids left out are hidden),
 `usageSevenDayAt` (80), `toolsMaxVisible` (4), `pushWarn` (5), `envThreshold` (0 = always). What `/moddeck rows` saved wins over
 `sessionRows` and `sessionLayout`.
@@ -60,7 +72,8 @@ row ids in display order, default `model,context,usage,cost,cache,git,tokens,act
 ## Limits
 - The pane is a terminal/desktop pane (boxes, text, buttons, dropdowns), not HTML: the switch is a coloured pill button, the
   switch has no `role="switch"` (the pane has no such property; the button carries a label such as `secret-guard switch, on`),
-  and keyboard focus is the engine's own. The expand button's resize is a close and reopen at another width; if there is no
+  and keyboard focus is the engine's own. The scroll bar is drawn with `┃` and `│` cells; the wheel finds the list by
+  counting rows from the bottom of the pane, which holds because every line there is exactly one row. The expand button's resize is a close and reopen at another width; if there is no
   room it puts the pane back.
 - It reads the switches from the mods' own state; if Claude Code refuses that read, the switch
   is not drawn (the other rows still work).
@@ -68,10 +81,11 @@ row ids in display order, default `model,context,usage,cost,cache,git,tokens,act
   observers (they let each event through first and keep their books in `try/catch`), and each failing source drops only its row.
 - The `cost` and `cache` rows need `budget-guard` and `cache-tax` to publish their atoms; without them those parts are not drawn.
 - The session name is not given to mods by the engine, so the environment row does not show one.
-- Never verified live: the pane, the dropdown and filling the prompt box were tested against Claude Code's simulated engine only.
+- Never verified live: the pane, the dropdown, the columns, the scroll bar and the wheel, and filling the prompt box were
+  tested against Claude Code's simulated engine only (it checks the tree, not how a surface paints it).
 
 ## Side Question
-A `▸ Side Question` button at the bottom; clicking it expands the chat panel (`▾`), which shows the last two answers and a field. Enter asks; `/btw <question>` does the same and expands the panel; `/btw` alone expands it. The answer is made over the main thread's cached context with every tool denied, shown only here and never added to the conversation, and costs a little credit (a cold cache costs like a full message). It needs a first reply in the session. If Claude Code's own built-in `/btw` takes priority over a mod's command of that name, use the field instead. Not verified live.
+A `▸ Side Question` line right under the Session box; clicking it expands the chat panel (`▾`), which shows the last two answers and a field. Enter asks; `/btw <question>` does the same and expands the panel; `/btw` alone expands it. The answer is made over the main thread's cached context with every tool denied, shown only here and never added to the conversation, and costs a little credit (a cold cache costs like a full message). It needs a first reply in the session. If Claude Code's own built-in `/btw` takes priority over a mod's command of that name, use the field instead. Not verified live.
 
 ## Updates
 Every time the side bar is turned on (session start, or opened again), moddeck runs `git ls-remote --tags` against its GitHub repository (at most every 6 hours; `updateCheck` turns it off) and, if a newer release exists, asks Update now / Later / Skip this version. Update now runs the installer's own one-liner (`pipx run --spec git+https://github.com/samuelbfernandes/moddeck@vX.Y.Z moddeck update`, else `uvx`); restart Claude Code afterwards. `/moddeck update` checks at once. Nothing is installed without your yes. Not verified live.

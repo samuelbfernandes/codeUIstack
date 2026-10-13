@@ -65,7 +65,7 @@
     {
       "name": "moddeck",
       "source": "./mods/moddeck",
-      "description": "A side bar with a live Session box, every mod and skill, a Side Question panel for side questions (/btw) and an update check. The suggest switch is green or red, and every other row runs its /command (or puts it in the prompt box when it needs your text)."
+      "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check."
     },
     {
       "name": "prompt-library",

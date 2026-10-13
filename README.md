@@ -69,11 +69,11 @@ On by default: You Should Know and hardened settings (plus the Rust and Python d
 Read [docs/SAFETY.md](docs/SAFETY.md): what it touches, what it never does, and the real caveats (global git hooks run on every
 commit; Codex sends code to OpenAI when you enable it).
 
-## The twenty-two mods
+## The twenty-one mods
 
 | Mod | One line |
 |---|---|
-| `moddeck` | A side bar with a live Session box (context, plan usage, cost, cache, git, activity), a **Side Question** panel (`/btw`), an update check and every mod and skill: green/red switches flip at once, other items fill the prompt box |
+| `moddeck` | A side bar with a live Session box (model, context, plan usage, cost, cache, git, backup, tokens, activity, environment), a **Side Question** panel (`/btw`) right under it, every mod in grouped cards (a switch is the mod's name, green on and red off: click it), the skills and saved prompts with a scroll bar, and an update check |
 | `blast-radius` | Asks before risky commands and shows what you would lose |
 | `cache-tax` | Warns once before a message that would re-pay for a cold prompt cache |
 | `suggest-model` | Suggests a cheaper or stronger model when your prompt clearly calls for it |
@@ -97,7 +97,7 @@ commit; Codex sends code to OpenAI when you enable it).
 
 **Commands always start with `/`.** Everything that costs no credit runs by itself, and the rest is a `/command` (`/branch-janitor`, `/suggest-model`, `/cache-tax`, `/agents-info`, `/replay`, `/filetree`, `/budget-guard`, `/secret-guard`, `/diagram`, `/moddeck`, `/data-guard`, `/big-file-guard`, `/repro`, `/auto-test`, `/prompts`, `/checkpoint`, `/long-run-ping`), also one click away in the moddeck side bar. A bare word without the slash is an ordinary prompt. See [docs/TOOLS.md](docs/TOOLS.md).
 
-Skills: `dual-model-review` (a second model tries to prove a change wrong) and `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric).
+Skills: `dual-model-review` (a second model tries to prove a change wrong), `agents-md-scaffold` (sets up `AGENTS.md`, a decisions log, a review rubric), `align` (interviews you before a big build, then writes a spec), `burst` (three independent versions of a text or idea, graded) and `assess-plugin` (what a plugin installs, costs and risks, before you install it).
 Turn any mod off with `/plugin disable <name>`.
 
 ## Try each item (about a minute each)
@@ -108,7 +108,7 @@ Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git 
 
 | Item | Try this | You should see |
 |---|---|---|
-| **moddeck** | Type `/moddeck` (wide window or desktop app), click the green `suggest` switch, then click `branch-janitor` | A side bar; the switch turns red and off at once; `branch-janitor` appears in the prompt box, not sent |
+| **moddeck** | Type `/moddeck` (wide window or desktop app), click the green `suggest` name, then click `[clean]` on the `branch-janitor` line. Drag the pane wider (or click ⤢) | A side bar: Session, then Side Question, then the mod cards. `suggest` turns red (off) at once; `/branch-janitor clean` appears in the prompt box, not sent. Wide, the short-named cards sit side by side; narrow, descriptions end in "…" |
 | **blast-radius** | Ask Claude: `create a folder build with a file a.txt, then delete the build folder` | Before `rm -rf build`: a box with the risk level, what is in the folder, what git could restore, "Recoverable: yes / partly / no", and **Cancel** as the first answer |
 | **cache-tax** | In `/config` set `cacheTtlMinutes` to 1, chat a little, wait two minutes, send anything. Then type `/cache-tax` | A small dialog "Cache went cold · this message ~$X (warm: ~$Y)" with **Send anyway / Hold it**; the word shows hit ratio, last turn and cold-write spend |
 | **suggest-model** | On Sonnet type: `derive the BLUP variance of the genomic breeding value under REML`. On Opus type: `fix the typo in the README title` | A dialog "Don't use Sonnet for this task" or "Opus is overkill for this" with a fit-and-cost table. Also: a green **suggest-model on** chip above the prompt; `suggest-model off` / `suggest-model on` / `suggest-model explain <text>` |
@@ -129,6 +129,9 @@ Open Claude Code in a **scratch git repository** (`mkdir demo && cd demo && git 
 |---|---|---|
 | **dual-model-review** | Ask: `I changed the variance component equation in R/vc.R, review the change with a second model` | A read-only review by a different model with a verdict: PASS, FAIL or UNVERIFIABLE |
 | **agents-md-scaffold** | Ask: `set up AGENTS.md for this project` | `AGENTS.md`, a decisions log and a review rubric are created |
+| **align** | Ask: `align with me before we build a data portal` | A few numbered questions at a time, a five-line plan to confirm, then `SPEC.md` and a paste-ready line for a fresh session |
+| **burst** | Ask: `burst three titles for my paper on genomic prediction` | Three independent versions, each graded against the goal, and one recommended |
+| **assess-plugin** | Ask: `assess the plugin obra/superpowers before I install it` | What it installs, what it costs each turn, whether it is safe and whether you need it; nothing is installed |
 
 ### Rules, git guards and settings
 

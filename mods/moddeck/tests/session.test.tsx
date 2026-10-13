@@ -167,8 +167,9 @@ const start = async ($: Engine, w: ReturnType<typeof world>) => {
 const measure = ($: Engine, usage: { context: unknown; rateLimits: unknown; cost?: unknown }, changed: string[] = ['context', 'rateLimits', 'cost']) =>
   $.session.measure({ context: usage.context, rateLimits: usage.rateLimits, cost: usage.cost, changed } as never)
 const clockText = (ms: number) => `${String(new Date(ms).getHours()).padStart(2, '0')}:${String(new Date(ms).getMinutes()).padStart(2, '0')}`
-/** The props (colour, dim, bold) of the first Text that holds `text`. */
-const colorOf = async (pane: { find: (q: { type: string; text: string }) => Promise<unknown> }, text: string) => JSON.stringify(((await pane.find({ type: 'Text', text })) as { props?: unknown } | undefined)?.props)
+// The props (colour, dim, bold) of the first Text that holds `text`. A line is one Text (cut with "…" when narrow) holding a Text per coloured part: the first part that matches.
+const colorOf = async (pane: { findAll: (q: { type: string; text: string }) => Promise<unknown[]> }, text: string) =>
+  JSON.stringify(((await pane.findAll({ type: 'Text', text })) as { props?: { wrap?: string } }[]).find(t => t.props?.wrap === undefined)?.props)
 
 test('with nothing known the Session box is not drawn and the side bar is the old one', MODS, async ($, on) => {
   const w = world(on, { usageThrows: true, throws: ['session.model'] })
@@ -176,7 +177,7 @@ test('with nothing known the Session box is not drawn and the side bar is the ol
   const pane = await mount($)
   const shown = await texts(pane)
   expect(shown).not.toContain('Session')
-  expect(shown).toContain('Tools')
+  expect(shown).toContain('Workspace utilities')
   expect(shown).toContain('Skills')
   expect(await pane.find({ key: 'row:checkpoint' })).toBeDefined()
 })
@@ -241,8 +242,9 @@ test('every row draws from the data it is given, in order, above the tools', MOD
   expect(shown).toContain('MCP: github')
   expect(shown).toContain('Compactions: 1')
   expect(shown).toContain('3 CLAUDE.md · 2 rules · 2 MCP · 3 hooks · 2 plugins')
-  // order: the Session box sits above Plugins, and its rows keep the setting's order
-  expect(shown.indexOf('Session')).toBeLessThan(shown.indexOf('Tools'))
+  // order: the Session box sits on top, and its rows keep the setting's order
+  expect(shown.indexOf('Session')).toBeLessThan(shown.indexOf('Side Question'))
+  expect(shown.indexOf('Side Question')).toBeLessThan(shown.indexOf('Workspace utilities')) // Side Question sits right under the Session box
   const order = ['claude-opus-4-5', 'Context', '5h ', '$1.23', 'Cache until', 'main*', 'in 1.2k', '✓ Read', '3 CLAUDE.md'].map(t => shown.indexOf(t))
   expect([...order].sort((a, b) => a - b)).toEqual(order)
 })
@@ -503,7 +505,7 @@ test('fail-open: every data source throwing leaves the start, the events and the
   await w.clock.advance(10)
   await w.clock.settle()
   const pane = await mount($)
-  expect(await texts(pane)).toContain('Tools')
+  expect(await texts(pane)).toContain('Workspace utilities')
   expect(await pane.find({ key: 'row:checkpoint' })).toBeDefined()
 })
 

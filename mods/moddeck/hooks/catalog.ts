@@ -1,10 +1,11 @@
-// What the side bar lists: every mod, one boxed row each (options indented under the row that owns them), then a
-// divider, then the skills. Commands are always written with their "/": the slash is required everywhere now.
+// What the side bar lists: every mod, one line each inside its group's card (name, then its controls, then a short
+// description), then the skills. Commands are always written with their "/": the slash is required everywhere now.
 //
-//  - a switch row (`suggest`, `reflect`, `secret-guard`: the ones that work by themselves) is green when on and red when off;
-//    a click flips it, and its options (only `suggest` has any) show only while it is on;
-//  - any other row runs its command at once (`run`), or puts it in the prompt box when it needs your text or changes something;
-//  - a tool with a single task has just the row: no indented button repeats it.
+//  - a switch (the mods that work by themselves) is its name, green when on and red when off; a click flips it, and its
+//    actions show only while it is on;
+//  - blast-radius is a switch too (off, or back to its last level) with a dropdown of levels right after the name;
+//  - any other name runs its command at once (`run`), or puts it in the prompt box when it needs your text or changes
+//    something; a tool with a single task has just its name: no button repeats it.
 
 /** A command line as typed, with its slash: `/reflect status`. A text ending in a space waits for the person to finish it. */
 export type Action = { text: string; run: boolean }
@@ -12,7 +13,8 @@ export type Action = { text: string; run: boolean }
 export type Option = { label: string; costs?: boolean } & Action
 
 export type Group = 'Prompt helpers' | 'Guards' | 'Automation' | 'Model controls' | 'Workspace utilities'
-export const GROUPS: Group[] = ['Prompt helpers', 'Guards', 'Automation', 'Model controls', 'Workspace utilities']
+/** In drawing order: the cards with short names come first, so a wide pane can set them side by side. */
+export const GROUPS: Group[] = ['Prompt helpers', 'Model controls', 'Guards', 'Automation', 'Workspace utilities']
 
 export type Tool = {
   id: string
@@ -28,11 +30,11 @@ export type Tool = {
   isSwitch?: boolean
   /** What a click does (rows that are not switches). */
   click?: Action
-  /** A dropdown of levels, one of them `off`: green while on, red while off. The pick runs `/<command> <level>` at once. */
+  /** A dropdown of levels, one of them `off`: the name is green while on, red while off. The pick runs `/<command> <level>` at once. */
   levels?: string[]
   /** A row with nothing to type says when it appears instead. */
   note?: string
-  /** Under the row: only while a switch is on, always for the others. */
+  /** Buttons right after the name (keep the labels short: the description gets what is left): only while a switch is on, always for the others. */
   options?: Option[]
 }
 
@@ -47,7 +49,7 @@ export const TOOLS: Tool[] = [
     command: 'suggest-model',
     options: [
       { label: 'status', text: '/suggest-model', run: true },
-      { label: 'explain a prompt', text: '/suggest-model explain ', run: false },
+      { label: 'explain', text: '/suggest-model explain ', run: false },
     ],
   },
   {
@@ -73,7 +75,7 @@ export const TOOLS: Tool[] = [
     isSwitch: true,
     command: 'repro',
     options: [
-      { label: 'write the recipe', text: '/repro', run: true },
+      { label: 'recipe', text: '/repro', run: true },
       { label: 'status', text: '/repro status', run: true },
     ],
   },
@@ -86,13 +88,13 @@ export const TOOLS: Tool[] = [
     isSwitch: true,
     command: 'auto-test',
     options: [
-      { label: 'run the tests now', text: '/auto-test run', run: true },
+      { label: 'run', text: '/auto-test run', run: true },
       { label: 'status', text: '/auto-test status', run: true },
     ],
   },
   { id: 'long-run-ping', label: 'long-run-ping', group: 'Automation', icon: '◷', desc: 'Pings when a long run ends', isSwitch: true, command: 'long-run-ping' },
   { id: 'blast-radius', label: 'blast-radius', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
-  { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', command: 'review-cost', levels: ['off', 'on'] },
+  { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', isSwitch: true, command: 'review-cost' },
   {
     id: 'checkpoint',
     label: 'checkpoint',
@@ -125,8 +127,8 @@ export const TOOLS: Tool[] = [
     desc: 'Warns before a cold cache is re-written',
     click: { text: '/cache-tax', run: true },
     options: [
-      { label: 'keep the cache warm', costs: true, text: '/keepwarm 90m', run: false },
-      { label: 'stop keeping it warm', text: '/keepwarm off', run: false },
+      { label: 'warm', costs: true, text: '/keepwarm 90m', run: false },
+      { label: 'cool', text: '/keepwarm off', run: false },
     ],
   },
   { id: 'budget-guard', label: 'budget-guard', group: 'Workspace utilities', icon: '▥', desc: 'Usage line and limits', click: { text: '/budget-guard', run: true } },
@@ -136,14 +138,14 @@ export const TOOLS: Tool[] = [
   { id: 'diagram', label: 'diagram', group: 'Workspace utilities', icon: '◇', desc: 'Draws the last mermaid diagram', click: { text: '/diagram', run: true } },
 ]
 
-export type Skill = { id: string; label: string; text: string }
+export type Skill = { id: string; label: string; desc: string; text: string }
 
 export const SKILLS: Skill[] = [
-  { id: 'dual-model-review', label: 'dual-model-review', text: 'Use the dual-model-review skill to review my last change' },
-  { id: 'agents-md-scaffold', label: 'agents-md-scaffold', text: 'Use the agents-md-scaffold skill to set up AGENTS.md for this repo' },
-  { id: 'align', label: 'align', text: 'Use the align skill: interview me before we build ' },
-  { id: 'burst', label: 'burst', text: 'Use the burst skill: three versions of ' },
-  { id: 'assess-plugin', label: 'assess-plugin', text: 'Use the assess-plugin skill to assess ' },
+  { id: 'dual-model-review', label: 'dual-model-review', desc: 'A second model tries to prove a change wrong', text: 'Use the dual-model-review skill to review my last change' },
+  { id: 'agents-md-scaffold', label: 'agents-md-scaffold', desc: 'Sets up AGENTS.md, a decisions log, a rubric', text: 'Use the agents-md-scaffold skill to set up AGENTS.md for this repo' },
+  { id: 'align', label: 'align', desc: 'Interviews you, writes a spec, hands off', text: 'Use the align skill: interview me before we build ' },
+  { id: 'burst', label: 'burst', desc: 'Three graded versions of a text or idea', text: 'Use the burst skill: three versions of ' },
+  { id: 'assess-plugin', label: 'assess-plugin', desc: 'Checks a plugin before you install it', text: 'Use the assess-plugin skill to assess ' },
 ]
 
 export const priced = (label: string, costs: boolean | undefined): string => (costs ? `$ ${label}` : label)
