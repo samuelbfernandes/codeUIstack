@@ -34,7 +34,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | scope-watch | no | none | no | no | command.run, session.start, tool.call |
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
 | staged-review | no | git | no | no | command.run, session.start, ui.render |
-| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.start, turn.step |
+| suggest-model | no | codex | no | yes | command.run, prompt.submit, session.end, session.start, turn.complete, turn.step |
 | test-ledger | no | none | no | no | command.run, session.start, tool.call, ui.render |
 | tool-skins | no | none | no | no | command.run, session.start, ui.render |
 | ui-preview | yes | Rscript, shiny, streamlit | yes | no | command.run, session.end, session.start, ui.render |

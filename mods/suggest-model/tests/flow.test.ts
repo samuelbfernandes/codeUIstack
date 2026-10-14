@@ -244,6 +244,15 @@ test('no cheaper offer is made when already on haiku, and no stronger one on opu
   expect(w.asks).toEqual([])
 })
 
+test('an overkill task in a big warm session that cannot go to a subagent is not asked about: no switch, sent as typed', async ($, on) => {
+  const w = world(on, { tokens: 456_000, model: 'claude-opus-4-5' } as never)
+  on('turn.complete', () => ({ text: '' }))
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't0', reason: 'answer' } as never)
+  const r = await submit($, 'rename that variable we discussed above to count')
+  expect(w.asks.length).toBe(0)
+  expect((r as { drop?: string }).drop).toBeUndefined()
+})
+
 test('a prompt that leans on the conversation gets no subagent option', async ($, on) => {
   const w = world(on)
   await submit($, 'derive the BLUP variance of this, as we discussed above')
@@ -251,11 +260,13 @@ test('a prompt that leans on the conversation gets no subagent option', async ($
   expect(w.asks[0]!.options[1]).toBe('Switch session to Opus')
 })
 
-test('a big context warns about the uncached re-read and offers the subagent first', async ($, on) => {
+test('a big context with a warm cache says a switch re-caches it and offers the subagent first', async ($, on) => {
   const w = world(on, { tokens: 85_000 })
+  on('turn.complete', () => ({ text: '' }))
+  await $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId: 't0', reason: 'answer' } as never) // a response just now: the cache is warm
   await submit($, DEEP)
   const ask = w.asks[0]!
-  expect(ask.question).toContain('re-reads ~85k tokens uncached')
+  expect(ask.question).toContain('re-caches ~85k tokens on Opus')
   expect(ask.options.slice(0, 3)).toEqual(['Keep Sonnet', 'Run this task as a subagent on Opus', 'Switch session to Opus'])
 })
 

@@ -19,6 +19,8 @@ export type DialogInput = {
   /** "~40x cheaper" or ''. */
   cheaper: string
   contextTokens: number
+  /** The current model's prompt cache is probably still warm: a switch would throw it away and re-cache the context. */
+  isCacheWarm: boolean
   canSubagent: boolean
   /** Codex is offered (review work and `codex --version` worked). */
   hasCodex: boolean
@@ -39,10 +41,16 @@ export function buildDialog(d: DialogInput): Dialog {
   }
   const isBig = d.contextTokens > BIG_CONTEXT_TOKENS
   const isReview = d.prediction.tier === 'review'
+  // Mid-session, a switch re-caches the whole conversation on the new model (and again on the way back), which costs more
+  // than a cheaper model saves on a task or two. So for an overkill task with a warm cache and a big context the move is
+  // a subagent (a fresh, small context) or nothing; a switch is offered when the cache is cold or the context small.
+  const isCostlySwitch = isBig && d.isCacheWarm
+  const noSwitch = isCostlySwitch && d.risk === 'over'
   // The ask dialog takes at most 4 options, so a review trades the subagent for Codex.
-  const move: Choice[] = d.target === undefined ? ['codex'] : isReview ? ['switch', 'codex'] : isBig && d.canSubagent ? ['subagent', 'switch'] : ['switch', 'subagent']
+  const move: Choice[] =
+    d.target === undefined ? ['codex'] : isReview ? (noSwitch ? ['codex'] : ['switch', 'codex']) : noSwitch ? ['subagent'] : isBig && d.canSubagent ? ['subagent', 'switch'] : ['switch', 'subagent']
   const order = ['keep' as const, ...move.filter(c => available(c, d)), 'mute' as const]
-  return { question: questionText(d, isBig), labels, order }
+  return { question: questionText(d, isBig, noSwitch), labels, order }
 }
 
 function available(c: Choice, d: DialogInput): boolean {
@@ -58,7 +66,7 @@ export function compactTable(rows: readonly Row[]): string {
   return rows.map(r => `${nameOf(r.family)} ${r.cost === undefined ? '' : `${fmtRatio(r.cost)} `}${r.rating}`).join(' · ')
 }
 
-function questionText(d: DialogInput, isBig: boolean): string {
+function questionText(d: DialogInput, isBig: boolean, noSwitch: boolean): string {
   const { prediction: p, current } = d
   const me = nameOf(current)
   if (d.risk === 'self' || d.target === undefined) return selfReviewText(d, me)
@@ -73,7 +81,9 @@ function questionText(d: DialogInput, isBig: boolean): string {
       : `${target} would do${d.cheaper ? ` · ${d.cheaper}` : ''}.`,
   ]
   const notes: string[] = []
-  if (isBig) notes.push(`Switching re-reads ~${fmtTokens(d.contextTokens)} tokens uncached; a subagent starts fresh.`)
+  if (noSwitch) notes.push(`Not switching: the session would re-cache ~${fmtTokens(d.contextTokens)} tokens on ${target}, more than this task saves. A subagent starts fresh. Switch at a natural break (after /clear, or once the cache has gone cold).`)
+  else if (isBig && d.isCacheWarm) notes.push(`Switching re-caches ~${fmtTokens(d.contextTokens)} tokens on ${target} (and again on the way back); a subagent starts fresh.`)
+  else if (isBig) notes.push(`The cache has gone cold, so switching now costs little extra; a subagent starts fresh.`)
   else if (d.canSubagent && p.tier !== 'review') notes.push('A subagent has no memory of this chat.')
   if (d.hasCodex) notes.push('Codex reviews read-only and uses Codex credit.')
   return [...lines, ...(notes.length > 0 ? ['', ...notes] : [])].join('\n')
@@ -88,6 +98,9 @@ function selfReviewText(d: DialogInput, me: string): string {
     'Read-only · uses Codex credit.',
   ].join('\n')
 }
+
+/** True when the dialog offers nothing but keeping the model: not worth asking. */
+export const isKeepOnly = (dialog: Dialog): boolean => dialog.order.every(c => c === 'keep' || c === 'mute')
 
 /** Maps the exact label the person chose back to a choice; anything else (free text under Other) is undefined. */
 export function choiceOf(dialog: Dialog, answer: string): Choice | undefined {

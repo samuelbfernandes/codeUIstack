@@ -1,7 +1,7 @@
 import { test, expect } from 'claude-code/testing'
 
 import { findModelRow, valueFor } from '../hooks/actions'
-import { buildDialog, choiceOf } from '../hooks/dialog'
+import { buildDialog, choiceOf, isKeepOnly } from '../hooks/dialog'
 import {
   canRunAlone,
   describeTask,
@@ -54,7 +54,7 @@ test('small display helpers', () => {
 // ------------------------------------------------------------------ the dialog text
 
 const table = ratingTable('deep', 'sonnet', parseCosts(undefined).costs)
-const base = { current: 'sonnet' as const, contextTokens: 0, canSubagent: true, hasCodex: false, table, cheaper: '' }
+const base = { current: 'sonnet' as const, contextTokens: 0, isCacheWarm: false, canSubagent: true, hasCodex: false, table, cheaper: '' }
 const UNDER = { ...base, risk: 'under' as const, target: 'opus' as const }
 const OVER = { ...base, risk: 'over' as const, target: 'haiku' as const, cheaper: '~3x cheaper', table: ratingTable('light', 'sonnet', parseCosts(undefined).costs) }
 
@@ -86,10 +86,25 @@ test('dialog, over-powered: "<Current> is overkill for this" and the saving', ()
   expect(d.labels.switch).toBe('Switch session to Haiku')
 })
 
-test('dialog: a big context puts the subagent first and warns about the uncached re-read', () => {
-  const d = buildDialog({ ...UNDER, contextTokens: 61_000, prediction: P('deep', 0.9) })
+test('dialog: a big warm context puts the subagent first and says a switch re-caches it', () => {
+  const d = buildDialog({ ...UNDER, contextTokens: 61_000, isCacheWarm: true, prediction: P('deep', 0.9) })
   expect(d.order.slice(0, 3)).toEqual(['keep', 'subagent', 'switch'])
-  expect(d.question).toContain('re-reads ~61k tokens uncached')
+  expect(d.question).toContain('re-caches ~61k tokens on Opus')
+})
+
+test('dialog: an overkill task in a big warm session is never offered a switch, only a subagent', () => {
+  const d = buildDialog({ ...OVER, contextTokens: 456_000, isCacheWarm: true, prediction: predict('fix typo in README') })
+  expect(d.order).toEqual(['keep', 'subagent', 'mute'])
+  expect(d.question).toContain('Not switching: the session would re-cache ~456k tokens on Haiku')
+  expect(isKeepOnly(d)).toBe(false)
+  const alone = buildDialog({ ...OVER, contextTokens: 456_000, isCacheWarm: true, canSubagent: false, prediction: predict('fix typo in README') })
+  expect(isKeepOnly(alone)).toBe(true) // nothing worth asking: the prompt goes on as typed
+})
+
+test('dialog: an overkill task after the cache went cold may switch: there is nothing left to lose', () => {
+  const d = buildDialog({ ...OVER, contextTokens: 456_000, isCacheWarm: false, prediction: predict('fix typo in README') })
+  expect(d.order).toContain('switch')
+  expect(d.question).toContain('The cache has gone cold')
 })
 
 test('dialog: a small context says nothing about re-reading', () => {

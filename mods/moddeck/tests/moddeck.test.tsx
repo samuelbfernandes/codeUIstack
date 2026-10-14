@@ -48,6 +48,16 @@ const MODS = {
       },
     },
     {
+      name: 'cache-tax',
+      register(on: On) {
+        on('command.run', { command: 'keepwarm' }, async ($, e) => {
+          const run = e.args === 'off' ? null : { startedAt: 0, until: 1, intervalMs: 1, pings: 0, usd: 0, failures: 0, lastCacheRead: null, lastWasCold: false }
+          await $.state.set({ plugin: 'cache-tax', key: 'keepwarm' } as never, run as never)
+          return { text: e.args === 'off' ? 'Keep-warm stopped' : 'Keep-warm on for 6h' }
+        })
+      },
+    },
+    {
       name: 'long-run-ping',
       register(on: On) {
         on('command.run', { command: 'long-run-ping' }, async ($, e) => {
@@ -196,9 +206,8 @@ for (const surface of SURFACES) {
     const pane = await mount($, surface)
     await pane.press({ key: 'option:checkpoint:/checkpoint restore ' })
     await pane.press({ key: 'option:branch-janitor:/branch-janitor clean' })
-    await pane.press({ key: 'option:cache-tax:/keepwarm 90m' })
     await pane.press({ key: 'skill:dual-model-review' })
-    expect(w.filled).toEqual(['/checkpoint restore ', '/branch-janitor clean', '/keepwarm 90m', 'Use the dual-model-review skill to review my last change'])
+    expect(w.filled).toEqual(['/checkpoint restore ', '/branch-janitor clean', 'Use the dual-model-review skill to review my last change'])
   })
 }
 
@@ -217,6 +226,7 @@ test('every tool is one row inside its group card, rules separate rows, and ther
   await run($, 'blast-radius', 'medium')
   await run($, 'review-cost', 'on')
   for (const c of ['data-guard', 'big-file-guard', 'repro', 'auto-test', 'long-run-ping']) await run($, c, 'on')
+  await run($, 'keepwarm', 'on')
   const pane = await mount($, 'desktop')
   for (const id of ['suggest', 'reflect', 'secret-guard', 'data-guard', 'big-file-guard', 'repro-log', 'auto-test', 'long-run-ping', 'checkpoint', 'blast-radius', 'review-cost', 'branch-janitor', 'cache-tax', 'budget-guard', 'savvy-progress', 'filetree', 'replay-theater', 'diagram']) {
     expect(await pane.find({ key: `row:${id}` })).toBeDefined()
@@ -225,7 +235,7 @@ test('every tool is one row inside its group card, rules separate rows, and ther
   expect(shown).toContain('Skills')
   expect(shown).not.toContain('Options')
   // two-or-more options sit under their own row; one-task tools have none
-  expect(await pane.find({ key: 'option:cache-tax:/keepwarm off' })).toBeDefined()
+  expect(await pane.find({ key: 'option:cache-tax:/cache-tax' })).toBeDefined() // the report, shown while keep-warm is on
   expect(await pane.find({ key: 'option:checkpoint:/checkpoint' })).toBeUndefined()
 })
 
@@ -350,7 +360,7 @@ test('▾ folds a card down to its title (with its count), ▸ opens it again, a
   expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
   await pane.press({ key: 'fold:group:Workspace utilities' })
   expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeUndefined() // the box is gone
-  expect(await texts(pane)).toContain('Workspace utilities · 11')
+  expect(await texts(pane)).toContain('Workspace utilities · 10')
   expect(JSON.stringify(await pane.find({ key: 'fold:group:Workspace utilities' }))).toContain('▸')
   expect(store.get('folded')).toEqual(['group:Workspace utilities'])
   await pane.press({ key: 'fold:group:Guards' })
@@ -389,6 +399,17 @@ test('advisor kept off by DISABLE_TELEMETRY: picking a model explains why and of
   expect(asked[0]).toContain('DISABLE_TELEMETRY=1')
   expect(w.filled.at(-1)).toContain('Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json')
   expect(w.filled).not.toContain('/advisor opus') // nothing to run until the variable is gone
+})
+
+test('cache-tax is a switch: green while keep-warm runs, red when off; a click runs /keepwarm on or off', MODS, async ($, on) => {
+  world(on)
+  await run($, 'keepwarm', 'off')
+  const pane = await mount($, 'desktop')
+  expect(await switchOf(pane, 'desktop', 'cache-tax')).toContain(OFF('desktop'))
+  await pane.press({ key: 'switch:cache-tax' })
+  expect(await switchOf(pane, 'desktop', 'cache-tax')).toContain(ON('desktop'))
+  await pane.press({ key: 'switch:cache-tax' })
+  expect(await switchOf(pane, 'desktop', 'cache-tax')).toContain(OFF('desktop'))
 })
 
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {

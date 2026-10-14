@@ -20,7 +20,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Run } from './actions'
 import { codexContext, manualSwitchHint, probeCodex, runCodex, spawnSubagent, switchModel } from './actions'
-import { buildDialog, choiceOf, compactTable } from './dialog'
+import { buildDialog, choiceOf, compactTable, isKeepOnly } from './dialog'
 import { dropWith } from './reply'
 import type { Choice } from './dialog'
 import { cheaperBy, effortAdvice, effortNote, judge, nameOf, parseCosts, ratingTable, recommend, statusText } from './fit'
@@ -227,6 +227,17 @@ async function hasCodex($: Dollar): Promise<boolean> {
   return ok
 }
 
+/** When the main conversation last got a response: its cache lives a TTL from there. undefined = none yet (nothing to lose). */
+let lastResponseAt: number | undefined
+
+/** The cache is probably warm: a response inside the TTL (60 min on a subscription, 5 otherwise, as Claude Code defaults). */
+async function isCacheWarm($: Dollar, windows: readonly { kind: string }[]): Promise<boolean> {
+  if (lastResponseAt === undefined) return false
+  const ttlMs = (windows.some(w => w.kind === 'five_hour' || w.kind === 'seven_day') ? 60 : 5) * 60_000
+  const now = await $.clock.now().catch(() => Date.now())
+  return now - lastResponseAt < ttlMs
+}
+
 async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, current: Family): Promise<Outcome> {
   const usage = await quietly(() => $.session.usage())
   const dialog = buildDialog({
@@ -237,10 +248,16 @@ async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, c
     table: ratingTable(p.tier, current, cfg.costs),
     cheaper: m.kind === 'review' ? '' : cheaperBy(cfg.costs, current, m.recommended),
     contextTokens: usage?.context.tokens ?? 0,
+    isCacheWarm: await isCacheWarm($, usage?.rateLimits ?? []),
     canSubagent: canRunAlone(text),
     hasCodex: p.tier === 'review' && (await hasCodex($)),
   })
 
+  if (isKeepOnly(dialog)) {
+    // The only real move would be a switch, and mid-session it costs more than it saves: no question, the prompt goes as typed.
+    await setOutcome($, 'kept the model: a switch would re-cache the conversation')
+    return PASS
+  }
   let answer: string
   try {
     answer = await $.ui.ask(dialog.question, { options: dialog.order.map(c => dialog.labels[c]), header: 'Model choice' })
@@ -371,6 +388,18 @@ async function runCommand($: Dollar, args: string, cfg: Cfg): Promise<string> {
 
 export const register: Register = (on, options) => {
   const cfg = readConfig(options)
+
+  // The main conversation's last response: its cache is warm for a TTL from here (subagents keep caches of their own).
+  // /clear starts an empty conversation: nothing cached to lose.
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') lastResponseAt = undefined
+    return next(e)
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    if (e.agentId === undefined) lastResponseAt = await $.clock.now().catch(() => Date.now())
+    return next(e)
+  })
 
   on('session.start', async ($, e, next) => {
     await quietly(async () => {

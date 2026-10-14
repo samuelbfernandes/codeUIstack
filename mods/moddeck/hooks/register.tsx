@@ -171,6 +171,7 @@ const themePick = atom({ plugin: 'moddeck', key: 'theme' } as const, null as The
 
 const LEDGER = { plugin: 'budget-guard', key: 'ledger' } as const
 const CACHE = { plugin: 'cache-tax', key: 'cache' } as const
+const KEEPWARM = { plugin: 'cache-tax', key: 'keepwarm' } as const
 
 const HELP = [
   'Moddeck · /moddeck shows or hides the side bar',
@@ -1064,6 +1065,8 @@ export const register: Register = (on, options) => {
       'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
       'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
       concise: flag(await valueOf($.state.get(CONCISE_OFF as never)), true),
+      // cache-tax's switch is keep-warm: on while /keepwarm runs (its state holds the run), off when it is null.
+      'cache-tax': await (async () => { const kw = await valueOf($.state.get(KEEPWARM as never)); return kw === undefined ? undefined : kw !== null })(),
     }
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)
