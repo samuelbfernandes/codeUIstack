@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { SKILLS, allSkills, listRowsOf, listSize, starFirst, toggleStar } from '../hooks/catalog'
+import { SKILLS, allSkills, listRowsOf, listSize, rankTools, starFirst, toggleStar } from '../hooks/catalog'
 
 test('allSkills keeps the toolkit skills first, then every other installed skill by name, once', () => {
   const list = allSkills([{ name: 'zeta', desc: 'Z  line' }, { name: 'burst' }, { name: 'plug:align' }, { name: 'alpha' }, { name: 'zeta' }, { name: ' ' }])
@@ -33,4 +33,12 @@ test('listSize fits every star, shows at least five, and never more than the lis
   expect(listSize(0, 8, 10)).toBe(8)
   expect(listSize(0, 5, 3)).toBe(3)
   expect(listSize(9, 5, 6)).toBe(6)
+})
+
+test('rankTools: starred first, then switches that are on, catalogue order kept inside each band', () => {
+  const items = ['a', 'b', 'c', 'd', 'e']
+  const star = new Set(['d', 'e'])
+  const on = new Set(['b', 'e'])
+  expect(rankTools(items, i => star.has(i), i => on.has(i))).toEqual(['e', 'd', 'b', 'a', 'c'])
+  expect(rankTools(items, () => false, () => false)).toEqual(items)
 })

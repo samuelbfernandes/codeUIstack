@@ -73,6 +73,8 @@ declare module 'claude-code' {
       permMode: string | undefined
       /** The Side Question panel is expanded. */
       btwOpen: boolean
+      /** The text in the Side Question's Ask here field, emptied after asking and by ✕ close. */
+      btwDraft: string
       /** Lines each list shows (`skills`, `prompts`), as its more/fewer buttons set it (also kept in the store); null = not loaded. */
       listRows: Record<string, number> | null
       /** Starred skill ids, drawn at the top of the Skills box (also kept in the store); null = not loaded. */
