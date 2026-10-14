@@ -99,6 +99,8 @@ def normalize(selected: set[str], det: catalog.Detected, root: Path | None = Non
             if dep in sel:
                 sel.discard(dep)
                 notes.append(f"'{dep}' needs the git guards and was dropped")
+    if "telemetry-off" in sel:
+        notes.append("telemetry-off also keeps /advisor off. Picking the advisor in moddeck asks first, then turns telemetry back on for you")
     return sel, notes
 
 

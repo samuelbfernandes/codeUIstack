@@ -409,6 +409,16 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class AdvisorNote(unittest.TestCase):
+    def test_telemetry_off_says_the_advisor_is_kept_off(self):
+        _, notes = installer.normalize({"telemetry-off"}, catalog.Detected())
+        self.assertTrue(any("keeps /advisor off" in n for n in notes), notes)
+
+    def test_no_note_without_telemetry_off(self):
+        _, notes = installer.normalize({"sandbox"}, catalog.Detected())
+        self.assertFalse(any("/advisor" in n for n in notes), notes)
+
+
 class NewModDefaults(unittest.TestCase):
     def test_safety_mods_start_on(self):
         by_name = {i.id: i for i in catalog.items(catalog.Detected())}
