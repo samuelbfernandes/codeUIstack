@@ -3,6 +3,7 @@ import { bestMove } from '../hooks/suggest'
 import type { On } from 'claude-code'
 
 import { dropWith } from '../hooks/reply'
+import { accountOf, decideTtl } from '../hooks/ttl'
 import { cacheClockLine, expiryAt, fmtClock, fmtExpiry, hitRate } from '../hooks/lib'
 
 const MIN = 60_000
@@ -26,6 +27,7 @@ type World = {
   compacts: number
   compactSkip?: string
   state: Map<string, unknown>
+  rateLimits: { kind: string; percentUsed: number; resetsAt: string }[]
 }
 
 const usage = (read: number, creation: number) => ({
@@ -50,6 +52,7 @@ function world(on: On, tokens = 150_000): World {
     filled: [],
     compacts: 0,
     state: new Map(),
+    rateLimits: [{ kind: 'five_hour', percentUsed: 20, resetsAt: '2030-01-01T00:00:00Z' }], // a subscription: the 1-hour cache
     tokens,
     forkResult: () => ({ isAnswered: true, text: 'ok', usage: usage(150_000, 0) }),
   }
@@ -63,7 +66,7 @@ function world(on: On, tokens = 150_000): World {
     return { value: 'claude-opus-4-5' }
   })
   on('session.usage', () => ({
-    value: { startedAt: 0, rateLimits: [], context: { window: 200_000, tokens: w.tokens || undefined } },
+    value: { startedAt: 0, rateLimits: w.rateLimits as never, context: { window: 200_000, tokens: w.tokens || undefined } },
   }))
   on('tool.call', { tool: 'AskUserQuestion' }, (_, e) => {
     const q = e.questions[0]!
@@ -233,6 +236,19 @@ test('/keepwarm pings through the idle hours, then stops itself with a toast', a
   expect(w.forks).toBe(forks)
 })
 
+test('any request that reads the cache refreshes it, so keep-warm waits a full interval from the last one', async ($, on) => {
+  const w = world(on)
+  await start($)
+  await turn($, 't1', 0, 150_000)
+  await slash($, 'keepwarm', '6h')
+  await w.clock.advance(30 * MIN)
+  await turn($, 't2', 0, 150_000) // reads the cache: a refresh at no extra charge
+  await w.clock.advance(30 * MIN) // 60 min after t1, 30 after t2
+  expect(w.forks).toBe(0) // no paid ping: still warm until minute 90
+  await w.clock.advance(25 * MIN) // 55 min after the refresh
+  expect(w.forks).toBe(1)
+})
+
 test('/keepwarm off stops the pings', async ($, on) => {
   const w = world(on)
   await start($)
@@ -324,7 +340,7 @@ test('/cache-tax leads with a headline, then a few plain lines', async ($, on) =
       'Context  ~150k tokens · last turn 15 (5 out)',
       'Keep-warm  off  (/keepwarm 90m to start)',
       'Cold writes this session  0 · ~$0.00',
-      'Estimates · Opus · 60 min cache',
+      'Estimates · Opus · 60 min cache (subscription)',
     ].join('\n'),
   )
 
@@ -664,7 +680,7 @@ test('/cache-tax shows "Cache until HH:MM" and the hit rate once cache tokens we
   const lines = (await slash($, 'cache-tax')).split('\n')
   const at = fmtClock(readCache(w).expiresAt!, true)
   expect(lines.length).toBeLessThanOrEqual(6)
-  expect(lines.at(-1)).toBe(`Estimates · Opus · 60 min cache · Cache until ${at} · hit 100%`)
+  expect(lines.at(-1)).toBe(`Estimates · Opus · 60 min cache (subscription) · Cache until ${at} · hit 100%`)
 })
 
 test('showCacheClock off and hourCycle24 off', { options: { showCacheClock: false } }, async ($, on) => {
@@ -729,4 +745,28 @@ test('a held multi-line prompt is echoed one transcript line per line, indentati
   await submit($, 'fix this:\n\ndef f():\n    return 1\n')
   expect(w.logs).toEqual(['fix this:', 'def f():', '    return 1'])
   expect(w.logs.every(l => !/[\r\n]/.test(l))).toBe(true)
+})
+
+test('decideTtl follows Claude Code\'s order: the setting, the env, promptCacheTtl, then the account', () => {
+  expect(decideTtl(30, { force5m: '1' })).toEqual({ minutes: 30, source: 'the cacheTtlMinutes setting' })
+  expect(decideTtl(0, { force5m: '1', ttlVar: '1h' }).minutes).toBe(5)
+  expect(decideTtl(0, { ttlVar: '1h' }, '5m').minutes).toBe(60)
+  expect(decideTtl(0, {}, '1h', 'other').minutes).toBe(60)
+  expect(decideTtl(0, { enable1h: 'true' }, undefined, 'other').minutes).toBe(60)
+  expect(decideTtl(0, {}, undefined, 'subscription').minutes).toBe(60)
+  expect(decideTtl(0, {}, undefined, 'credits').minutes).toBe(5)
+  expect(decideTtl(0, {}, undefined, 'other').minutes).toBe(5)
+  expect(accountOf([{ kind: 'five_hour', percentUsed: 40 }])).toBe('subscription')
+  expect(accountOf([{ kind: 'seven_day', percentUsed: 100 }])).toBe('credits')
+  expect(accountOf([])).toBe('other')
+})
+
+test('an API-key session (no plan windows) gets the 5-minute cache: idle 6 minutes is cold', STOP, async ($, on) => {
+  const w = world(on)
+  w.rateLimits = []
+  await start($)
+  await turn($, 't1')
+  await w.clock.advance(6 * MIN)
+  expect((await submit($, 'go on')).drop).toContain('Cache went cold')
+  expect(await slash($, 'cache-tax')).toContain('5 min cache (API key or unknown account)')
 })

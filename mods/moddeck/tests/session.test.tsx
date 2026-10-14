@@ -568,7 +568,7 @@ test('the permission mode shows only when it is not the ordinary one, red for by
 test('no mode row for the default mode', MODS, async ($, on) => {
   const w = world(on, { usage: GOOD_USAGE, settings: { permissions: { defaultMode: 'default' } } })
   await start($, w)
-  expect(await texts(await mount($))).not.toContain('Mode')
+  expect(await texts(await mount($))).not.toContain('Mode:')
 })
 
 test('backup: time since the newest commit or checkpoint; amber after 2 h with files unsaved, red after 8 h', MODS, async ($, on) => {

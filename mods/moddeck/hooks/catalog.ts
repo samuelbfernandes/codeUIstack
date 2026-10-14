@@ -127,6 +127,16 @@ export const TOOLS: Tool[] = [
     ],
   },
   { id: 'blast-radius', label: 'blast-radius', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
+  {
+    id: 'advisor',
+    label: 'advisor',
+    group: 'Model controls',
+    icon: '⚖',
+    desc: 'Claude consults a stronger model at hard decisions (experimental, API only)',
+    costs: true,
+    command: 'advisor',
+    levels: ['off', 'opus', 'fable'],
+  },
   { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', isSwitch: true, command: 'review-cost' },
   {
     id: 'checkpoint',

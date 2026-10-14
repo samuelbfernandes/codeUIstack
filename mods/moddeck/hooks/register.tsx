@@ -899,9 +899,11 @@ export const register: Register = (on, options) => {
       return (
         <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
           <Box columnGap={1} {...fit}>
-            <Text bold wrap="truncate-end">
-              {shownTitle}
-            </Text>
+            <Button key={`title:${key}`} plain label={desk ? undefined : isFolded ? `open ${title}` : `fold ${title}`} onPress={() => void flipFold($, key)}>
+              <Text bold wrap="truncate-end">
+                {shownTitle}
+              </Text>
+            </Button>
             <Button key={`fold:${key}`} plain label={desk ? undefined : isFolded ? `open ${title}` : `fold ${title}`} onPress={() => void flipFold($, key)}>
               <Text color={link}>{isFolded ? '▸' : '▾'}</Text>
             </Button>
@@ -1034,9 +1036,21 @@ export const register: Register = (on, options) => {
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)
     // The level the dropdown shows: the person's last pick, else the mod's own state; undefined = the mod is not readable.
+    // The advisor is Claude Code's own (/advisor): its model is the advisorModel setting; two variables keep it off.
+    const settingsNow = (await attempt(() => $.settings.read())) as { advisorModel?: unknown; env?: Record<string, string> } | undefined
+    const savedAdvisor = typeof settingsNow?.advisorModel === 'string' && settingsNow.advisorModel !== '' ? settingsNow.advisorModel : 'off'
+    const envOf = (v: string | undefined, fromSettings: string | undefined) => (v !== undefined && v !== "" ? v : fromSettings)
+    const noTelemetry = envOf(await attempt(() => $.env.get('DISABLE_TELEMETRY')), settingsNow?.env?.DISABLE_TELEMETRY)
+    const noAdvisor = envOf(await attempt(() => $.env.get('CLAUDE_CODE_DISABLE_ADVISOR_TOOL')), settingsNow?.env?.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)
+    const advisorBlock = noAdvisor === '1' ? 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL' : noTelemetry === '1' ? 'DISABLE_TELEMETRY' : undefined
     const levelOf: Record<string, string | undefined> = {
       'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
+      advisor: chosen.advisor ?? savedAdvisor,
     }
+    // A level the list does not name (a saved "sonnet") is still shown as picked.
+    const levelsOf = (t: Tool): string[] => (t.levels !== undefined && levelOf[t.id] !== undefined && !t.levels.includes(levelOf[t.id]!) ? [...t.levels, levelOf[t.id]!] : (t.levels ?? []))
+    const descOf = (t: Tool): string | undefined =>
+      t.id === 'advisor' && advisorBlock !== undefined ? `Kept off by ${advisorBlock}=1 in your environment; remove it to use the advisor` : t.desc
 
     // One line per tool: its name (a green or red pill when it is a switch), its controls, then its description, which
     // takes what is left and is cut with "…". The descriptions, icons and groups are presentation only.
@@ -1080,7 +1094,7 @@ export const register: Register = (on, options) => {
           </Button>
         )
       const level = t.levels !== undefined && (
-        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
+        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
       )
       return (
         <Box key={`row:${t.id}`} columnGap={1} {...fit}>
@@ -1091,7 +1105,7 @@ export const register: Register = (on, options) => {
           </Box>
           <Box flexGrow={1} flexShrink={1} {...fit}>
             <Text {...dim} wrap="truncate-end">
-              {t.desc ?? t.note ?? ''}
+              {descOf(t) ?? t.note ?? ''}
             </Text>
           </Box>
         </Box>

@@ -357,6 +357,25 @@ test('▾ folds a card down to its title (with its count), ▸ opens it again, a
   expect(await texts(pane)).toMatch(/Guards · \d/) // a small group shows its count once folded
   await pane.press({ key: 'fold:group:Workspace utilities' })
   expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+  await pane.press({ key: 'title:group:Workspace utilities' }) // the name folds it too
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeUndefined()
+  await pane.press({ key: 'title:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+})
+
+test('advisor works like blast-radius: a dropdown, its name red while off and green while on, a click flips it back', async ($, on) => {
+  const w = world(on)
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'level:advisor' }))).toContain('"value":"off"')
+  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(OFF('desktop'))
+  await pane.select({ key: 'level:advisor', value: 'fable' } as never)
+  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(ON('desktop'))
+  await pane.press({ key: 'switch:advisor' }) // on -> off
+  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(OFF('desktop'))
+  await pane.press({ key: 'switch:advisor' }) // off -> the model it had
+  expect(JSON.stringify(await pane.find({ key: 'level:advisor' }))).toContain('"value":"fable"')
+  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(ON('desktop'))
+  void w
 })
 
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {

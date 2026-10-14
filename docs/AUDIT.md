@@ -12,7 +12,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | blast-radius | no | du, find, git | no | no | command.run, session.start, tool.call |
 | branch-janitor | no | gh, git | no | no | command.run, prompt.submit, session.start, tool.call |
 | budget-guard | no | none | no | no | command.run, prompt.submit, session.end, session.measure, session.start, turn.complete, turn.start, ui.render |
-| cache-tax | no | none | no | yes | classic.SessionStart, command.run, prompt.submit, session.end, session.start, turn.complete, turn.start |
+| cache-tax | no | none | no | yes | classic.SessionStart, command.run, model.fork, prompt.submit, session.end, session.start, turn.complete, turn.start, turn.step |
 | checkpoint | no | cmd, git, rm | no | no | command.run, prompt.submit, session.start |
 | color-lab | no | none | no | no | command.run, session.start, ui.render |
 | concise | no | none | no | no | command.run, prompt.submit, session.compact, session.start |

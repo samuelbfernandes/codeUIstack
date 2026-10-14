@@ -18,18 +18,19 @@ import {
   pingIntervalMs,
   plural,
   priceFor,
-  skipBelowMs,
   usageUsd,
   warmUsd,
 } from './lib'
 import type { Usage } from './lib'
 import { dropWith } from './reply'
+import { accountOf, decideTtl } from './ttl'
+import type { CacheEnv } from './ttl'
 import { bestMove } from './suggest'
 import type { Move } from './suggest'
 
 type Dollar = EngineInterface
 /** The user's tunables, resolved once in register(). */
-type Cfg = { ttlMinutes: number; ttlMs: number; minTokens: number; minExtraUsd: number; onCold: 'ask' | 'stop' | 'off'; showCacheClock: boolean; hourCycle24: boolean }
+type Cfg = { ttlMinutes: number; ttlMs: number; ttlSource: string; ttlPinned: number; minTokens: number; minExtraUsd: number; onCold: 'ask' | 'stop' | 'off'; showCacheClock: boolean; hourCycle24: boolean }
 
 const MINUTE = 60_000
 const MAX_STORED_SESSIONS = 50
@@ -51,6 +52,8 @@ const keepwarm = atom({ plugin: 'cache-tax', key: 'keepwarm' } as const, null)
 // Timer handles of this module instance only (not redraw state). The truth is `keepwarm` in
 // $.state; a hot reload drops the timers and ensureTimers() restarts them on the next hook.
 const timers: { ping?: Timer; tick?: Timer } = {}
+/** When the main loop's last request that used the cache started: the cache's lifetime counts from a request's start. */
+let lastStepStart = 0
 
 /** Bookkeeping must never break the session: swallow and carry on. */
 async function quietly(fn: () => Promise<unknown>): Promise<void> {
@@ -300,8 +303,8 @@ async function housekeeping($: Dollar): Promise<void> {
   $.ui.status(statusLine(k, now))
 }
 
-async function recordPing(cfg: Cfg, $: Dollar, usage: Usage): Promise<void> {
-  const now = await $.clock.now()
+async function recordPing(cfg: Cfg, $: Dollar, usage: Usage, startedAt: number): Promise<void> {
+  const now = startedAt // the refresh counts from the ping's start
   const { rate } = priceFor(await $.session.model())
   await update($, keepwarm, cur =>
     cur
@@ -330,11 +333,13 @@ async function ping(cfg: Cfg, $: Dollar): Promise<void> {
   if (await read($, isBusy)) return
   const touched = lastTouch(await read($, activity))
   const idle = now - touched
-  // No history, or already lapsed: a ping would only pay a write. Too soon: the next one still lands in time.
-  if (touched === 0 || idle >= cfg.ttlMs || idle < skipBelowMs(cfg.ttlMinutes)) return
+  // No history, or already lapsed: a ping would only pay a write. Not due yet: the last request that read the cache (a turn,
+  // a side question, another plugin's fork, or the last ping) refreshed it, so the ping waits a full interval from there.
+  if (touched === 0 || idle >= cfg.ttlMs || idle < pingIntervalMs(cfg.ttlMinutes)) return
 
+  const startedAt = now
   const r = await $.model.fork({ prompt: PING_PROMPT })
-  if (r.isAnswered) return recordPing(cfg, $, r.usage)
+  if (r.isAnswered) return recordPing(cfg, $, r.usage, startedAt)
   if (r.reason === 'nothing-to-fork') return
   const failures = k.failures + 1
   if (failures >= 3) return endKeepwarm($, k, 'stopped after 3 failed pings')
@@ -343,7 +348,9 @@ async function ping(cfg: Cfg, $: Dollar): Promise<void> {
 
 function startTimers(cfg: Cfg, $: Dollar, intervalMs: number): void {
   stopTimers()
-  timers.ping = $.clock.every(intervalMs, () => void quietly(() => ping(cfg, $)))
+  // Checked every minute rather than on a fixed beat, so a refresh by any other request pushes the next ping back.
+  void intervalMs
+  timers.ping = $.clock.every(MINUTE, () => void quietly(() => ping(cfg, $)))
   timers.tick = $.clock.every(MINUTE, () => void quietly(() => housekeeping($)))
 }
 
@@ -457,20 +464,64 @@ async function report(cfg: Cfg, $: Dollar): Promise<string> {
     await keepwarmLine($),
     `Cold writes this session  ${total.count} · ${fmtApprox(total.usd)}` +
       ((await read($, held)) ? ' · on hold: send the same text again to continue' : ''),
-    `Estimates · ${label} · ${cfg.ttlMinutes} min cache` + (await clockSuffix(cfg, $, now, hit)),
+    `Estimates · ${label} · ${cfg.ttlMinutes} min cache (${cfg.ttlSource})` + (await clockSuffix(cfg, $, now, hit)),
   ]
     .filter(line => line !== '')
     .join('\n')
 }
 
+// ---- the cache's lifetime --------------------------------------------------------------------------------------------
+let ttlInputs: { env: CacheEnv; setting: unknown } | undefined
+
+/** The promptCacheTtl setting, from the files that can carry it (local over project over user). */
+async function readTtlSetting($: Dollar): Promise<unknown> {
+  const home = await $.env.get('HOME').catch(() => undefined)
+  const cwd = await $.session.cwd().catch(() => undefined)
+  for (const file of [cwd && `${cwd}/.claude/settings.local.json`, cwd && `${cwd}/.claude/settings.json`, home && `${home}/.claude/settings.json`]) {
+    if (!file) continue
+    try {
+      const v = JSON.parse(await $.fs.read(file)).promptCacheTtl
+      if (v === '5m' || v === '1h') return v
+    } catch {
+      // missing or unreadable: the next file
+    }
+  }
+  return undefined
+}
+
+/** Works out the TTL as Claude Code does; the environment and settings are read once per session, the account each turn. */
+async function refreshTtl(cfg: Cfg, $: Dollar, isStart: boolean): Promise<void> {
+  if (cfg.ttlPinned > 0) return
+  if (isStart || ttlInputs === undefined) {
+    const none = () => undefined
+    ttlInputs = {
+      env: {
+        force5m: await $.env.get('FORCE_PROMPT_CACHING_5M').catch(none),
+        ttlVar: await $.env.get('CLAUDE_CODE_PROMPT_CACHE_TTL').catch(none),
+        enable1h: await $.env.get('ENABLE_PROMPT_CACHING_1H').catch(none),
+      },
+      setting: await readTtlSetting($),
+    }
+  }
+  const windows = (await $.session.usage().catch(() => undefined))?.rateLimits ?? []
+  const choice = decideTtl(0, ttlInputs.env, ttlInputs.setting, accountOf(windows))
+  cfg.ttlMinutes = choice.minutes
+  cfg.ttlMs = choice.minutes * MINUTE
+  cfg.ttlSource = choice.source
+}
+
 // ---- wiring ----------------------------------------------------------------
 
 export const register: Register = (on, options) => {
-  const ttlMinutes = Math.max(Number(options.cacheTtlMinutes) || 60, 1)
+  // 0 (the default) = follow Claude Code's own rules (env, settings, account); any other value pins the TTL.
+  const ttlPinned = Math.max(Math.floor(Number(options.cacheTtlMinutes) || 0), 0)
+  const ttlMinutes = ttlPinned > 0 ? ttlPinned : 60
   const onCold = options.onCold === 'stop' || options.onCold === 'off' ? options.onCold : 'ask'
   const cfg: Cfg = {
     ttlMinutes,
     ttlMs: ttlMinutes * MINUTE,
+    ttlSource: ttlPinned > 0 ? 'the cacheTtlMinutes setting' : 'not known yet',
+    ttlPinned,
     minTokens: Number(options.minContextTokens ?? 20_000),
     minExtraUsd: Math.max(Number(options.minExtraUsd ?? 0.25) || 0, 0),
     onCold,
@@ -496,6 +547,30 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
+  // Every main-loop request that reads the cache refreshes it at no extra charge: note when the last one started.
+  on('turn.step', async function* ($, e, next) {
+    if (e.agentId !== undefined) return yield* next(e) // a subagent has a prefix of its own
+    const startedAt = await $.clock.now().catch(() => 0)
+    const r = yield* next(e)
+    if (startedAt > 0 && r.usage && r.usage.cache_read_input_tokens + r.usage.cache_creation_input_tokens > 0) lastStepStart = startedAt
+    return r
+  })
+
+  // So does any fork of the conversation another plugin runs (a side question, a review): it reads the same cache, so it
+  // counts as a refresh, and keep-warm skips its own ping until one is due again.
+  on('model.fork', async ($, e, next) => {
+    const startedAt = await $.clock.now().catch(() => 0)
+    const r = await next(e)
+    const v = (r as { value?: { isAnswered?: boolean; usage?: Usage } }).value
+    if (startedAt > 0 && v?.isAnswered && v.usage && v.usage.cache_read_input_tokens > 0) {
+      await quietly(async () => {
+        const a = await read($, activity)
+        if (startedAt > a.pingAt) await touch($, { pingAt: startedAt })
+      })
+    }
+    return r
+  })
+
   on('turn.complete', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e) // a subagent has a prefix of its own
     await quietly(async () => {
@@ -507,7 +582,10 @@ export const register: Register = (on, options) => {
       } catch {
         // keep the last known size
       }
-      await touch($, { at: now, tokens })
+      // The lifetime runs from the start of the last request that read or wrote the cache, not from the turn's end.
+      await refreshTtl(cfg, $, false) // a subscription that runs out of plan usage moves to usage credits: 5 min
+      await touch($, { at: lastStepStart > 0 ? lastStepStart : now, tokens })
+      lastStepStart = 0
       await payColdWrite(cfg, $, e.usage)
       await recordUsage($, e.usage)
       await ensureTimers(cfg, $)
@@ -517,6 +595,7 @@ export const register: Register = (on, options) => {
   })
 
   on('session.start', async ($, e, next) => {
+    await quietly(() => refreshTtl(cfg, $, true))
     await quietly(() =>
       $.command.register({
         name: 'keepwarm',

@@ -19,12 +19,17 @@ ends with `Keep it warm next time: /keepwarm 90m` (once; shown as plain text, th
   Cache hits  93% (est.) · 1.2M read · 85k written
   Keep-warm  off  (/keepwarm 90m to start)
   Cold writes this session  0 · ~$0.00
-  Estimates · Sonnet · 60 min cache
+  Estimates · Sonnet · 60 min cache (subscription)
   ```
   Hit ratio = cache-read tokens / (read + written) over this session's completed turns, from the usage each turn reports; the
   percentage and dollar figures are estimates. Last turn = its four token counts summed (a multi-step turn re-reads the cache each step).
 - `/keepwarm [90m|2h|off]` (explicit only): a tiny model call every TTL minus 5 min keeps the cache warm. Default 6h, max 24h,
   no argument = status. None runs during a turn or onto an already cold cache; three failures stop it.
+- Refreshes that cost nothing extra are used first: any request that reads the cache resets its lifetime (Anthropic's
+  prompt-caching docs), so each step of a turn, a side question or another plugin's fork counts as a refresh, and a
+  keep-warm ping goes out only when the cache has gone TTL minus 5 min without one. A ping is still a cache read
+  (about a tenth of the input price): cheap, never free. Expiry is counted from the start of the last request that used
+  the cache, as the docs say, not from the end of the turn.
 - `onCold = stop` gives the older one-line stop (send the same text again to pay); `off` never stops.
 
 ## Expiry clock and hit rate
@@ -40,7 +45,7 @@ drains, so a clock time stays correct however old the drawing is; a "58 min left
 ## Turn off
 `/plugin disable cache-tax`
 ## Settings (`/config`)
-`cacheTtlMinutes` (60; API-key sessions use 5 unless `promptCacheTtl` is changed), `minContextTokens` (20000),
+`cacheTtlMinutes` (0 = follow Claude Code's rules, in order: `FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, the `promptCacheTtl` setting, `ENABLE_PROMPT_CACHING_1H`, then the account: 60 min on a subscription within its plan usage, 5 on usage credits or an API key, told apart by the rate-limit windows the last response reported; the report names the source; any other value pins it; the rules are adapted from claude-code-templates' prompt-cache-control, MIT), `minContextTokens` (20000),
 `minExtraUsd` (0.25), `onCold` (`ask`, `stop`, `off`), `showCacheClock` (true), `hourCycle24` (true).
 
 ## Limits
