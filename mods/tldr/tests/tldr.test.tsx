@@ -107,7 +107,7 @@ test('highlight: the must-read sentences are marked but the box above the prompt
 })
 
 test('colour: green by default, /tldr color changes the tint, an unknown name is refused', async ($, on) => {
-  mock.store(on)
+  world(on)
   await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
   expect(await cmd($, 'status')).toContain('colour green')
   expect(await cmd($, 'color red')).toBe('tldr · highlight colour · red')
