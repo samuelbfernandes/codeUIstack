@@ -69,7 +69,7 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 ### Mods
 
 **Prompt helpers**
-- `suggest-model`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
+- `model-picker`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
 - `reflect`: offers to save a rule when you correct Claude (spends a few tokens).
 - `tldr`: a switch, off until you turn it on; then each long reply gets a TL;DR box above the prompt (Summary, Needs you, Next) and its must-read sentences are drawn bold with ⚑ inside the reply. One Haiku call per long reply.
 - `concise`: a switch, off until you turn it on; then Claude's replies lead with the next action, number the steps, restate where you are and leave tangents for later (adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd), MIT).
@@ -150,7 +150,7 @@ Then try any of these:
 
 - **moddeck**: type `/moddeck` and click the green `suggest` name. It turns red (off) at once.
 - **command-guard**: ask `create a folder build with a file a.txt, then delete the build folder`. A box shows the risk and what would be lost, with **Cancel** first.
-- **suggest-model**: on Opus, type `fix the typo in the README title`. A dialog says Opus is overkill and suggests a cheaper model.
+- **model-picker**: on Opus, type `fix the typo in the README title`. A dialog says Opus is overkill and suggests a cheaper model.
 - **secret-guard**: type `my token is [secret:github-token], remember it`. A dialog offers to send it redacted.
 - **data-guard**: run `echo "email,age" > people.csv && git add people.csv`, then ask Claude to commit. A dialog names the file and the column `email`.
 - **checkpoint**: type `/checkpoint`, edit a file, then `/checkpoint restore <name>`. It lists the files that would change.
@@ -179,7 +179,7 @@ The installer never installs these. Each has a cost or catch worth reading first
 - **thedotmack/claude-mem**: automatic memory; runs model summaries of your tool use and stores them.
 - **github/spec-kit, Fission-AI/OpenSpec**: spec-driven workflows; many manual steps, and OpenSpec has telemetry on by default.
 - **ruvnet/ruflo, SuperClaude Framework**: agent swarms; large always-present instructions and background workers.
-- **musistudio/claude-code-router**: routes requests across providers; built for API keys, and `suggest-model` does the cheap version.
+- **musistudio/claude-code-router**: routes requests across providers; built for API keys, and `model-picker` does the cheap version.
 - **openai/codex-plugin-cc**: Codex commands; its review gate reviews every reply and can drain usage limits.
 - **wshobson/agents, davila7/claude-code-templates**: catalogs of 100+ agents and skills; browse, do not bulk-install.
 

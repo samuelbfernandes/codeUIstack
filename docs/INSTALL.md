@@ -68,7 +68,7 @@ install.cmd --plan              # Windows (double-clicking install.cmd also work
 4. The plan, then a final yes or no.
 
 Without questions: `moddeck install --yes` (defaults), plus any of `--scope project --project DIR`, `--profile lab`,
-`--mods command-guard,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `moddeck list` shows every id.
+`--mods command-guard,model-picker`, `--with sandbox`, `--without filetree`, `--force-hooks`. `moddeck list` shows every id.
 
 ## Afterwards
 

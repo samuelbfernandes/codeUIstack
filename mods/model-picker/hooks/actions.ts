@@ -79,7 +79,7 @@ export async function switchModel(config: ConfigApi, alias: Alias): Promise<Swit
 }
 
 export const manualSwitchHint = (alias: Alias): string =>
-  `suggest-model: could not switch automatically. Type /model ${alias} yourself.`
+  `model-picker: could not switch automatically. Type /model ${alias} yourself.`
 
 // ---------------------------------------------------------------------- subagent
 
@@ -92,6 +92,10 @@ export async function spawnSubagent(spawn: Spawn, text: string, alias: Alias): P
     return { ok: false, why: (error instanceof Error ? error.message : 'the call failed').slice(0, 160) }
   }
 }
+
+/** Your prompt with your choice spelled out, so Claude delegates it: the subagent is then one you asked for. */
+export const delegateText = (text: string, alias: Alias): string =>
+  `${text}\n\n(I chose to run this as a subagent on ${alias}: use the Agent tool with model "${alias}" and give it this task in full; do not do the task yourself.)`
 
 // ------------------------------------------------------------------------- codex
 

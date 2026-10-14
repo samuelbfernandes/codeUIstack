@@ -1,4 +1,4 @@
-// suggest-model: every prompt the person types is checked locally (keyword rules, no model call by
+// model-picker: every prompt the person types is checked locally (keyword rules, no model call by
 // default, zero tokens) for two risks: the current model is likely too WEAK for the task, or it is
 // OVERKILL for it. Each check refreshes a one-line status ($.ui.status); only a mismatch at or above
 // the confidence bar opens a dialog and BLOCKS the prompt until it is answered: switch the session,
@@ -14,12 +14,12 @@
 // FAIL OPEN for everything except the question itself: an error in the predictor, state, switch,
 // spawn or Codex sends the prompt exactly as typed. The deliberate drops are: a prompt sent to a subagent the person asked for, and a prompt
 // HELD because the person dismissed the dialog (Esc) with `onDismiss` = hold, the default. A held
-// prompt is echoed back in full so nothing typed is lost; `/suggest-model off` ends any trap.
+// prompt is echoed back in full so nothing typed is lost; `/model-picker off` ends any trap.
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Run } from './actions'
-import { codexContext, manualSwitchHint, probeCodex, runCodex, spawnSubagent, switchModel } from './actions'
+import { codexContext, delegateText, manualSwitchHint, probeCodex, runCodex, spawnSubagent, switchModel } from './actions'
 import { buildDialog, choiceOf, compactTable, isKeepOnly } from './dialog'
 import { dropWith } from './reply'
 import type { Choice } from './dialog'
@@ -35,18 +35,18 @@ import type { SuggestModelEntry } from '../types'
 
 type Dollar = EngineInterface
 
-const seen = atom({ plugin: 'suggest-model', key: 'seen' } as const, 0)
-const isMuted = atom({ plugin: 'suggest-model', key: 'isMuted' } as const, false)
+const seen = atom({ plugin: 'model-picker', key: 'seen' } as const, 0)
+const isMuted = atom({ plugin: 'model-picker', key: 'isMuted' } as const, false)
 /** Mirror of the persisted on/off switch (`$.store` 'off'), read by the moddeck side bar so it redraws when ANY path flips it. */
-const isOff = atom({ plugin: 'suggest-model', key: 'isOff' } as const, false)
-const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
-const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
+const isOff = atom({ plugin: 'model-picker', key: 'isOff' } as const, false)
+const codexOk = atom({ plugin: 'model-picker', key: 'codexOk' } as const, null)
+const recent = atom({ plugin: 'model-picker', key: 'recent' } as const, [])
 /** The session's effort level as the last model request named it (empty: none seen, or a model without effort). */
 /** What the side bar's model row shows beside the effort when it does not fit the last task (`medium would do`). */
 /** The routed model's name for the moddeck Session box ('' when not routed). */
-const routedTo = atom({ plugin: 'suggest-model', key: 'routedTo' } as const, '')
-const effortHint = atom({ plugin: 'suggest-model', key: 'effortAdvice' } as const, '')
-const effortNow = atom({ plugin: 'suggest-model', key: 'effort' } as const, '')
+const routedTo = atom({ plugin: 'model-picker', key: 'routedTo' } as const, '')
+const effortHint = atom({ plugin: 'model-picker', key: 'effortAdvice' } as const, '')
+const effortNow = atom({ plugin: 'model-picker', key: 'effort' } as const, '')
 
 // Only the person typing is ever analysed. 'bridge' is the same person on a phone or the web.
 const PERSON = new Set(['composer', 'bridge'])
@@ -128,9 +128,9 @@ async function tally($: Dollar, kind: 'a' | 'd'): Promise<void> {
   })
 }
 
-const OFF_STATUS = 'suggest-model: off · type /suggest-model on'
+const OFF_STATUS = 'model-picker: off · type /model-picker on'
 
-/** The one place the switch changes, for the moddeck side bar and /suggest-model alike. */
+/** The one place the switch changes, for the moddeck side bar and /model-picker alike. */
 async function setSwitch($: Dollar, cfg: Cfg, off: boolean): Promise<void> {
   if (off) {
     await $.store.set('off', true)
@@ -175,7 +175,7 @@ async function refine($: Dollar, text: string, p: Prediction, minConfidence: num
 
 const isAmbiguous = (p: Prediction, minConfidence: number): boolean => p.tier !== 'review' && p.confidence < minConfidence
 
-type Outcome = { kind: 'pass' } | { kind: 'drop'; reason: string } | { kind: 'context'; context: string[] }
+type Outcome = { kind: 'pass' } | { kind: 'drop'; reason: string } | { kind: 'context'; context: string[] } | { kind: 'rewrite'; text: string }
 const PASS: Outcome = { kind: 'pass' }
 
 type Mismatch = Extract<Fit, { kind: 'mismatch' }>
@@ -204,8 +204,8 @@ async function review($: Dollar, e: { text: string; origin: { kind: string }; tu
       await quietly(() => update($, routedTo, () => nameOf(pick)))
       await note($, text, p, `routed to ${pick}`)
       await setOutcome($, `routed this conversation to ${pick}`)
-      $.ui.toast(`suggest-model · this conversation runs on ${nameOf(pick)} (${p.tier} task) · /model to choose yourself`, { timeoutMs: 10_000 })
-      await showStatus($, cfg, `suggest-model: on ${nameOf(pick)} for this conversation`)
+      $.ui.toast(`model-picker · this conversation runs on ${nameOf(pick)} (${p.tier} task) · /model to choose yourself`, { timeoutMs: 10_000 })
+      await showStatus($, cfg, `model-picker: on ${nameOf(pick)} for this conversation`)
       return PASS
     }
   }
@@ -224,7 +224,7 @@ async function review($: Dollar, e: { text: string; origin: { kind: string }; tu
   const effortLevel = await read($, effortNow)
   const effort = cfg.effortWatch && p.confidence >= minConfidence ? effortNote(p.tier, effortLevel) : undefined
   await quietly(() => update($, effortHint, () => (cfg.effortWatch && p.confidence >= minConfidence ? (effortAdvice(p.tier, effortLevel) ?? '') : '')))
-  await showStatus($, cfg, verdict !== undefined && effort !== undefined ? `${verdict} · ${effort}` : (verdict ?? (effort !== undefined ? `suggest-model: ${effort}` : undefined))) // a prompt the rules cannot place clears the line
+  await showStatus($, cfg, verdict !== undefined && effort !== undefined ? `${verdict} · ${effort}` : (verdict ?? (effort !== undefined ? `model-picker: ${effort}` : undefined))) // a prompt the rules cannot place clears the line
   if (fit.kind !== 'mismatch' && fit.kind !== 'review') {
     return await skip($, fit.kind === 'none' ? `no: ${fit.why}` : fit.kind === 'fits' ? 'fits: no dialog' : 'hint on the status line only')
   }
@@ -310,37 +310,39 @@ async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, c
 /** After Esc: a one-line reason (the drop box); the prompt text goes to the transcript so nothing typed is lost. */
 export function heldMessage(text: string): string {
   const shown = text.length > 2000 ? `${text.slice(0, 2000)}...` : text
-  return ['suggest-model blocked your prompt · nothing was sent. Send it again to choose, or type /suggest-model off.', shown].join('\n')
+  return ['model-picker blocked your prompt · nothing was sent. Send it again to choose, or type /model-picker off.', shown].join('\n')
 }
 
 async function act($: Dollar, cfg: Cfg, choice: Choice, text: string, alias: Alias | undefined): Promise<Outcome> {
   if (choice === 'mute') {
     await update($, isMuted, () => true)
     await tally($, 'd')
-    $.ui.toast('suggest-model · muted for this session. The status line stays.')
+    $.ui.toast('model-picker · muted for this session. The status line stays.')
     return PASS
   }
   if (choice === 'switch' && alias !== undefined) {
     await tally($, 'a')
     const r = await switchModel({ list: () => $.config.list(), set: (key, value) => $.config.set({ key, value }) }, alias)
-    $.ui.toast(r.isSwitched ? `suggest-model · switched to ${nameOf(alias)}` : manualSwitchHint(alias))
-    if (r.isSwitched) await showStatus($, cfg, `suggest-model: switched to ${nameOf(alias)}`)
+    $.ui.toast(r.isSwitched ? `model-picker · switched to ${nameOf(alias)}` : manualSwitchHint(alias))
+    if (r.isSwitched) await showStatus($, cfg, `model-picker: switched to ${nameOf(alias)}`)
     return PASS // the prompt itself continues; the new model reads it if the switch took
   }
   if (choice === 'subagent' && alias !== undefined) {
     await tally($, 'a')
     const started = await spawnSubagent(args => $.agent.spawn(args), text, alias)
     if (started.ok) return { kind: 'drop', reason: `Sent to a ${alias} subagent; its answer will appear when done` }
-    $.ui.toast(`suggest-model · could not start the subagent (${started.why}), sending to the current model`, { timeoutMs: 10000 })
-    $.ui.log(`suggest-model · subagent not started: ${started.why}`)
-    return PASS
+    // A subagent a mod starts is refused where your own prompt did not ask for one (auto mode's check, for one). So the
+    // request goes into your prompt instead: Claude starts the subagent itself, as you asked.
+    $.ui.log(`model-picker · could not start the subagent directly (${started.why}); asking Claude to delegate instead`)
+    $.ui.toast(`Asking Claude to run this as a ${nameOf(alias)} subagent`, { timeoutMs: 6000 })
+    return { kind: 'rewrite', text: delegateText(text, alias) }
   }
   if (choice === 'codex') {
     await tally($, 'a')
-    $.ui.toast('suggest-model · asking Codex, read-only (can take a few minutes)', { timeoutMs: 8000 })
+    $.ui.toast('model-picker · asking Codex, read-only (can take a few minutes)', { timeoutMs: 8000 })
     const r = await runCodex(runner($), await quietly(() => $.session.cwd()), text)
     if (!r.ok) {
-      $.ui.toast(`suggest-model · Codex did not answer (${r.why}), sending as typed`, { timeoutMs: 8000 })
+      $.ui.toast(`model-picker · Codex did not answer (${r.why}), sending as typed`, { timeoutMs: 8000 })
       return PASS
     }
     $.ui.log(`Codex review · read-only\n${r.text}`)
@@ -363,7 +365,7 @@ function verdictText(fit: Fit, current: Family | undefined): string {
 }
 
 async function explain($: Dollar, text: string, cfg: Cfg): Promise<string> {
-  if (text.trim() === '') return 'Usage: /suggest-model explain <text to test>'
+  if (text.trim() === '') return 'Usage: /model-picker explain <text to test>'
   const p = predict(text)
   const current = familyOf((await quietly(() => $.session.model())) ?? '')
   const fit = judge(p, current, cfg.minConfidence, cfg.costs, cfg.askOnStandard)
@@ -388,13 +390,13 @@ async function status($: Dollar, cfg: Cfg): Promise<string> {
   const rows = list.map(r => `${TIER_WORD[r.tier].toLowerCase()} ${r.confidence.toFixed(2)} “${r.snippet}” · ${r.reasons.join(', ')} → ${r.outcome}`)
   const costs = (['haiku', 'sonnet', 'opus', 'fable'] as const).filter(f => cfg.costs[f] !== undefined).map(f => `${nameOf(f)} ${cfg.costs[f]}x`).join(' · ')
   return [
-    `suggest-model · ${on ? 'on' : 'off'} · ${model === undefined ? 'unrecognised model' : nameOf(model)}`,
+    `model-picker · ${on ? 'on' : 'off'} · ${model === undefined ? 'unrecognised model' : nameOf(model)}`,
     on
       ? `Blocks and asks on a mismatch (confidence ≥ ${cfg.minConfidence.toFixed(2)})${cfg.askOnStandard ? ', ordinary tasks too' : ''}. Esc ${cfg.onDismiss === 'hold' ? 'holds the prompt' : 'sends it'}.`
-      : 'Not checking prompts. Type /suggest-model on to resume.',
+      : 'Not checking prompts. Type /model-picker on to resume.',
     `${costs} (rough, set in costRatios)`,
     total === 0 ? 'No answers yet' : `${c.accepted} accepted · ${c.dismissed} dismissed`,
-    ...((await read($, isMuted)) ? ['Questions muted this session. Type /suggest-model on to lift it.'] : []),
+    ...((await read($, isMuted)) ? ['Questions muted this session. Type /model-picker on to lift it.'] : []),
     ...(cfg.costProblems.length > 0 ? [`Ignored in costRatios: ${cfg.costProblems.join(', ')}.`] : []),
     ...(rows.length > 0 ? ['Recent', ...rows.map(r => `  ${r}`)] : []),
   ].join('\n')
@@ -406,14 +408,14 @@ async function runCommand($: Dollar, args: string, cfg: Cfg): Promise<string> {
   if (arg === 'explain') return explain($, rest.join(' '), cfg)
   if (arg === 'off') {
     await setSwitch($, cfg, true)
-    return 'suggest-model · off\nNo prompt is checked. Type /suggest-model on to resume.'
+    return 'model-picker · off\nNo prompt is checked. Type /model-picker on to resume.'
   }
   if (arg === 'on') {
-    if (!cfg.isEnabled) return 'suggest-model · disabled\nThe enabled setting is false. Change it in /config.'
+    if (!cfg.isEnabled) return 'model-picker · disabled\nThe enabled setting is false. Change it in /config.'
     await setSwitch($, cfg, false)
   }
   const text = await status($, cfg)
-  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: /suggest-model · /suggest-model on · /suggest-model off · /suggest-model explain <text>`
+  return arg === '' || arg === 'on' || arg === 'status' ? text : `${text}\nTry: /model-picker · /model-picker on · /model-picker off · /model-picker explain <text>`
 }
 
 // --------------------------------------------------------------------- register
@@ -455,7 +457,7 @@ export const register: Register = (on, options) => {
     })
     await quietly(() =>
       $.command.register({
-        name: 'suggest-model',
+        name: 'model-picker',
         description: 'Suggest model: status, on, off, or explain <text>',
         argumentHint: 'status|on|off|explain <text>',
       }),
@@ -463,8 +465,8 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('command.run', { command: 'suggest-model' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
-    text: 'suggest-model · that did not work, nothing changed',
+  on('command.run', { command: 'model-picker' }, async ($, e) => ({ text: await runCommand($, e.args, cfg) })).catch(() => ({
+    text: 'model-picker · that did not work, nothing changed',
   }))
 
   // Effort-watch only reads: the level of each main-thread request is kept (off the request's path) for the next prompt's status line.
@@ -491,6 +493,7 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     const out = await review($, e, cfg).catch((): Outcome => PASS)
     if (out.kind === 'drop') return dropWith(note => $.ui.log(note), out.reason)
+    if (out.kind === 'rewrite') return next({ ...e, text: out.text })
     return next(out.kind === 'context' ? { ...e, context: [...(e.context ?? []), ...out.context] } : e)
   }).catch(($, e, next) => next(e)) // fail open; if `next` already ran this replays its result
 }

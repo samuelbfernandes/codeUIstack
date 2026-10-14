@@ -134,8 +134,8 @@ class UserScope(Base):
         self.assertFalse((self.home / ".claude" / "settings.json").exists() and "attribution" in (self.home / ".claude" / "settings.json").read_text())
 
     def test_mods_flag_selects_exactly_those(self):
-        self.install("--scope", "user", "--mods", "command-guard,suggest-model")
-        self.assertEqual({p for p in self.plugins()}, {f"command-guard@{MP}", f"suggest-model@{MP}"})
+        self.install("--scope", "user", "--mods", "command-guard,model-picker")
+        self.assertEqual({p for p in self.plugins()}, {f"command-guard@{MP}", f"model-picker@{MP}"})
 
     def test_unknown_ids_are_refused_before_anything_changes(self):
         before = self.sb.tree()
@@ -154,11 +154,11 @@ class UserScope(Base):
         self.assertEqual((self.home / ".claude" / "settings.json").read_text(), "{ broken")
 
     def test_failed_plugin_is_reported_and_others_continue(self):
-        os.environ["FAKE_FAIL"] = f"suggest-model@{MP}"
+        os.environ["FAKE_FAIL"] = f"model-picker@{MP}"
         out = self.install("--scope", "user")
-        self.assertIn("could not install suggest-model", out)
+        self.assertIn("could not install model-picker", out)
         self.assertIn(f"command-guard@{MP}", self.plugins())
-        self.assertNotIn(f"suggest-model@{MP}", self.plugins())
+        self.assertNotIn(f"model-picker@{MP}", self.plugins())
 
     def test_old_claude_code_skips_mods_with_a_clear_message(self):
         os.environ["FAKE_CLAUDE_VERSION"] = "2.0.1"
@@ -322,7 +322,7 @@ class Interactive(Base):
         rc, out, err = self.run_with(["1", "", number, "", "", "", "", "y"])
         self.assertEqual(rc, 0, out + err)
         self.assertNotIn(f"command-guard@{MP}", self.plugins())
-        self.assertIn(f"suggest-model@{MP}", self.plugins())
+        self.assertIn(f"model-picker@{MP}", self.plugins())
 
     def test_saying_no_changes_nothing(self):
         before = self.sb.tree()

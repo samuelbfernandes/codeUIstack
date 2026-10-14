@@ -48,6 +48,6 @@ first each session: it is that project's source of truth. A project may add to t
 ## Tooling already installed (use, do not re-propose)
 Mods: command-guard (holds destructive commands, reports what would be lost), cache-guard (/keepwarm), edit-replay (/replay),
 reflect, progress (/progress), filetree (/filetree), review-cost (shows the Codex review cost
-before a push), suggest-model (/suggest-model: suggests a better-fitting model), branch-janitor (/branch-janitor: offers to delete
+before a push), model-picker (/model-picker: suggests a better-fitting model), branch-janitor (/branch-janitor: offers to delete
 finished branches). Global git hooks reject AI trailers and staged agent files.
 Skills: `dual-model-review`, `agents-md-scaffold`.

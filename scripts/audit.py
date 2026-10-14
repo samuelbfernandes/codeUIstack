@@ -23,7 +23,7 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "branch-janitor": {"git", "gh"},       # gh = a read-only `gh pr list`, only if the user has gh
     "cache-guard": set(),
     "filetree": {"git"},
-    "suggest-model": {"codex"},                # offered as an option for review tasks, only if Codex is installed
+    "model-picker": {"codex"},                # offered as an option for review tasks, only if Codex is installed
     "reflect": set(),
     "edit-replay": set(),
     "review-cost": {"git"},
@@ -148,7 +148,7 @@ def render(rows: list[tuple[str, dict]], shell_files: list[str], installer_files
         progs = ", ".join(sorted(i["programs"])) or "none"
         out.append(f"| {name} | {yn(i['network'])} | {progs} | {yn(i['writes'])} | {yn(i['model'])} | {', '.join(sorted(i['events'])) or 'commands only'} |")
     out += ["", "\"Writes files\" means the mod can write through Claude Code's file API (reflect does, only when you press Save).",
-            "\"Spends model tokens\" means the mod can ask a model something itself (reflect: a small model once per correction; cache-guard: optional keep-warm pings; suggest-model: only if you pick the subagent option).",
+            "\"Spends model tokens\" means the mod can ask a model something itself (reflect: a small model once per correction; cache-guard: optional keep-warm pings; model-picker: only if you pick the subagent option).",
             "", "## Shell scripts (git guards)", "", "Checked for: curl, wget, nc, ssh, scp, telnet, eval, base64 -d, piping into a shell, sudo. None present.", ""]
     out += [f"- `{f}`" for f in shell_files]
     out += ["", "## Installer (Python, standard library only)", "",

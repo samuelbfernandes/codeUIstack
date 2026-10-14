@@ -93,7 +93,7 @@ test('review on a strong-enough model is a self-review verdict (Codex only), sub
   expect(judge(P('review'), 'opus', 0.6, COSTS)).toEqual({ kind: 'review' })
   expect(judge(P('review'), 'fable', 0.6, COSTS)).toEqual({ kind: 'review' })
   expect(judge(P('review', 0.7), 'opus', 0.8, COSTS).kind).toBe('none')
-  expect(statusText({ kind: 'review' }, 'opus', COSTS)).toBe('suggest-model: review, Codex available')
+  expect(statusText({ kind: 'review' }, 'opus', COSTS)).toBe('model-picker: review, Codex available')
 })
 
 test('fable as the current model: light work is overkill, standard work gets a status hint, deep work fits', () => {
@@ -128,12 +128,12 @@ test('a cost setting that makes the recommendation no cheaper turns "overkill" i
 
 test('status line wording for every verdict', () => {
   const s = (fit: Parameters<typeof statusText>[0], cur: Parameters<typeof statusText>[1]) => statusText(fit, cur, COSTS)
-  expect(s({ kind: 'fits' }, 'opus')).toBe('suggest-model: Opus fits')
-  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'opus')).toBe('suggest-model: overkill, Haiku would do (~40x cheaper)')
-  expect(s({ kind: 'mismatch', risk: 'under', recommended: 'opus' }, 'sonnet')).toBe('suggest-model: weak for this, use Opus')
-  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'spare' }, 'opus')).toBe('suggest-model: Sonnet would do (~2x cheaper)')
-  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'borderline' }, 'haiku')).toBe('suggest-model: Haiku is borderline for this, Sonnet is safer')
-  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'fable')).toBe('suggest-model: overkill, Haiku would do') // no cost known for fable: no ratio
+  expect(s({ kind: 'fits' }, 'opus')).toBe('model-picker: Opus fits')
+  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'opus')).toBe('model-picker: overkill, Haiku would do (~40x cheaper)')
+  expect(s({ kind: 'mismatch', risk: 'under', recommended: 'opus' }, 'sonnet')).toBe('model-picker: weak for this, use Opus')
+  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'spare' }, 'opus')).toBe('model-picker: Sonnet would do (~2x cheaper)')
+  expect(s({ kind: 'hint', recommended: 'sonnet', why: 'borderline' }, 'haiku')).toBe('model-picker: Haiku is borderline for this, Sonnet is safer')
+  expect(s({ kind: 'mismatch', risk: 'over', recommended: 'haiku' }, 'fable')).toBe('model-picker: overkill, Haiku would do') // no cost known for fable: no ratio
   expect(s({ kind: 'none', why: 'x' }, 'opus')).toBeUndefined() // clears the line
   expect(s({ kind: 'fits' }, undefined)).toBeUndefined()
 })

@@ -24,10 +24,10 @@ const MODS = {
       },
     },
     {
-      name: 'suggest-model',
+      name: 'model-picker',
       register(on: On) {
         on('command.run', { command: 'seed-effort' }, async ($, e) => {
-          await $.state.set({ plugin: 'suggest-model', key: 'effortAdvice' } as never, (e.args === 'none' ? '' : e.args) as never)
+          await $.state.set({ plugin: 'model-picker', key: 'effortAdvice' } as never, (e.args === 'none' ? '' : e.args) as never)
           return { text: 'seeded' }
         })
       },
@@ -603,7 +603,7 @@ test('backup: a clean tree is green however old the commit', MODS, async ($, on)
   expect(await colorOf(pane, '1d 6h ago')).toContain('success')
 })
 
-test('effort fit: the model row shows suggest-model\'s advice beside the effort, in the warning colour, and nothing when it fits', MODS, async ($, on) => {
+test('effort fit: the model row shows model-picker\'s advice beside the effort, in the warning colour, and nothing when it fits', MODS, async ($, on) => {
   const w = world(on, { usage: GOOD_USAGE })
   await start($, w)
   await run($, 'seed-effort', 'medium would do')
@@ -614,7 +614,7 @@ test('effort fit: the model row shows suggest-model\'s advice beside the effort,
   expect(await texts(await mount($))).not.toContain('⚠')
 })
 
-test('a conversation suggest-model routed shows the session model dimmed, then → the routed one', () => {
+test('a conversation model-picker routed shows the session model dimmed, then → the routed one', () => {
   const rows = buildRows({ now: T0, model: 'claude-opus-5-5', routedTo: 'Haiku' }, DEFAULT_BOX)
   const text = rows.model!.parts.map(p => p.text).join('')
   expect(text).toContain('claude-opus-5-5 → Haiku (routed)')

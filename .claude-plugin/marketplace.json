@@ -93,6 +93,11 @@
       "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check."
     },
     {
+      "name": "model-picker",
+      "source": "./mods/model-picker",
+      "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
+    },
+    {
       "name": "progress",
       "source": "./mods/progress",
       "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts."
@@ -131,11 +136,6 @@
       "name": "staged-diff",
       "source": "./mods/staged-diff",
       "description": "Shows what is staged for the next commit (git diff --cached, stat and diff) in a pane, with a Refresh button. Read-only."
-    },
-    {
-      "name": "suggest-model",
-      "source": "./mods/suggest-model",
-      "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
     },
     {
       "name": "table-preview",

@@ -60,6 +60,7 @@ class Detected:
 RENAMED: dict[str, str] = {
     "savvy-progress": "progress", "blast-radius": "command-guard", "budget-guard": "usage-meter", "cache-tax": "cache-guard",
     "replay-theater": "edit-replay", "color-lab": "contrast-check", "csv-table": "table-preview", "staged-review": "staged-diff",
+    "suggest-model": "model-picker",
 }
 
 
@@ -71,7 +72,7 @@ def renamed(ids) -> set[str]:
 # name -> (token note, needs, start-here)
 MOD_META: dict[str, tuple[str, str, bool]] = {
     "command-guard": ("none", "", True),
-    "suggest-model": ("none (local rules)", "", True),
+    "model-picker": ("none (local rules)", "", True),
     "branch-janitor": ("none", "", True),
     "cache-guard": ("none (keep-warm pings are optional)", "", True),
     "review-cost": ("none (only estimates)", "codex", True),

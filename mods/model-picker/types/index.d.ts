@@ -1,4 +1,4 @@
-/** One prediction as /suggest-model status lists it. The prompt is cut to a short snippet and lives in session memory only. */
+/** One prediction as /model-picker status lists it. The prompt is cut to a short snippet and lives in session memory only. */
 export type SuggestModelEntry = {
   snippet: string
   tier: 'light' | 'standard' | 'deep' | 'review'
@@ -10,7 +10,7 @@ export type SuggestModelEntry = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'suggest-model': {
+    'model-picker': {
       /** Prompts from the person checked this session. */
       seen: number
       /** "Keep ... and don't suggest again this session" was chosen. */

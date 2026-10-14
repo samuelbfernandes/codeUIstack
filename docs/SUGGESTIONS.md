@@ -32,8 +32,8 @@ costs all its tool definitions in every session; a hook that runs local code cos
 | **obra/superpowers** (293k) | 15 skills that trigger on their own: test-driven development, systematic debugging, verification before completion, git worktrees, finishing a branch. Works with Codex. | It injects a bootstrap at every session start, and its page gives no token figure. It pushes a brainstorm-plan-execute workflow that competes with a project's own `AGENTS.md` rules. Try it on one project and watch `/context` before adopting. |
 | **thedotmack/claude-mem** (97.2k) | Automatic memory across sessions through five hooks. | It runs AI summaries of your tool use (tokens against your plan), stores them locally in SQLite plus a search index, and the install asks for an email sign-in (can be skipped). Think hard before it records unpublished data. |
 | **github/spec-kit** (139k) and **Fission-AI/OpenSpec** (66.9k) | Spec-driven workflows. | You invoke every step by hand, they add many prompts, and OpenSpec has anonymous telemetry on by default (`OPENSPEC_TELEMETRY=0`). Only worth it for a project that wants that process. |
-| **ruvnet/ruflo** (74.2k) and **SuperClaude-Org/SuperClaude_Framework** (23.9k) | Agent swarms, routing, many commands and modes. | Large always-present instruction surfaces with no measured token cost. Ruflo runs background workers. Both overlap `suggest-model` and `reflect`. |
-| **musistudio/claude-code-router** (37.3k) | A local gateway that routes requests across providers, with fallbacks and cost estimates. | Meant for people with API keys across providers. `suggest-model` does the cheap version (a suggestion on your own plan). |
+| **ruvnet/ruflo** (74.2k) and **SuperClaude-Org/SuperClaude_Framework** (23.9k) | Agent swarms, routing, many commands and modes. | Large always-present instruction surfaces with no measured token cost. Ruflo runs background workers. Both overlap `model-picker` and `reflect`. |
+| **musistudio/claude-code-router** (37.3k) | A local gateway that routes requests across providers, with fallbacks and cost estimates. | Meant for people with API keys across providers. `model-picker` does the cheap version (a suggestion on your own plan). |
 | **openai/codex-plugin-cc** (32.7k) | Official Codex commands inside Claude Code. | Its review gate is a Stop hook that reviews every reply; its README warns it "may drain usage limits quickly". The toolkit's push-time review is the cheap alternative. The manual `/codex:adversarial-review` command is fine if you want it. |
 | **wshobson/agents** (40.3k), **davila7/claude-code-templates** (30.8k) | Catalogs of 100+ agents, skills and hooks. | Browse, do not bulk-install. Each installed piece costs context. |
 | **BloopAI/vibe-kanban** (28.1k) | Kanban board that runs coding agents on branches. | Its own page says it is sunsetting. |
@@ -50,7 +50,7 @@ costs all its tool definitions in every session; a hook that runs local code cos
 | Need | Built here | Existing alternative |
 |---|---|---|
 | Cost of a Codex review before it runs | `review-cost` (estimates, asks, learns from your past runs) | None found with these controls |
-| A better-fitting model for this prompt | `suggest-model` (local rules; switch, subagent or keep) | claude-code-router and ruflo route requests automatically; they need extra setup and cost |
+| A better-fitting model for this prompt | `model-picker` (local rules; switch, subagent or keep) | claude-code-router and ruflo route requests automatically; they need extra setup and cost |
 | Delete a finished branch safely | `branch-janitor` | trailofbits `git-cleanup` skill (you invoke it) and superpowers' `finishing-a-development-branch` (part of its workflow) |
 
 ## Interface mods checked on 2026-10-12 (all small and new; patterns to learn from, not defaults)

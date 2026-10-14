@@ -23,13 +23,13 @@ function world(on: On) {
 
 const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, origin: { kind: 'composer' } } as never)
 const command = ($: Engine, args: string) =>
-  $.command.run({ command: 'suggest-model', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as never)
+  $.command.run({ command: 'model-picker', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as never)
 
-test('the switch: /suggest-model on|off flips one persisted flag, and off clears the status line', { options: { autoRoute: false } }, async ($, on) => {
+test('the switch: /model-picker on|off flips one persisted flag, and off clears the status line', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
   await command($, 'off')
   expect(w.store.get('off')).toBe(true)
-  expect(w.statuses.at(-1)).toContain('suggest-model: off')
+  expect(w.statuses.at(-1)).toContain('model-picker: off')
   await command($, 'on')
   expect(w.store.has('off')).toBe(false)
   expect(w.statuses.at(-1)).toBeUndefined()
@@ -46,7 +46,7 @@ test('a switch left off in an earlier session shows OFF at once', { options: { a
   const w = world(on)
   w.store.set('off', true)
   await $.session.start({ cwd: '/work' } as never)
-  expect(w.statuses.at(-1)).toContain('suggest-model: off')
+  expect(w.statuses.at(-1)).toContain('model-picker: off')
 })
 
 test('nothing is drawn above the prompt any more', { options: { autoRoute: false } }, async ($, on) => {
@@ -56,7 +56,7 @@ test('nothing is drawn above the prompt any more', { options: { autoRoute: false
     return <Box key="engine-band" />
   })
   const band = await $.ui.mount({
-    plugin: 'suggest-model',
+    plugin: 'model-picker',
     surface: 'desktop',
     component: 'AbovePrompt',
     props: { hasSurvey: false, isWorking: false, maxRows: 6, bodyColumns: 100, scroll: { offset: 0, bodyRows: 6 }, view: {} },

@@ -161,8 +161,8 @@ const activity = atom({ plugin: 'moddeck', key: 'activity' } as const, EMPTY_ACT
 const backupAt = atom({ plugin: 'moddeck', key: 'backupAt' } as const, undefined as number | null | undefined) // state is JSON data: only a number or null is ever written
 /** The configured permission mode. */
 const permMode = atom({ plugin: 'moddeck', key: 'permMode' } as const, undefined as string | undefined)
-const EFFORT_ADVICE = { plugin: 'suggest-model', key: 'effortAdvice' } as const
-const ROUTED_TO = { plugin: 'suggest-model', key: 'routedTo' } as const
+const EFFORT_ADVICE = { plugin: 'model-picker', key: 'effortAdvice' } as const
+const ROUTED_TO = { plugin: 'model-picker', key: 'routedTo' } as const
 const envCounts = atom({ plugin: 'moddeck', key: 'env' } as const, null as EnvCounts | null)
 /** The rows shown (a comma list in display order) and the layout, as /moddeck rows set them; null = not set by the person (the settings apply). */
 const rowsList = atom({ plugin: 'moddeck', key: 'rows' } as const, null as string | null)
@@ -196,7 +196,7 @@ function defer($: Dollar, work: () => Promise<void>): void {
 
 // The other mods' state this side bar reads. The engine wants each reference written out here, so the list of what a
 // module reads can be checked; a mod that is not installed (or a read that is refused) reads as "cannot see".
-const SUGGEST_OFF = { plugin: 'suggest-model', key: 'isOff' } as const
+const SUGGEST_OFF = { plugin: 'model-picker', key: 'isOff' } as const
 const REFLECT_OFF = { plugin: 'reflect', key: 'isOff' } as const
 const SECRET_ON = { plugin: 'secret-guard', key: 'isOn' } as const
 const DATA_OFF = { plugin: 'data-guard', key: 'isOff' } as const
@@ -1054,7 +1054,7 @@ export const register: Register = (on, options) => {
     // installed (or not readable) is simply not drawn.
     const flag = (v: unknown, isOff: boolean): boolean | undefined => (typeof v === 'boolean' ? (isOff ? !v : v) : undefined)
     const ons: Record<string, boolean | undefined> = {
-      suggest: flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
+      'model-picker': flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
       reflect: flag(await valueOf($.state.get(REFLECT_OFF as never)), true),
       'secret-guard': flag(await valueOf($.state.get(SECRET_ON as never)), false),
       'data-guard': flag(await valueOf($.state.get(DATA_OFF as never)), true),

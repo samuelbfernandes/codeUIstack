@@ -25,7 +25,7 @@ export type Tool = {
   desc?: string
   /** Spends model tokens: drawn with a "$". */
   costs?: boolean
-  /** A switch: the command to run with `on` / `off` (`/suggest-model on`). */
+  /** A switch: the command to run with `on` / `off` (`/model-picker on`). */
   command?: string
   isSwitch?: boolean
   /** What a click does (rows that are not switches). */
@@ -42,16 +42,16 @@ export type Tool = {
 
 export const TOOLS: Tool[] = [
   {
-    id: 'suggest',
-    label: 'suggest',
+    id: 'model-picker',
+    label: 'model-picker',
     group: 'Prompt helpers',
     icon: '✦',
-    desc: 'Checks each prompt against the model',
+    desc: 'Picks the model for new conversations and subagents; flags a mismatch',
     isSwitch: true,
-    command: 'suggest-model',
+    command: 'model-picker',
     options: [
-      { label: 'status', text: '/suggest-model', run: true },
-      { label: 'explain', text: '/suggest-model explain ', run: false },
+      { label: 'status', text: '/model-picker', run: true },
+      { label: 'explain', text: '/model-picker explain ', run: false },
     ],
   },
   {

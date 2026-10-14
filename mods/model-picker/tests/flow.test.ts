@@ -126,7 +126,7 @@ const submit = ($: Engine, text: string, origin: { kind: string; name?: string }
   $.prompt.submit({ text, wait: false, origin } as never)
 
 const command = async ($: Engine, args: string) =>
-  (await $.command.run({ command: 'suggest-model', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })).text ?? ''
+  (await $.command.run({ command: 'model-picker', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })).text ?? ''
 
 // ------------------------------------------------------------------------ pass-through
 
@@ -136,7 +136,7 @@ test('a prompt that fits its model is sent untouched and nothing is asked', { op
   expect(out.text).toBe('write a testthat test for foo()')
   expect(w.asks).toEqual([])
   expect(w.arrived).toHaveLength(1)
-  expect(w.statuses).toEqual(['suggest-model: Sonnet fits'])
+  expect(w.statuses).toEqual(['model-picker: Sonnet fits'])
 })
 
 test('only the person typing is analysed: plugin, task, schedule, slash, mid-turn and short prompts pass silently', { options: { autoRoute: false } }, async ($, on) => {
@@ -144,7 +144,7 @@ test('only the person typing is analysed: plugin, task, schedule, slash, mid-tur
   await submit($, DEEP, { kind: 'plugin', name: 'other' })
   await submit($, DEEP, { kind: 'task-notification' })
   await submit($, DEEP, { kind: 'scheduled-trigger' })
-  await submit($, '/suggest-model derive the BLUP variance of everything')
+  await submit($, '/model-picker derive the BLUP variance of everything')
   await submit($, 'ok thanks') // short and no strong rule
   expect(w.asks).toEqual([])
   expect(w.arrived).toHaveLength(5)
@@ -162,7 +162,7 @@ test('a short prompt is judged only when it matches a strong rule', { options: {
   expect(w.arrived).toHaveLength(2)
 })
 
-test('unknown model, disabled mod and /suggest-model off do nothing', { options: { autoRoute: false } }, async ($, on) => {
+test('unknown model, disabled mod and /model-picker off do nothing', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on, { model: 'some-other-model' })
   await submit($, DEEP)
   expect(w.asks).toEqual([])
@@ -175,7 +175,7 @@ test('unknown model, disabled mod and /suggest-model off do nothing', { options:
   expect(w.asks).toHaveLength(1)
 })
 
-test('settings: enabled=false wins over /suggest-model on', { options: { autoRoute: false, enabled: false } }, async ($, on) => {
+test('settings: enabled=false wins over /model-picker on', { options: { autoRoute: false, enabled: false } }, async ($, on) => {
   const w = world(on)
   await submit($, DEEP)
   expect(w.asks).toEqual([])
@@ -202,7 +202,7 @@ for (const surface of SURFACES) {
       'Run this task as a subagent on Opus',
       "Keep Sonnet and don't suggest again this session",
     ])
-    expect(w.statuses).toEqual(['suggest-model: weak for this, use Opus']) // the status line is set before the dialog
+    expect(w.statuses).toEqual(['model-picker: weak for this, use Opus']) // the status line is set before the dialog
     expect(w.sets).toEqual([])
     expect(w.spawns).toEqual([])
   })
@@ -233,7 +233,7 @@ test('a light task on opus offers haiku', { options: { autoRoute: false } }, asy
   expect(w.asks[0]!.question.split('\n')[1]).toBe('Light task · typo or spelling')
   expect(w.asks[0]!.question).toContain('Haiku 1x ok · Sonnet 20x ok · Opus 40x best')
   expect(w.asks[0]!.question).toContain('Haiku would do · ~40x cheaper')
-  expect(w.statuses).toEqual(['suggest-model: overkill, Haiku would do (~40x cheaper)'])
+  expect(w.statuses).toEqual(['model-picker: overkill, Haiku would do (~40x cheaper)'])
 })
 
 test('no cheaper offer is made when already on haiku, and no stronger one on opus', { options: { autoRoute: false } }, async ($, on) => {
@@ -301,12 +301,13 @@ test('switch: a row with no matching option falls back to the toast', { options:
   expect(w.toasts.join(' ')).toContain('/model opus')
 })
 
-test('subagent: a refused spawn keeps the prompt for the current model', { options: { autoRoute: false } }, async ($, on) => {
-  const w = world(on, { answer: 'Run this task', spawnResult: () => ({ deny: 'no agents' }) })
+test('subagent: a refused spawn (e.g. auto mode) asks Claude to delegate, in your own prompt', { options: { autoRoute: false } }, async ($, on) => {
+  const w = world(on, { answer: 'Run this task', spawnResult: () => ({ deny: 'The server-side auto mode classifier gave no verdict for Agent' }) })
   const out = await submit($, DEEP)
-  expect(out.text).toBe(DEEP)
+  expect(out.text).toContain(DEEP)
+  expect(out.text).toContain('use the Agent tool with model "opus"')
   expect(w.arrived).toHaveLength(1)
-  expect(w.toasts.join(' ')).toContain('could not start the subagent')
+  expect(w.toasts.join(' ')).toContain('Asking Claude to run this as a')
 })
 
 // -------------------------------------------------------------------------------- codex
@@ -334,7 +335,7 @@ test('review on a weaker model with Codex present: Switch and Codex offered, one
 test('review on Opus with Codex present: a self-review dialog (Keep, Codex, mute), status "review, Codex available"', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on, { model: 'claude-opus-4-1', answer: 'Ask Codex' })
   const out = await submit($, REVIEW)
-  expect(w.statuses).toEqual(['suggest-model: review, Codex available'])
+  expect(w.statuses).toEqual(['model-picker: review, Codex available'])
   expect(w.asks[0]!.question.split('\n')[0]).toBe('Get a second opinion on this')
   expect(w.asks[0]!.question).toContain('A different model (Codex) catches more than Opus reviewing its own work')
   expect(w.asks[0]!.options).toEqual(['Keep Opus', 'Ask Codex for a read-only review', "Keep Opus and don't suggest again this session"])
@@ -348,7 +349,7 @@ test('review on Opus: Keep is the default and sends the prompt untouched; every 
   expect((await submit($, REVIEW)).text).toBe(REVIEW)
   await submit($, 'give me a second opinion on this approach to the model')
   expect(w.asks).toHaveLength(2) // no "already asked" memory
-  expect(w.statuses).toEqual(Array(2).fill('suggest-model: review, Codex available'))
+  expect(w.statuses).toEqual(Array(2).fill('model-picker: review, Codex available'))
   await submit($, 'write a testthat test for foo()')
   await submit($, REVIEW)
   expect(w.asks).toHaveLength(3)
@@ -360,7 +361,7 @@ test('review on Opus with Codex absent: silent apart from the status line, which
   const out = await submit($, REVIEW)
   expect(out.text).toBe(REVIEW)
   expect(w.asks).toEqual([])
-  expect(w.statuses).toEqual(['suggest-model: Opus fits'])
+  expect(w.statuses).toEqual(['model-picker: Opus fits'])
 })
 
 test('review on Opus respects minConfidence', { options: { autoRoute: false, minConfidence: 0.8 } }, async ($, on) => {
@@ -422,7 +423,7 @@ test('"don\'t suggest again" mutes the dialogs for the session, but the status l
     await submit($, DEEP)
   }
   expect(w.asks).toHaveLength(1)
-  expect(w.statuses.filter(x => x === 'suggest-model: weak for this, use Opus')).toHaveLength(7)
+  expect(w.statuses.filter(x => x === 'model-picker: weak for this, use Opus')).toHaveLength(7)
   expect(await command($, 'status')).toContain('Questions muted this session')
 })
 
@@ -442,7 +443,7 @@ test('the same mismatch asks EVERY time, back to back; the status line updates t
   await submit($, 'prove that the estimator is unbiased when the relationship matrix is singular')
   await submit($, 'design the architecture for a pipeline that scores a million genotypes per hour')
   expect(w.asks).toHaveLength(3)
-  expect(w.statuses).toEqual(Array(3).fill('suggest-model: weak for this, use Opus'))
+  expect(w.statuses).toEqual(Array(3).fill('model-picker: weak for this, use Opus'))
   expect(w.arrived).toHaveLength(3)
   // non-tasks in between are never judged
   await submit($, 'yes')
@@ -528,18 +529,18 @@ test('classifier failure is ignored', { options: { autoRoute: false, useClassifi
 
 // ---------------------------------------------------------------------------- commands
 
-test('/suggest-model status lists the last 5 predictions with reasons and outcomes', { options: { autoRoute: false } }, async ($, on) => {
+test('/model-picker status lists the last 5 predictions with reasons and outcomes', { options: { autoRoute: false } }, async ($, on) => {
   world(on)
   const prompts = [DEEP, 'write a testthat test for foo()', LIGHT, 'add a --verbose flag to the cli', REVIEW + ' now', 'fix typo in README please', 'rename x to y in analysis.R']
   for (const p of prompts) await submit($, p)
   const text = await command($, '')
-  expect(text).toContain('suggest-model · on · Sonnet')
+  expect(text).toContain('model-picker · on · Sonnet')
   const rows = text.split('\n').filter(l => /^ {2}(light|standard|deep|review) /.test(l))
   expect(rows).toHaveLength(5)
   expect(rows.some(r => r.includes('typo or spelling'))).toBe(true)
 })
 
-test('/suggest-model explain is a dry run: cues, per-model table, costs, recommendation, no dialog, no model call', { options: { autoRoute: false } }, async ($, on) => {
+test('/model-picker explain is a dry run: cues, per-model table, costs, recommendation, no dialog, no model call', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
   const text = await command($, 'explain derive the BLUP variance of the genomic breeding value under REML')
   expect(text).toContain('Deep task')
@@ -576,9 +577,9 @@ test('explain on fable lists Fable in the table', { options: { autoRoute: false 
   expect(text).toContain('status line only (spare capacity, Sonnet is the alternative')
 })
 
-test('/suggest-model with an unknown word shows status plus usage', { options: { autoRoute: false } }, async ($, on) => {
+test('/model-picker with an unknown word shows status plus usage', { options: { autoRoute: false } }, async ($, on) => {
   world(on)
-  expect(await command($, 'banana')).toContain('Try: /suggest-model')
+  expect(await command($, 'banana')).toContain('Try: /model-picker')
 })
 
 // -------------------------------------------------------------------------- fail-open
@@ -587,7 +588,7 @@ test('dialog dismissed (Esc): the prompt is HELD by default, never sent, and ech
   const w = world(on, { answer: 'REJECT' })
   const out = await submit($, DEEP)
   expect(w.arrived).toEqual([]) // nothing reached the model
-  expect(JSON.stringify(out)).toContain('suggest-model blocked your prompt · nothing was sent')
+  expect(JSON.stringify(out)).toContain('model-picker blocked your prompt · nothing was sent')
   expect(w.logs.join('\n')).toContain(DEEP) // the prompt text is returned in the transcript note
   expect(w.sets).toEqual([])
   expect(w.spawns).toEqual([])
@@ -645,9 +646,9 @@ test('every prompt is evaluated locally: each checked prompt refreshes the statu
   await submit($, DEEP)
   await submit($, 'please help me with my analysis of the field trial') // cannot be placed: silent, line cleared
   expect(w.statuses).toEqual([
-    'suggest-model: Sonnet fits',
-    'suggest-model: overkill, Haiku would do (~20x cheaper)',
-    'suggest-model: weak for this, use Opus',
+    'model-picker: Sonnet fits',
+    'model-picker: overkill, Haiku would do (~20x cheaper)',
+    'model-picker: weak for this, use Opus',
     undefined,
   ])
   expect(w.asks).toHaveLength(2)
@@ -661,18 +662,18 @@ for (const surface of SURFACES) {
   test(`status line on ${surface}: fits, overkill and weak wording, set on every checked prompt`, { options: { autoRoute: false } }, async ($, on) => {
     const w = world(on, { surfaces: [surface], model: 'claude-opus-4-1' })
     await submit($, 'write a testthat test for foo()')
-    expect(w.statuses.at(-1)).toBe('suggest-model: Sonnet would do (~2x cheaper)')
+    expect(w.statuses.at(-1)).toBe('model-picker: Sonnet would do (~2x cheaper)')
     await submit($, DEEP)
-    expect(w.statuses.at(-1)).toBe('suggest-model: Opus fits')
+    expect(w.statuses.at(-1)).toBe('model-picker: Opus fits')
     await submit($, LIGHT)
-    expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do (~40x cheaper)')
+    expect(w.statuses.at(-1)).toBe('model-picker: overkill, Haiku would do (~40x cheaper)')
     expect(w.asks).toHaveLength(1) // only the mismatch asked
     w.model = 'claude-haiku-4-5'
     await submit($, 'write a testthat test for foo()')
-    expect(w.statuses.at(-1)).toBe('suggest-model: Haiku is borderline for this, Sonnet is safer')
+    expect(w.statuses.at(-1)).toBe('model-picker: Haiku is borderline for this, Sonnet is safer')
     w.model = 'claude-sonnet-4-5'
     await submit($, DEEP)
-    expect(w.statuses.at(-1)).toBe('suggest-model: weak for this, use Opus')
+    expect(w.statuses.at(-1)).toBe('model-picker: weak for this, use Opus')
     expect(w.asks).toHaveLength(2)
   })
 }
@@ -688,7 +689,7 @@ test('statusLine = false: the verdict still works but the status line is never t
 test('a switch updates the status line to say so', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on, { answer: 'Switch' })
   await submit($, DEEP)
-  expect(w.statuses.at(-1)).toBe('suggest-model: switched to Opus')
+  expect(w.statuses.at(-1)).toBe('model-picker: switched to Opus')
 })
 
 test('no dialog for anything that fits: opus on deep, sonnet on standard, haiku on light, fable on deep', { options: { autoRoute: false } }, async ($, on) => {
@@ -701,7 +702,7 @@ test('no dialog for anything that fits: opus on deep, sonnet on standard, haiku 
   w.model = 'claude-fable-1'
   await submit($, DEEP)
   expect(w.asks).toEqual([])
-  expect(w.statuses).toEqual(['suggest-model: Opus fits', 'suggest-model: Sonnet fits', 'suggest-model: Haiku fits', 'suggest-model: Fable fits'])
+  expect(w.statuses).toEqual(['model-picker: Opus fits', 'model-picker: Sonnet fits', 'model-picker: Haiku fits', 'model-picker: Fable fits'])
   expect(w.arrived).toHaveLength(4)
 })
 
@@ -715,7 +716,7 @@ test('fable as the current model: light work warns (overkill) and shows Fable in
   expect(ask.question).toContain('Haiku 1x ok · Sonnet 20x ok · Opus 40x best · Fable best')
   expect(ask.question).toContain('Haiku would do.') // no ratio is invented for fable
   expect(ask.options).toEqual(['Keep Fable', 'Switch session to Haiku', 'Run this task as a subagent on Haiku', "Keep Fable and don't suggest again this session"])
-  expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do')
+  expect(w.statuses.at(-1)).toBe('model-picker: overkill, Haiku would do')
 })
 
 test('askOnStandard: an ordinary task on a borderline or roomy model blocks and asks too', { options: { autoRoute: false, askOnStandard: true } }, async ($, on) => {
@@ -744,9 +745,9 @@ test('without askOnStandard an ordinary task never asks, whatever the model', { 
 test('fable as the current model: standard work gets a status hint only, deep work fits', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on, { model: 'claude-fable-1' })
   await submit($, 'write a testthat test for foo()')
-  expect(w.statuses.at(-1)).toBe('suggest-model: Sonnet would do')
+  expect(w.statuses.at(-1)).toBe('model-picker: Sonnet would do')
   await submit($, DEEP)
-  expect(w.statuses.at(-1)).toBe('suggest-model: Fable fits')
+  expect(w.statuses.at(-1)).toBe('model-picker: Fable fits')
   expect(w.asks).toEqual([])
 })
 
@@ -754,13 +755,13 @@ test('fable with a cost in the setting shows the saving', { options: { autoRoute
   const w = world(on, { model: 'claude-fable-1' })
   await submit($, LIGHT)
   expect(w.asks[0]!.question).toContain('Fable 10x best')
-  expect(w.statuses.at(-1)).toBe('suggest-model: overkill, Haiku would do (~10x cheaper)')
+  expect(w.statuses.at(-1)).toBe('model-picker: overkill, Haiku would do (~10x cheaper)')
 })
 
 test('the cost setting changes the recommendation; bad input falls back to the defaults, never breaks a prompt', { options: { autoRoute: false, costRatios: 'haiku=1,sonnet=6,opus=4' } }, async ($, on) => {
   const w = world(on, { model: 'claude-haiku-4-5' })
   await submit($, 'write a testthat test for foo()')
-  expect(w.statuses.at(-1)).toBe('suggest-model: Haiku is borderline for this, Opus is safer')
+  expect(w.statuses.at(-1)).toBe('model-picker: Haiku is borderline for this, Opus is safer')
 })
 
 test('garbage in the cost setting is ignored and the defaults apply', { options: { autoRoute: false, costRatios: 'banana, ===, opus=-4' } }, async ($, on) => {
@@ -772,19 +773,19 @@ test('garbage in the cost setting is ignored and the defaults apply', { options:
 
 // ------------------------------------------------------------------- typed words need the slash
 
-test('a bare typed suggest-model word is not a command: it is reviewed like any prompt and the switch is unchanged', { options: { autoRoute: false } }, async ($, on) => {
+test('a bare typed model-picker word is not a command: it is reviewed like any prompt and the switch is unchanged', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
-  const words = ['suggest-model', 'suggest model', 'suggest-model off', 'Suggest-Model on.']
+  const words = ['model-picker', 'suggest model', 'model-picker off', 'Suggest-Model on.']
   for (const t of words) expect(await submit($, t), t).toEqual({ text: t })
   expect(w.arrived.map(x => x.text)).toEqual(words)
-  expect(await command($, '')).toContain('suggest-model · on')
+  expect(await command($, '')).toContain('model-picker · on')
   await submit($, DEEP)
   expect(w.asks).toHaveLength(1) // still on
 })
 
 test('a prompt that merely contains the keyword is untouched and goes to the model', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
-  const prompts = ['what does suggest-model do', 'suggest-model please', 'turn suggest-model off for this session', 'the model fit is poor, refit with REML']
+  const prompts = ['what does model-picker do', 'model-picker please', 'turn model-picker off for this session', 'the model fit is poor, refit with REML']
   for (const t of prompts) {
     const out = await submit($, t)
     expect(out.text).toBe(t)
@@ -792,17 +793,17 @@ test('a prompt that merely contains the keyword is untouched and goes to the mod
   expect(w.arrived.map(x => x.text)).toEqual(prompts)
 })
 
-test('/suggest-model on respects enabled = false', { options: { autoRoute: false, enabled: false } }, async ($, on) => {
+test('/model-picker on respects enabled = false', { options: { autoRoute: false, enabled: false } }, async ($, on) => {
   world(on)
-  expect(await command($, 'on')).toContain('suggest-model · disabled')
+  expect(await command($, 'on')).toContain('model-picker · disabled')
 })
 
 test('the slash command still works with the same functions', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
-  expect(await command($, 'off')).toContain('suggest-model · off')
+  expect(await command($, 'off')).toContain('model-picker · off')
   await submit($, DEEP)
   expect(w.asks).toEqual([])
-  expect(await command($, 'on')).toContain('suggest-model · on · Sonnet')
+  expect(await command($, 'on')).toContain('model-picker · on · Sonnet')
   expect(await command($, 'status')).toContain('Blocks and asks on a mismatch')
 })
 
@@ -831,9 +832,9 @@ test('a failing status line never blocks the prompt or the dialog', { options: {
   expect(w.arrived).toHaveLength(1)
 })
 
-test('a failing /suggest-model off says nothing changed', { options: { autoRoute: false } }, async ($, on) => {
+test('a failing /model-picker off says nothing changed', { options: { autoRoute: false } }, async ($, on) => {
   world(on, { breaks: new Set(['storeSet']) })
-  expect(await command($, 'off')).toBe('suggest-model · that did not work, nothing changed')
+  expect(await command($, 'off')).toBe('model-picker · that did not work, nothing changed')
 })
 
 // ------------------------------------------------------------------- effort-watch
@@ -846,7 +847,7 @@ test('effort-watch: max effort on a light task adds a note to the status line, a
   for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-haiku-5-5', effort: 'max', messageCount: 1 } as never)) void _
   await w.clock.advance(5)
   await submit($, LIGHT)
-  expect(w.statuses.at(-1)).toBe('suggest-model: Haiku fits · effort max is more than this needs · /effort medium')
+  expect(w.statuses.at(-1)).toBe('model-picker: Haiku fits · effort max is more than this needs · /effort medium')
   expect(w.asks).toHaveLength(0)
   expect(w.arrived).toHaveLength(1) // the prompt went through
 })
@@ -859,7 +860,7 @@ test('effort-watch: medium effort says nothing extra; the effortWatch setting of
   for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-haiku-5-5', effort: 'max', messageCount: 1 } as never)) void _
   await w.clock.advance(5)
   await submit($, LIGHT)
-  expect(w.statuses.at(-1)).toBe('suggest-model: Haiku fits')
+  expect(w.statuses.at(-1)).toBe('model-picker: Haiku fits')
 })
 
 // ---------------------------------------------------------------------- routing without a switch

@@ -25,9 +25,9 @@ export type Snapshot = {
   model?: string
   provider?: string
   effort?: string | number
-  /** suggest-model's advice when the effort level does not fit the last task (`medium would do`), else absent. */
+  /** model-picker's advice when the effort level does not fit the last task (`medium would do`), else absent. */
   effortAdvice?: string
-  /** The model suggest-model routed this conversation to (`Haiku`), when it differs from the session's; else absent. */
+  /** The model model-picker routed this conversation to (`Haiku`), when it differs from the session's; else absent. */
   routedTo?: string
   /** The configured permission mode (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). */
   permissionMode?: string
