@@ -264,26 +264,23 @@ async function act($: Dollar, action: Action): Promise<void> {
 /** Asked when the advisor is picked while a variable keeps it off: what is in the way, and a way out. */
 async function offerAdvisorFix($: Dollar, blockedBy: string, model: string): Promise<void> {
   const isTelemetry = blockedBy === 'DISABLE_TELEMETRY'
-  const FIX = 'Ask Claude to fix it'
-  const KEEP = isTelemetry ? 'Keep telemetry off' : 'Leave it off'
-  const text = [
-    `The advisor cannot run: ${blockedBy}=1 is set in your environment.`,
-    isTelemetry
-      ? 'Claude Code turns the advisor on through a feature flag it fetches, and DISABLE_TELEMETRY stops that fetch. Removing it turns usage telemetry back on.'
-      : 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL turns the advisor tool off entirely.',
-    `"${FIX}" puts a request in the prompt box; nothing changes until you send it and approve the edit. Restart afterwards, then run /advisor ${model}.`,
-  ].join('\n')
+  const YES = 'Yes, go ahead'
+  const NO = 'No'
+  const text = isTelemetry
+    ? `Using the advisor turns Claude Code's telemetry back on (DISABLE_TELEMETRY is removed from your settings). OK to proceed?`
+    : `Using the advisor removes CLAUDE_CODE_DISABLE_ADVISOR_TOOL from your settings. OK to proceed?`
   let answer: string
   try {
-    answer = await $.ui.ask(text, { options: [FIX, KEEP], header: 'Advisor off' })
+    answer = await $.ui.ask(text, { options: [YES, NO], header: 'Advisor' })
   } catch {
     return // Esc: nothing changes
   }
-  if (answer !== FIX) return
+  if (answer !== YES) return
   const request = isTelemetry
-    ? 'Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json, and if ~/.claude/moddeck/state/user.json lists "telemetry-off" under "selected", take it out so a moddeck update does not put it back. Back up both files first. This is so the advisor tool can run.'
-    : 'Remove CLAUDE_CODE_DISABLE_ADVISOR_TOOL from the env block of ~/.claude/settings.json (back the file up first) so the advisor tool can run.'
+    ? `Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json, and if ~/.claude/moddeck/state/user.json lists "telemetry-off" under "selected", take it out so a moddeck update does not put it back. Back up both files first. Then tell me to restart and run /advisor ${model}.`
+    : `Remove CLAUDE_CODE_DISABLE_ADVISOR_TOOL from the env block of ~/.claude/settings.json (back the file up first). Then tell me to restart and run /advisor ${model}.`
   await act($, { text: request, run: false })
+  $.ui.toast('Press Enter to make the change')
 }
 
 async function pick($: Dollar, id: string, command: string, value: string, fillsPrompt = false, blockedBy?: string): Promise<void> {
@@ -1109,8 +1106,10 @@ export const register: Register = (on, options) => {
       const run = () => (t.click ? act($, t.click) : undefined)
       // In the app every name is a pill (INK): green or red for a switch, gray for a command that runs on click. The pill box
       // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
+      // The name in a small box drawn like the group cards (round, the cards' border colour), filled like the Side
+      // Question box. The whole box is the button.
       const pillOf = (key: string, color: string, onPress: () => unknown) => (
-        <Box key={`pill:${t.id}`} backgroundColor={color} flexShrink={0}>
+        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" backgroundColor={color} flexShrink={0}>
           <Button key={key} plain onPress={onPress as () => void}>
             <Text bold color={ink?.text} backgroundColor={color}>
               {text}
@@ -1120,7 +1119,7 @@ export const register: Register = (on, options) => {
       )
       // Every name sits in the same neutral box; a switch says on or off only by the dot after it (green on, red off).
       const name = desk ? (
-        pillOf(isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`, ink!.run, isOn === undefined ? run : press)
+        pillOf(isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`, ink!.fill, isOn === undefined ? run : press)
       ) : (
         <Button key={isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`} plain label={isOn === undefined ? undefined : `${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={isOn === undefined ? run : press}>
           <Text bold inverse>

@@ -414,12 +414,13 @@ test('advisor kept off by DISABLE_TELEMETRY: picking a model explains why and of
   on('tool.call', { tool: 'AskUserQuestion' }, (_, e) => {
     const q = e.questions[0]!
     asked.push(q.question)
-    return { result: { questions: e.questions, answers: { [q.question]: 'Ask Claude to fix it' } } } as never
+    return { result: { questions: e.questions, answers: { [q.question]: 'Yes, go ahead' } } } as never
   })
   const pane = await mount($, 'desktop')
   expect(await texts(pane)).toContain('Kept off by DISABLE_TELEMETRY=1')
   await pane.select({ key: 'level:advisor', value: 'opus' } as never)
-  expect(asked[0]).toContain('DISABLE_TELEMETRY=1')
+  expect(asked[0]).toContain('turns Claude Code\'s telemetry back on')
+  expect(asked[0]).toContain('OK to proceed?')
   expect(w.filled.at(-1)).toContain('Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json')
   expect(w.filled).not.toContain('/advisor opus') // nothing to run until the variable is gone
 })
@@ -549,8 +550,8 @@ test('desktop: no button carries a label (the app would draw it instead of the n
   expect(JSON.stringify(await pane.find({ key: 'switch:suggest' }))).toMatch(/"label":" ?suggest *"/)
   expect(await pane.find({ key: 'expand' })).toBeUndefined() // the app's own frame has expand and close
   expect(await switchOf(pane, 'desktop', 'suggest')).toContain(ON('desktop'))
-  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"backgroundColor":"#374151"') // every name: the same gray pill
-  expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).toContain('"backgroundColor":"#374151"') // a switch too: only its dot says on or off
+  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"borderStyle":"round"') // every name: a box like the group cards
+  expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).toContain('"backgroundColor":"#1F1F1E"') // a switch too, filled like the Side Question box; only its dot says on or off
   expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).not.toContain('padding') // the whole coloured area is the button
   for (const key of ['row:suggest', 'row:command-guard', 'group:Prompt helpers', 'session', 'btw']) {
     const box = await pane.find({ key })
@@ -612,7 +613,7 @@ test('desktop: the appTheme setting picks the light colours without a command', 
   world(on)
   const pane = await mount($, 'desktop')
   expect(JSON.stringify(await pane.find({ key: 'group:Workspace utilities' }))).toContain('"backgroundColor":"#FAF9F5"')
-  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"backgroundColor":"#E5E7EB"')
+  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"backgroundColor":"#FAF9F5"')
 })
 
 test('desktop: the sun and the moon at the top switch the colours, the one in use at full strength; the terminal has neither', MODS, async ($, on) => {
