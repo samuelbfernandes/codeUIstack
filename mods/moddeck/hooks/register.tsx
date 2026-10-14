@@ -258,7 +258,13 @@ async function act($: Dollar, action: Action): Promise<void> {
 }
 
 /** A dropdown pick: remember it for the drawing, then run the mod's own command with it. */
-async function pick($: Dollar, id: string, command: string, value: string): Promise<void> {
+async function pick($: Dollar, id: string, command: string, value: string, fillsPrompt = false): Promise<void> {
+  if (fillsPrompt) {
+    // Claude Code's own command: a mod cannot run it, so it goes in the prompt box; the row follows the setting once sent.
+    await act($, { text: `/${command} ${value}`, run: false })
+    $.ui.toast(`Press Enter to run /${command} ${value}`)
+    return
+  }
   await safe(() => update($, picks, p => ({ ...p, [id]: value })))
   try {
     const out = (await $.command.run({ command, args: value })) as { text?: string } | undefined
@@ -272,7 +278,7 @@ async function pick($: Dollar, id: string, command: string, value: string): Prom
 async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>): Promise<void> {
   const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
   if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
-  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off')
+  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off', t.fillsPrompt === true)
 }
 
 async function safe(f: () => Promise<unknown>): Promise<void> {
@@ -1045,7 +1051,7 @@ export const register: Register = (on, options) => {
     const advisorBlock = noAdvisor === '1' ? 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL' : noTelemetry === '1' ? 'DISABLE_TELEMETRY' : undefined
     const levelOf: Record<string, string | undefined> = {
       'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
-      advisor: chosen.advisor ?? savedAdvisor,
+      advisor: savedAdvisor, // the setting: /advisor writes it, a pick here only fills the prompt box
     }
     // A level the list does not name (a saved "sonnet") is still shown as picked.
     const levelsOf = (t: Tool): string[] => (t.levels !== undefined && levelOf[t.id] !== undefined && !t.levels.includes(levelOf[t.id]!) ? [...t.levels, levelOf[t.id]!] : (t.levels ?? []))
@@ -1094,7 +1100,7 @@ export const register: Register = (on, options) => {
           </Button>
         )
       const level = t.levels !== undefined && (
-        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
+        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v, t.fillsPrompt === true)} />
       )
       return (
         <Box key={`row:${t.id}`} columnGap={1} {...fit}>

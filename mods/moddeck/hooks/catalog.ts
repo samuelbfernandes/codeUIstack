@@ -32,6 +32,8 @@ export type Tool = {
   click?: Action
   /** A dropdown of levels, one of them `off`: the name is green while on, red while off. The pick runs `/<command> <level>` at once. */
   levels?: string[]
+  /** A level is set by Claude Code's own command, which a mod cannot run: a pick puts `/<command> <level>` in the prompt box instead. */
+  fillsPrompt?: true
   /** A row with nothing to type says when it appears instead. */
   note?: string
   /** Buttons right after the name (keep the labels short: the description gets what is left): only while a switch is on, always for the others. */
@@ -136,6 +138,7 @@ export const TOOLS: Tool[] = [
     costs: true,
     command: 'advisor',
     levels: ['off', 'opus', 'fable'],
+    fillsPrompt: true,
   },
   { id: 'review-cost', label: 'review-cost', group: 'Model controls', icon: '$', desc: 'Shows review cost before a push', isSwitch: true, command: 'review-cost' },
   {

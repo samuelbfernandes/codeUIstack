@@ -363,19 +363,15 @@ test('▾ folds a card down to its title (with its count), ▸ opens it again, a
   expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
 })
 
-test('advisor works like blast-radius: a dropdown, its name red while off and green while on, a click flips it back', async ($, on) => {
+test('advisor: a dropdown and a red/green name like blast-radius; a pick or a click puts /advisor in the prompt box', async ($, on) => {
   const w = world(on)
   const pane = await mount($, 'desktop')
   expect(JSON.stringify(await pane.find({ key: 'level:advisor' }))).toContain('"value":"off"')
   expect(await switchOf(pane, 'desktop', 'advisor')).toContain(OFF('desktop'))
   await pane.select({ key: 'level:advisor', value: 'fable' } as never)
-  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(ON('desktop'))
-  await pane.press({ key: 'switch:advisor' }) // on -> off
-  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(OFF('desktop'))
-  await pane.press({ key: 'switch:advisor' }) // off -> the model it had
-  expect(JSON.stringify(await pane.find({ key: 'level:advisor' }))).toContain('"value":"fable"')
-  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(ON('desktop'))
-  void w
+  expect(w.filled.at(-1)).toBe('/advisor fable') // Claude Code's own command: a mod cannot run it
+  await pane.press({ key: 'switch:advisor' }) // off -> the first model
+  expect(w.filled.at(-1)).toBe('/advisor opus')
 })
 
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
