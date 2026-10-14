@@ -23,4 +23,4 @@ If the project has an `AGENTS.md` or `README`, read it first: it is that project
 
 ## Installed tools you can mention (do not re-propose)
 `/suggest-model` (suggests a better-fitting model), `/branch-janitor` (offers to delete finished branches), `/keepwarm`,
-`/replay`, `/reflect`, `/agents-info`, `/filetree`, `/skin`. Skills: `dual-model-review`, `agents-md-scaffold`.
+`/replay`, `/reflect`, `/progress`, `/filetree`. Skills: `dual-model-review`, `agents-md-scaffold`.

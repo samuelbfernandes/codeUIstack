@@ -18,23 +18,13 @@
       "description": "Saves tokens: when the model reads a large data or log file whole, it gets the first lines and a note, unless it asks for a range itself."
     },
     {
-      "name": "blast-radius",
-      "source": "./mods/blast-radius",
-      "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system."
-    },
-    {
       "name": "branch-janitor",
       "source": "./mods/branch-janitor",
       "description": "Watches your git branches by itself (nothing to run) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question."
     },
     {
-      "name": "budget-guard",
-      "source": "./mods/budget-guard",
-      "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /budget-guard for a short report."
-    },
-    {
-      "name": "cache-tax",
-      "source": "./mods/cache-tax",
+      "name": "cache-guard",
+      "source": "./mods/cache-guard",
       "description": "Stops you once before a message that would re-write a cold prompt cache, shows the price, and can keep the cache warm with /keepwarm."
     },
     {
@@ -43,9 +33,9 @@
       "description": "One-click safety snapshots of your working tree (untracked files too) that never touch your branch, index or stash. /checkpoint, list, diff, restore, drop. Restore shows what would be lost and asks first."
     },
     {
-      "name": "color-lab",
-      "source": "./mods/color-lab",
-      "description": "Checks the contrast of a text colour on a background (WCAG 2.x AA and AAA) and suggests the nearest shade that passes. Pure arithmetic; reads no files."
+      "name": "command-guard",
+      "source": "./mods/command-guard",
+      "description": "Holds risky Bash commands (rm -rf, git reset --hard, force push, DROP TABLE ...), shows exactly what they would destroy, and asks first. A safety net, not a permission system."
     },
     {
       "name": "concise",
@@ -53,9 +43,9 @@
       "description": "While switched on, every prompt carries rules that shape Claude's replies so you can act on them: the next action first, numbered steps, state restated each turn, no tangents, specific time estimates. Off until you type /concise on."
     },
     {
-      "name": "csv-table",
-      "source": "./mods/csv-table",
-      "description": "Previews a csv, tsv or txt table in a pane: delimiter, columns with simple types, row count and the first 20 rows. Reads only the file you name."
+      "name": "contrast-check",
+      "source": "./mods/contrast-check",
+      "description": "Checks the contrast of a text colour on a background (WCAG 2.x AA and AAA) and suggests the nearest shade that passes. Pure arithmetic; reads no files."
     },
     {
       "name": "data-guard",
@@ -71,6 +61,11 @@
       "name": "diagram",
       "source": "./mods/diagram",
       "description": "Draws the last mermaid diagram from Claude's answer as box art in a pane: run /diagram to open it. Flowcharts, sequence diagrams and pie charts; offline, no model tokens."
+    },
+    {
+      "name": "edit-replay",
+      "source": "./mods/edit-replay",
+      "description": "/replay steps through every file edit Claude made in the last turn (or the session), one diff at a time."
     },
     {
       "name": "error-inbox",
@@ -98,6 +93,11 @@
       "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check."
     },
     {
+      "name": "progress",
+      "source": "./mods/progress",
+      "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts."
+    },
+    {
       "name": "prompt-library",
       "source": "./mods/prompt-library",
       "description": "Keeps your saved prompts, per project: /prompts add, use, rename, remove. The moddeck side bar shows them."
@@ -106,11 +106,6 @@
       "name": "reflect",
       "source": "./mods/reflect",
       "description": "Turns your corrections (\"no, use pnpm\", \"never do X\") into rules you can save to CLAUDE.md with one click."
-    },
-    {
-      "name": "replay-theater",
-      "source": "./mods/replay-theater",
-      "description": "/replay steps through every file edit Claude made in the last turn (or the session), one diff at a time."
     },
     {
       "name": "repro-log",
@@ -123,11 +118,6 @@
       "description": "Before a git push triggers the automatic second-model review, shows its estimated token cost (green / amber / red) and lets you choose Review or Skip."
     },
     {
-      "name": "savvy-progress",
-      "source": "./mods/savvy-progress",
-      "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts."
-    },
-    {
       "name": "scope-watch",
       "source": "./mods/scope-watch",
       "description": "Set the folder you are working in; when Claude edits a file outside it, you get a toast and Claude gets a short note to check the edit was intended. Never blocks."
@@ -138,8 +128,8 @@
       "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent."
     },
     {
-      "name": "staged-review",
-      "source": "./mods/staged-review",
+      "name": "staged-diff",
+      "source": "./mods/staged-diff",
       "description": "Shows what is staged for the next commit (git diff --cached, stat and diff) in a pane, with a Refresh button. Read-only."
     },
     {
@@ -148,19 +138,24 @@
       "description": "Checks every prompt locally (zero tokens). When the current model is likely too weak or overkill, it blocks the prompt and shows a dialog (\"Don't use X for this task\"), recommending the model with the best predicted fit per cost."
     },
     {
+      "name": "table-preview",
+      "source": "./mods/table-preview",
+      "description": "Previews a csv, tsv or txt table in a pane: delimiter, columns with simple types, row count and the first 20 rows. Reads only the file you name."
+    },
+    {
       "name": "test-ledger",
       "source": "./mods/test-ledger",
       "description": "Keeps a list of the test, lint, build, format and check commands Claude runs this session (pytest, R CMD check, cargo, npm, ruff, ...) with pass or fail and duration. Watches only; never blocks."
     },
     {
-      "name": "tool-skins",
-      "source": "./mods/tool-skins",
-      "description": "Restyles tool-call rows and Edit/Write diff cards in seven colour themes; /skin <theme> switches live."
-    },
-    {
       "name": "ui-preview",
       "source": "./mods/ui-preview",
       "description": "Runs the app in this project (a plumber API first; also npm run dev, Shiny for R or Python, Streamlit) on 127.0.0.1 and shows it in a pane: the plumber routes, the output, a headless-browser screenshot, and a button that drafts a review prompt. Starts nothing until you ask."
+    },
+    {
+      "name": "usage-meter",
+      "source": "./mods/usage-meter",
+      "description": "A quiet usage line above the prompt that appears only when context, a plan window or a dollar limit needs a look, and an optional limit (plan-window used/total, or dollars for API-key use) that asks before the next prompt instead of refusing. Type /usage-meter for a short report."
     }
   ]
 }

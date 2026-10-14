@@ -1,7 +1,0 @@
-{
-  "name": "staged-review",
-  "version": "0.1.0",
-  "description": "Shows what is staged for the next commit (git diff --cached, stat and diff) in a pane, with a Refresh button. Read-only.",
-  "author": { "name": "Samuel Fernandes" },
-  "types": "./types/index.d.ts"
-}

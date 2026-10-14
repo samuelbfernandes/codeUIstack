@@ -6,11 +6,11 @@ pages it cites were re-read on 2026-10-12 for pricing and caching). Nothing here
 ## Already covered by a mod
 | # | Mistake | Mod |
 |---|---|---|
-| 12 | Walking away mid-session (cold cache) | `cache-tax` (guard + `/keepwarm`) |
-| 14 | No safety net | `blast-radius`, `secret-guard`, `data-guard` |
+| 12 | Walking away mid-session (cold cache) | `cache-guard` (guard + `/keepwarm`) |
+| 14 | No safety net | `command-guard`, `secret-guard`, `data-guard` |
 | 15 | No backup | `checkpoint` |
 | 17 | Infinite exploration | `big-file-guard` (partly) |
-| 18 | Never checking usage | `budget-guard`, moddeck Session box |
+| 18 | Never checking usage | `usage-meter`, moddeck Session box |
 | 23 | No model routing | `suggest-model` |
 | 4 | Side questions in the main chat | built-in `/btw`; moddeck's own `/btw` panel shows the answer in the side bar (`aside` was dropped) |
 
@@ -38,4 +38,4 @@ pages it cites were re-read on 2026-10-12 for pricing and caching). Nothing here
 
 ## Not worth building
 - A second side-question tool: `/btw` exists.
-- Auto-`/loop` pings beyond `cache-tax`'s `/keepwarm`: Anthropic lists scheduled tasks as a cost driver.
+- Auto-`/loop` pings beyond `cache-guard`'s `/keepwarm`: Anthropic lists scheduled tasks as a cost driver.

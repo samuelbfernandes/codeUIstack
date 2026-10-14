@@ -15,10 +15,10 @@ const H = 60 * MIN
 const MODS = {
   plugins: [
     {
-      name: 'budget-guard',
+      name: 'usage-meter',
       register(on: On) {
         on('command.run', { command: 'seed-budget-guard' }, async ($, e) => {
-          await $.state.set({ plugin: 'budget-guard', key: 'ledger' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
+          await $.state.set({ plugin: 'usage-meter', key: 'ledger' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
           return { text: 'seeded' }
         })
       },
@@ -33,10 +33,10 @@ const MODS = {
       },
     },
     {
-      name: 'cache-tax',
+      name: 'cache-guard',
       register(on: On) {
         on('command.run', { command: 'seed-cache-tax' }, async ($, e) => {
-          await $.state.set({ plugin: 'cache-tax', key: 'cache' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
+          await $.state.set({ plugin: 'cache-guard', key: 'cache' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
           return { text: 'seeded' }
         })
       },

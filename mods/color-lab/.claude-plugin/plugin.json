@@ -1,7 +1,0 @@
-{
-  "name": "color-lab",
-  "version": "0.1.0",
-  "description": "Checks the contrast of a text colour on a background (WCAG 2.x AA and AAA) and suggests the nearest shade that passes. Pure arithmetic; reads no files.",
-  "author": { "name": "Samuel Fernandes" },
-  "types": "./types/index.d.ts"
-}

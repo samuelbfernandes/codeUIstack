@@ -55,20 +55,32 @@ class Detected:
         return bool(self.tools.get(tool))
 
 
+# Mods renamed so their names say what they do: an install that chose the old name keeps the choice under the new one
+# (the installer then removes the old plugin and installs the new). tool-skins was dropped: the app draws tool rows itself.
+RENAMED: dict[str, str] = {
+    "savvy-progress": "progress", "blast-radius": "command-guard", "budget-guard": "usage-meter", "cache-tax": "cache-guard",
+    "replay-theater": "edit-replay", "color-lab": "contrast-check", "csv-table": "table-preview", "staged-review": "staged-diff",
+}
+
+
+def renamed(ids) -> set[str]:
+    """Saved item ids with renamed mods under their new names."""
+    return {RENAMED.get(i, i) for i in ids}
+
+
 # name -> (token note, needs, start-here)
 MOD_META: dict[str, tuple[str, str, bool]] = {
-    "blast-radius": ("none", "", True),
+    "command-guard": ("none", "", True),
     "suggest-model": ("none (local rules)", "", True),
     "branch-janitor": ("none", "", True),
-    "cache-tax": ("none (keep-warm pings are optional)", "", True),
+    "cache-guard": ("none (keep-warm pings are optional)", "", True),
     "review-cost": ("none (only estimates)", "codex", True),
     "reflect": ("small: a corrected prompt goes once to a small model", "", False),
-    "savvy-progress": ("none", "", False),
+    "progress": ("none", "", False),
     "filetree": ("none", "", False),
-    "replay-theater": ("none", "", False),
-    "tool-skins": ("none", "", False),
+    "edit-replay": ("none", "", False),
     "secret-guard": ("none", "", True),
-    "budget-guard": ("none", "", True),
+    "usage-meter": ("none", "", True),
     "diagram": ("none", "", False),
     "moddeck": ("none", "", True),
     "data-guard": ("none", "", True),

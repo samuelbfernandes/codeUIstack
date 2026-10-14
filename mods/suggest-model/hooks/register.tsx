@@ -8,7 +8,7 @@
 // measurement.
 //
 // HOW THE DIALOG HOLDS THE PROMPT: a hook has 10 s of its OWN time, but the clock stops while
-// a `$` call is in flight, and `$.ui.ask` is one (the pattern blast-radius uses). So the hook
+// a `$` call is in flight, and `$.ui.ask` is one (the pattern command-guard uses). So the hook
 // simply awaits the question; the person may take minutes at no cost.
 //
 // FAIL OPEN for everything except the question itself: an error in the predictor, state, switch,

@@ -3,7 +3,7 @@
 //
 //  - a switch (the mods that work by themselves) is its name, green when on and red when off; a click flips it, and its
 //    actions show only while it is on;
-//  - blast-radius is a switch too (off, or back to its last level) with a dropdown of levels right after the name;
+//  - command-guard is a switch too (off, or back to its last level) with a dropdown of levels right after the name;
 //  - any other name runs its command at once (`run`), or puts it in the prompt box when it needs your text or changes
 //    something; a tool with a single task has just its name: no button repeats it.
 
@@ -128,7 +128,7 @@ export const TOOLS: Tool[] = [
       { label: 'off', text: '/scope-watch off', run: false },
     ],
   },
-  { id: 'blast-radius', label: 'blast-radius', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'blast-radius', levels: ['off', 'low', 'medium', 'high'] },
+  { id: 'command-guard', label: 'command-guard', group: 'Model controls', icon: '◎', desc: 'Asks before risky commands', command: 'command-guard', levels: ['off', 'low', 'medium', 'high'] },
   {
     id: 'advisor',
     label: 'advisor',
@@ -158,30 +158,40 @@ export const TOOLS: Tool[] = [
     label: 'branch-janitor',
     group: 'Workspace utilities',
     icon: '⑂',
-    desc: 'Offers to delete finished branches',
-    click: { text: '/branch-janitor', run: true },
+    desc: 'On: watches this repository and offers to delete finished branches',
+    isSwitch: true,
+    command: 'branch-janitor',
     options: [
+      { label: 'check', text: '/branch-janitor', run: true },
       { label: 'clean', text: '/branch-janitor clean', run: false },
-      { label: 'off', text: '/branch-janitor off', run: false },
     ],
   },
   {
-    id: 'cache-tax',
-    label: 'cache-tax',
+    id: 'cache-guard',
+    label: 'cache-guard',
     group: 'Workspace utilities',
     icon: '♨',
     desc: 'On: keeps the prompt cache warm (cheap pings); always warns before a cold write',
     costs: true,
     isSwitch: true,
     command: 'keepwarm',
-    options: [{ label: 'report', text: '/cache-tax', run: true }],
+    options: [{ label: 'report', text: '/cache-guard', run: true }],
   },
-  { id: 'budget-guard', label: 'budget-guard', group: 'Workspace utilities', icon: '▥', desc: 'Usage line and limits', click: { text: '/budget-guard', run: true } },
-  { id: 'savvy-progress', label: 'savvy-progress', group: 'Workspace utilities', icon: '▰', desc: 'Plan tasks and subagents', click: { text: '/agents-info', run: true } },
+  { id: 'usage-meter', label: 'usage-meter', group: 'Workspace utilities', icon: '▥', desc: 'Usage line and limits', click: { text: '/usage-meter', run: true } },
+  {
+    id: 'progress',
+    label: 'progress',
+    group: 'Workspace utilities',
+    icon: '▰',
+    desc: 'On: a progress line above the prompt while subagents or plan tasks run',
+    isSwitch: true,
+    command: 'progress',
+    options: [{ label: 'pane', text: '/progress', run: true }],
+  },
   { id: 'filetree', label: 'filetree', group: 'Workspace utilities', icon: '⌥', desc: 'File tree beside the chat', click: { text: '/filetree', run: true } },
-  { id: 'replay-theater', label: 'replay-theater', group: 'Workspace utilities', icon: '▶', desc: 'Step through the last edits', click: { text: '/replay', run: true } },
+  { id: 'edit-replay', label: 'edit-replay', group: 'Workspace utilities', icon: '▶', desc: 'Step through the last edits', click: { text: '/replay', run: true } },
   { id: 'diagram', label: 'diagram', group: 'Workspace utilities', icon: '◇', desc: 'Draws the last mermaid diagram', click: { text: '/diagram', run: true } },
-  { id: 'staged-review', label: 'staged-review', group: 'Workspace utilities', icon: '±', desc: 'What the next commit holds', click: { text: '/staged-review', run: true } },
+  { id: 'staged-diff', label: 'staged-diff', group: 'Workspace utilities', icon: '±', desc: 'What the next commit holds', click: { text: '/staged-diff', run: true } },
   {
     id: 'error-inbox',
     label: 'error-inbox',
@@ -201,7 +211,7 @@ export const TOOLS: Tool[] = [
     click: { text: '/decision-log', run: true },
     options: [{ label: 'add', text: '/decision ', run: false }],
   },
-  { id: 'csv-table', label: 'csv-table', group: 'Workspace utilities', icon: '▦', desc: 'Preview a csv or tsv file', click: { text: '/csv-table ', run: false } },
+  { id: 'table-preview', label: 'table-preview', group: 'Workspace utilities', icon: '▦', desc: 'Preview a csv or tsv file', click: { text: '/table-preview ', run: false } },
   {
     id: 'ui-preview',
     label: 'ui-preview',
@@ -214,7 +224,7 @@ export const TOOLS: Tool[] = [
       { label: 'shot', text: '/ui-preview shot', run: true },
     ],
   },
-  { id: 'color-lab', label: 'color-lab', group: 'UI development', icon: '◐', desc: 'Contrast and colour formats', click: { text: '/color-lab ', run: false } },
+  { id: 'contrast-check', label: 'contrast-check', group: 'UI development', icon: '◐', desc: 'Contrast and colour formats', click: { text: '/contrast-check ', run: false } },
 ]
 
 export type Skill = { id: string; label: string; desc: string; text: string }

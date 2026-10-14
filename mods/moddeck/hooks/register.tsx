@@ -48,10 +48,10 @@ const PANE_SURFACES = new Set(['terminal', 'desktop'])
  * theme's colour (light on a dark theme, dark on a light one), so a pill's fill is chosen to read under that text:
  * deep on a dark theme, a pale tint of the same hue on a light one.
  */
-type Ink = { fill: string; text: string; desc: string; link: string; on: string; off: string; run: string }
+type Ink = { fill: string; text: string; desc: string; link: string; on: string; off: string; run: string; dotOn: string; dotOff: string }
 const INK: Record<'dark' | 'light', Ink> = {
-  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5', on: '#166534', off: '#991B1B', run: '#374151' },
-  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5', on: '#BBF7D0', off: '#FECACA', run: '#E5E7EB' },
+  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5', on: '#166534', off: '#991B1B', run: '#374151', dotOn: '#22C55E', dotOff: '#EF4444' },
+  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5', on: '#BBF7D0', off: '#FECACA', run: '#E5E7EB', dotOn: '#16A34A', dotOff: '#DC2626' },
 }
 type ThemePick = 'light' | 'dark'
 const THEMES: readonly ThemePick[] = ['light', 'dark']
@@ -140,7 +140,7 @@ let paneOffset = 0
 let bottomLists: BottomList[] = []
 let scrollables: Record<string, { total: number; shown: number }> = {}
 const clampTop = (top: number, total: number, shown: number): number => Math.max(0, Math.min(top, total - shown))
-/** What the person last picked in a dropdown here (`blast-radius`, and `blast-radius:last`, the level its switch goes back to): the pick shows at once, even where the other mod's state is not watched for redraws. */
+/** What the person last picked in a dropdown here (`command-guard`, and `command-guard:last`, the level its switch goes back to): the pick shows at once, even where the other mod's state is not watched for redraws. */
 const picks = atom({ plugin: 'moddeck', key: 'picks' } as const, {} as Record<string, string>)
 
 // ---- the Session box: what is kept in memory (never in the transcript), and read by the pane ---------------------------------
@@ -169,9 +169,11 @@ const layoutPick = atom({ plugin: 'moddeck', key: 'layout' } as const, null as L
 /** `/moddeck theme light|dark`, this session's pick (kept in the store too); null = the setting. */
 const themePick = atom({ plugin: 'moddeck', key: 'theme' } as const, null as ThemePick | null)
 
-const LEDGER = { plugin: 'budget-guard', key: 'ledger' } as const
-const CACHE = { plugin: 'cache-tax', key: 'cache' } as const
-const KEEPWARM = { plugin: 'cache-tax', key: 'keepwarm' } as const
+const LEDGER = { plugin: 'usage-meter', key: 'ledger' } as const
+const CACHE = { plugin: 'cache-guard', key: 'cache' } as const
+const KEEPWARM = { plugin: 'cache-guard', key: 'keepwarm' } as const
+const JANITOR_OFF = { plugin: 'branch-janitor', key: 'isOff' } as const
+const BAND_HIDDEN = { plugin: 'progress', key: 'isHidden' } as const
 
 const HELP = [
   'Moddeck · /moddeck shows or hides the side bar',
@@ -202,7 +204,7 @@ const REPRO_OFF = { plugin: 'repro-log', key: 'isOff' } as const
 const AUTOTEST_OFF = { plugin: 'auto-test', key: 'isOff' } as const
 const PING_OFF = { plugin: 'long-run-ping', key: 'isOff' } as const
 const PROMPTS = { plugin: 'prompt-library', key: 'items' } as const
-const BLAST_LEVEL = { plugin: 'blast-radius', key: 'level' } as const
+const BLAST_LEVEL = { plugin: 'command-guard', key: 'level' } as const
 const REVIEW_OFF = { plugin: 'review-cost', key: 'isOff' } as const
 const FORMAT_OFF = { plugin: 'format-on-edit', key: 'isOff' } as const
 const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
@@ -301,7 +303,7 @@ async function pick($: Dollar, id: string, command: string, value: string, fills
   }
 }
 
-/** blast-radius's name is a switch too: off, or back to the level it had (medium the first time). */
+/** command-guard's name is a switch too: off, or back to the level it had (medium the first time). */
 async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>, blockedBy?: string): Promise<void> {
   const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
   if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
@@ -1065,8 +1067,10 @@ export const register: Register = (on, options) => {
       'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
       'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
       concise: flag(await valueOf($.state.get(CONCISE_OFF as never)), true),
-      // cache-tax's switch is keep-warm: on while /keepwarm runs (its state holds the run), off when it is null.
-      'cache-tax': await (async () => { const kw = await valueOf($.state.get(KEEPWARM as never)); return kw === undefined ? undefined : kw !== null })(),
+      'branch-janitor': flag(await valueOf($.state.get(JANITOR_OFF as never)), true), // null outside a repository: not drawn
+      'progress': flag(await valueOf($.state.get(BAND_HIDDEN as never)), true),
+      // cache-guard's switch is keep-warm: on while /keepwarm runs (its state holds the run), off when it is null.
+      'cache-guard': await (async () => { const kw = await valueOf($.state.get(KEEPWARM as never)); return kw === undefined ? undefined : kw !== null })(),
     }
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)
@@ -1079,7 +1083,7 @@ export const register: Register = (on, options) => {
     const noAdvisor = envOf(await attempt(() => $.env.get('CLAUDE_CODE_DISABLE_ADVISOR_TOOL')), settingsNow?.env?.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)
     const advisorBlock = noAdvisor === '1' ? 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL' : noTelemetry === '1' ? 'DISABLE_TELEMETRY' : undefined
     const levelOf: Record<string, string | undefined> = {
-      'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
+      'command-guard': chosen['command-guard'] ?? (typeof blast === 'string' ? blast : undefined),
       advisor: savedAdvisor, // the setting: /advisor writes it, a pick here only fills the prompt box
     }
     // A level the list does not name (a saved "sonnet") is still shown as picked.
@@ -1114,20 +1118,21 @@ export const register: Register = (on, options) => {
           </Button>
         </Box>
       )
-      const name =
-        desk ? (
-          isOn === undefined ? pillOf(`tool:${t.id}`, ink!.run, run) : pillOf(`switch:${t.id}`, isOn ? ink!.on : ink!.off, press)
-        ) : isOn === undefined ? (
-          <Button key={`tool:${t.id}`} plain onPress={run}>
-            <Text bold>{text}</Text>
-          </Button>
-        ) : (
-          <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={press}>
-            <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'error'}>
-              {text}
-            </Text>
-          </Button>
-        )
+      // Every name sits in the same neutral box; a switch says on or off only by the dot after it (green on, red off).
+      const name = desk ? (
+        pillOf(isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`, ink!.run, isOn === undefined ? run : press)
+      ) : (
+        <Button key={isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`} plain label={isOn === undefined ? undefined : `${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={isOn === undefined ? run : press}>
+          <Text bold inverse>
+            {text}
+          </Text>
+        </Button>
+      )
+      const dot = isOn !== undefined && (
+        <Box key={`dot:${t.id}`} flexShrink={0}>
+          <Text color={isOn ? (ink?.dotOn ?? 'success') : (ink?.dotOff ?? 'error')}>●</Text>
+        </Box>
+      )
       const level = t.levels !== undefined && (
         <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v, t.fillsPrompt === true, t.id === 'advisor' ? advisorBlock : undefined)} />
       )
@@ -1135,6 +1140,7 @@ export const register: Register = (on, options) => {
         <Box key={`row:${t.id}`} columnGap={1} {...fit}>
           <Box flexShrink={0} columnGap={1}>
             {name}
+            {dot as never}
             {level as never}
             {actionsShown(t).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
           </Box>

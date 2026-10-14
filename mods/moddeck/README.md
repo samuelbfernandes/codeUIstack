@@ -17,8 +17,8 @@ absent and the side bar is exactly the old one. Nothing here sends a prompt or c
 | `context` | bar, percent, `tokens/window`; green, yellow from 70%, red from 85%; from 85% also the three biggest categories | `session.measure` / `$.session.usage()`; the breakdown is `breakdown: 'summary'` (local estimate, never `'full'`) |
 | `usage` | one bar per rate-limit window (`5h`, `7d`, other kinds by name) with percent and `resets in 1h 30m`; the 7d window only from `usageSevenDayAt` % | `rateLimits` |
 | usage pace | a `▲` (amber, red) when, at the burn rate so far (percent used over the elapsed share of the window: 5h or 7d), the window reaches 90% (amber) or 100% (red) before it resets; under 10% used stays neutral | `hooks/pace.ts` |
-| `cost` | session `$x.xx`, plus `Today $x` and `Week $x` | `usage().cost`; atom `budget-guard.ledger` `{ today, week }` (nothing drawn when absent) |
-| `cache` | `Cache until 14:30` (a clock time: the pane does not repaint between turns), `Cache expired`, `hit 87%` | atom `cache-tax.cache` `{ expiresAt, hitRate }` (nothing drawn when absent) |
+| `cost` | session `$x.xx`, plus `Today $x` and `Week $x` | `usage().cost`; atom `usage-meter.ledger` `{ today, week }` (nothing drawn when absent) |
+| `cache` | `Cache until 14:30` (a clock time: the pane does not repaint between turns), `Cache expired`, `hit 87%` | atom `cache-guard.cache` `{ expiresAt, hitRate }` (nothing drawn when absent) |
 | `git` | branch with `*` when dirty, `↑2 ↓1`, `!3 +1 ✘0 ?2` (modified, added, deleted, untracked), `⎇ name` in a linked worktree; ahead turns to the warning colour from `pushWarn` | read-only `git status --porcelain=v2 --branch` and `rev-parse`, at session start and after each turn; not a repository: no row |
 | `tokens` | session in / out / cache totals and the last turn's output speed | `turn.complete` `usage` and `durationMs` (speed is output over the whole turn's time, so tool time makes it read low) |
 | `activity` | the last few tool calls (`✓ Read ×3 · ◐ Edit auth.ts`, running vs done), skills used, MCP servers used, `Compactions: 2` (after the first) | `tool.call` before and after `next`, `session.compact` |
@@ -40,12 +40,12 @@ no command or state changed.
 - **A switch is the mod's name**: a pill, green while on and red while off. A click runs `/<mod> on|off` at once and shows
   the reply as a toast. Its action buttons (blue, `[like this]`) sit right after the name and show while it is on.
 - **Prompt helpers**: suggest (`[status]`, `[explain]`) and `$ reflect`.
-- **Model controls**: blast-radius, whose name is a switch (off, or back to the level it had; medium the first time) with
+- **Model controls**: command-guard, whose name is a switch (off, or back to the level it had; medium the first time) with
   its `off|low|medium|high` dropdown right after the name; review-cost, a plain switch (it has only on and off).
 - **Guards**: secret-guard, data-guard, big-file-guard, repro-log (`[recipe]`, `[status]` while on).
 - **Automation**: auto-test (`[run]`, `[status]` while on), long-run-ping.
-- **Workspace utilities**: checkpoint, branch-janitor, cache-tax, budget-guard, savvy-progress, filetree, replay-theater,
-  diagram. Their names are plain (not switches): a click runs the command (`/checkpoint`, `/cache-tax`, ...; the first line
+- **Workspace utilities**: checkpoint, branch-janitor, cache-guard, usage-meter, progress, filetree, edit-replay,
+  diagram. Their names are plain (not switches): a click runs the command (`/checkpoint`, `/cache-guard`, ...; the first line
   of the reply is a toast, and the engine prints the whole reply under the command). Commands that need your text or change something
   (`[clean]` for `/branch-janitor clean`, `[$ warm]` for `/keepwarm 90m`, `[restore]` for `/checkpoint restore `) are put in
   the prompt box; nothing is sent until you press Enter.
@@ -86,7 +86,7 @@ row ids in display order, default `model,context,usage,cost,cache,git,tokens,act
   is not drawn (the other rows still work).
 - Every Session box figure comes from the engine's typed API, but none was seen in a live session: the hooks are only
   observers (they let each event through first and keep their books in `try/catch`), and each failing source drops only its row.
-- The `cost` and `cache` rows need `budget-guard` and `cache-tax` to publish their atoms; without them those parts are not drawn.
+- The `cost` and `cache` rows need `usage-meter` and `cache-guard` to publish their atoms; without them those parts are not drawn.
 - The session name is not given to mods by the engine, so the environment row does not show one.
 - Never verified live: the pane, the dropdown, the scroll bar and the wheel, and filling the prompt box were
   tested against Claude Code's simulated engine only (it checks the tree, not how a surface paints it).

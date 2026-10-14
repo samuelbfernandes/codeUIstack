@@ -47,7 +47,7 @@ declare module 'claude-code' {
       autoOpen: AutoOpen
       /** Index of the first row shown in each scrolling list (`skills`, `prompts`): moved by the scroll bar and the wheel. */
       tops: Record<string, number>
-      /** What the person last picked in the dropdown (`blast-radius`), and the level its switch goes back to (`blast-radius:last`). */
+      /** What the person last picked in the dropdown (`command-guard`), and the level its switch goes back to (`command-guard:last`). */
       picks: Record<string, string>
       /** The Session box's latest figures; null before any. */
       measure: DeckMeasure | null

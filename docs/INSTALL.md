@@ -11,7 +11,7 @@ Inside Claude Code:
 
 ```
 /plugin marketplace add samuelbfernandes/moddeck
-/plugin install blast-radius@moddeck
+/plugin install command-guard@moddeck
 ```
 
 Repeat the second line for each mod you want (`/plugin install` lists them). You get the mods; you do not get the rules,
@@ -68,7 +68,7 @@ install.cmd --plan              # Windows (double-clicking install.cmd also work
 4. The plan, then a final yes or no.
 
 Without questions: `moddeck install --yes` (defaults), plus any of `--scope project --project DIR`, `--profile lab`,
-`--mods blast-radius,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `moddeck list` shows every id.
+`--mods command-guard,suggest-model`, `--with sandbox`, `--without filetree`, `--force-hooks`. `moddeck list` shows every id.
 
 ## Afterwards
 

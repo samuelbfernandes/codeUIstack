@@ -3,7 +3,7 @@
 Tools that make building interfaces faster: plumber APIs with a JavaScript front end, Shiny (R and Python), Streamlit,
 Gradio, Panel, Quarto and plain HTML. Three kinds:
 
-1. **Moddeck's own mods** (installed with the rest): `ui-preview`, `format-on-edit`, `color-lab`, `csv-table`.
+1. **Moddeck's own mods** (installed with the rest): `ui-preview`, `format-on-edit`, `contrast-check`, `table-preview`.
 2. **Optional installer items** (the "UI development" list; never switched on by default, never picked by `--standard`
    or `--all`): tick them in the installer, or `--with <id>`. `uninstall` removes exactly what was added.
 3. **Programs and per-project skills** the installer does not touch: install them yourself with the commands below.
@@ -16,8 +16,8 @@ Commands were copied from each project's own page on 2026-10-13. Check the page 
 |---|---|
 | `ui-preview` | `/ui-preview start` runs the app in this project (a plumber API first, then a JS dev server, Shiny for R, Shiny for Python, Streamlit), lists a plumber API's routes from `/openapi.json`, takes a screenshot with headless Chrome, and puts a "review this page" prompt in the prompt box. |
 | `format-on-edit` | Off until `/format-on-edit on`. Formats each file Claude edits: Air for R, Ruff for Python, Prettier or Biome for JS/CSS/HTML when the project already uses one. |
-| `color-lab` | `/color-lab #1f6feb #ffffff`: hex, RGB, HSL and the WCAG contrast ratio, with the nearest passing shade when AA fails. |
-| `csv-table` | `/csv-table data.csv`: the delimiter, column types and first rows of a table, in a pane. |
+| `contrast-check` | `/contrast-check #1f6feb #ffffff`: hex, RGB, HSL and the WCAG contrast ratio, with the nearest passing shade when AA fails. |
+| `table-preview` | `/table-preview data.csv`: the delimiter, column types and first rows of a table, in a pane. |
 
 ## 2. Installer items (`moddeck install --with <id>`)
 

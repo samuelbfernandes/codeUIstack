@@ -123,9 +123,9 @@ def cmd_install(args, update: bool = False) -> int:
     if from_earlier:
         old = installer.load_state(earlier[0])
         print(f"Found an install made under the earlier name '{earlier[0].name}': it will be replaced" + (", keeping your choices." if update else "."))
-    saved = set(old.get("selected", [])) if (old and update) else None
+    saved = catalog.renamed(old.get("selected", [])) if (old and update) else None
     if saved is not None and (from_earlier or "known" in old):
-        saved |= catalog.defaults(det, root) - set(old.get("known", []))   # items added since that install start on at their default
+        saved |= catalog.defaults(det, root) - catalog.renamed(old.get("known", []))   # items added since that install start on at their default
     profile = getattr(args, "profile", None) or (old.get("profile") if old else None)
     if not profile:
         profile = "neutral" if not talk else ui.choice("Which rule set?", [
@@ -157,7 +157,7 @@ def cmd_install(args, update: bool = False) -> int:
 
 def _done(lay: installer.Layout, ctx: installer.Ctx, ident: dict) -> None:
     print("\nDone." + (f" {len(ctx.warnings)} warning(s) above." if ctx.warnings else ""))
-    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; open the side bar with /moddeck, or run one:  /branch-janitor   /suggest-model   /cache-tax")
+    print("Start a NEW Claude Code session (or run /reload-plugins in an open one). Most tools now run by themselves; open the side bar with /moddeck, or run one:  /branch-janitor   /suggest-model   /cache-guard")
     print(f"What each tool does: {lay.stage / 'docs' / 'TOOLS.md'}" if (lay.stage / "TOOLS.md").exists() else "What each tool does: see docs/TOOLS.md in the repository.")
     cli = ident["cli"]
     where = "" if lay.user else f" --scope project --project {lay.project}"

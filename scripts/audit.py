@@ -19,18 +19,17 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Programs a mod may start (via $.process.run argv arrays). Anything else fails the audit.
 ALLOW_PROGRAMS: dict[str, set[str]] = {
-    "blast-radius": {"git", "find", "du"},
+    "command-guard": {"git", "find", "du"},
     "branch-janitor": {"git", "gh"},       # gh = a read-only `gh pr list`, only if the user has gh
-    "cache-tax": set(),
+    "cache-guard": set(),
     "filetree": {"git"},
     "suggest-model": {"codex"},                # offered as an option for review tasks, only if Codex is installed
     "reflect": set(),
-    "replay-theater": set(),
+    "edit-replay": set(),
     "review-cost": {"git"},
-    "savvy-progress": set(),
-    "tool-skins": set(),
+    "progress": set(),
     "secret-guard": set(),
-    "budget-guard": set(),
+    "usage-meter": set(),
     "diagram": set(),
     "moddeck": {"git", "pipx", "uvx"},         # git: read-only for the Session box, and `git ls-remote --tags` for the update check; pipx/uvx: the installer's own one-liner, only after you answer "Update now"
     "data-guard": {"git"},
@@ -40,10 +39,10 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "prompt-library": set(),
     "checkpoint": {"git", "rm", "cmd"},          # rm / del only on a confirmed restore, only paths the dialog listed
     "long-run-ping": set(),
-    # Adapted from whyashthakker/awesome-claude-code-mods (MIT): read-only git for staged-review, nothing else.
-    "staged-review": {"git"},
-    "color-lab": set(),
-    "csv-table": set(),
+    # Adapted from whyashthakker/awesome-claude-code-mods (MIT): read-only git for staged-diff, nothing else.
+    "staged-diff": {"git"},
+    "contrast-check": set(),
+    "table-preview": set(),
     "test-ledger": set(),
     "scope-watch": set(),
     "error-inbox": set(),
@@ -148,7 +147,7 @@ def render(rows: list[tuple[str, dict]], shell_files: list[str], installer_files
         progs = ", ".join(sorted(i["programs"])) or "none"
         out.append(f"| {name} | {yn(i['network'])} | {progs} | {yn(i['writes'])} | {yn(i['model'])} | {', '.join(sorted(i['events'])) or 'commands only'} |")
     out += ["", "\"Writes files\" means the mod can write through Claude Code's file API (reflect does, only when you press Save).",
-            "\"Spends model tokens\" means the mod can ask a model something itself (reflect: a small model once per correction; cache-tax: optional keep-warm pings; suggest-model: only if you pick the subagent option).",
+            "\"Spends model tokens\" means the mod can ask a model something itself (reflect: a small model once per correction; cache-guard: optional keep-warm pings; suggest-model: only if you pick the subagent option).",
             "", "## Shell scripts (git guards)", "", "Checked for: curl, wget, nc, ssh, scp, telnet, eval, base64 -d, piping into a shell, sudo. None present.", ""]
     out += [f"- `{f}`" for f in shell_files]
     out += ["", "## Installer (Python, standard library only)", "",

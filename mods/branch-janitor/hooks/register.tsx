@@ -21,6 +21,7 @@
 // FAIL-OPEN. Every failure here (a git probe, the dialog, a thrown error, the budget) ends in "pass the
 // Bash result / the prompt through unchanged": the `.catch` replays `next(e)`. This mod is a convenience, never
 // a gate.
+import { atom, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import { readSettings } from './config'
@@ -56,6 +57,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await quietly(() => registerCommand($))
+    if (e.isInteractive) await quietly(() => syncOff($)) // only a session with a screen shows the switch
     if (e.isInteractive) $.clock.after(START_DELAY_MS, () => void lookIfPossible($, settings, 'start'))
     return next(e)
   }).catch(($, e, next) => next(e))
@@ -70,8 +72,20 @@ export const register: Register = (on, options) => {
 
   on('command.run', { command: 'branch-janitor' }, async ($, e) => {
     const text = await runCommand(depsOf($, settings), await $.session.cwd(), e.args.trim().toLowerCase())
+    await quietly(() => syncOff($)) // on, off, or the dialog's "never" may have changed it
     return { text }
   }).catch(() => ({ text: FAILED }))
+}
+
+/** Off for this repository (`git config toolkit.branchJanitor false`): the moddeck switch reads it; null outside a repository. */
+const isOff = atom({ plugin: 'branch-janitor', key: 'isOff' } as const, null as boolean | null)
+
+async function syncOff($: EngineInterface): Promise<void> {
+  const cwd = await $.session.cwd()
+  const inRepo = await $.process.run(['git', '-C', cwd, 'rev-parse', '--is-inside-work-tree'], { timeoutMs: 5_000 })
+  if (inRepo.exitCode !== 0) return void (await update($, isOff, () => null))
+  const r = await $.process.run(['git', '-C', cwd, 'config', '--get', 'toolkit.branchJanitor'], { timeoutMs: 5_000 })
+  await update($, isOff, () => r.stdout.trim() === 'false')
 }
 
 const hasSurface = async ($: EngineInterface) => (await $.session.surfaces()).length > 0
