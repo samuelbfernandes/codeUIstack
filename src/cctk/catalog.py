@@ -78,6 +78,7 @@ MOD_META: dict[str, tuple[str, str, bool]] = {
     "prompt-library": ("none", "", False),
     "checkpoint": ("none", "", True),
     "long-run-ping": ("none", "", False),
+    "concise": ("none until switched on; then about 1,500 tokens of rules once per session and one line per prompt", "", False),
 }
 # Mods that spend model credit when used: listed, but not switched on until the person chooses them.
 OFF_BY_DEFAULT: set = set()
@@ -91,7 +92,7 @@ def items(det: Detected, root=None) -> list[Item]:
         out.append(Item(m["name"], GROUP_MOD, m["name"], m["description"], tokens, default=((not needs or det.has(needs)) and m["name"] not in OFF_BY_DEFAULT), star=star, needs=needs))
     out += [
         Item("rules", GROUP_RULE, "Global rules for Claude", "A short CLAUDE.md block (tests before claims, small changes, ask before destructive steps). Your own text in that file is never touched.", "small: about 25 lines read each session"),
-        Item("skills", GROUP_RULE, "Five skills", "dual-model-review (a second model tries to prove a change wrong), agents-md-scaffold (sets up AGENTS.md and a decisions log), align (interview before a big build), burst (three graded versions of short writing) and assess-plugin (check a plugin before installing it).", "one description line each until used"),
+        Item("skills", GROUP_RULE, "Six skills", "dual-model-review (a second model tries to prove a change wrong), agents-md-scaffold (sets up AGENTS.md and a decisions log), align (interview before a big build), burst (three graded versions of short writing), assess-plugin (check a plugin before installing it) and no-ai-text (edits AI tells out of a draft, keeps the voice).", "one description line each until used"),
         Item("git-guards", GROUP_RULE, "Git guards", "On commit: refuses staged secret files (.env, private keys). On push: refuses force-pushes and remote branch deletion.", star=True),
         Item("guard-rules", GROUP_RULE, "Claude asks before git push", "Permission rules: every git push needs your OK, and commit/push --no-verify is denied so the guards cannot be skipped.", star=True),
         Item("prepush-tests", GROUP_RULE, "Run tests before push", "R (devtools::test()) or Rust (cargo test) projects are tested before a push goes out. Other projects are skipped."),

@@ -265,16 +265,18 @@ test('each row is hidden when its figure is missing, and the rest still draw', M
 test('context goes green, yellow at 70% and red at 85%, and at 85% the biggest categories show without a paid count', MODS, async ($, on) => {
   const w = world(on, { usage: GOOD_USAGE })
   await start($, w)
+  const atStart = w.breakdownAsked.length // the Skills box reads the skill list once, from the free local estimate
   await measure($, { ...GOOD_USAGE, context: { tokens: 90_000, window: 200_000, percent: 45 } })
   expect(await colorOf(await mount($), '▰')).toContain('success')
   await measure($, { ...GOOD_USAGE, context: { tokens: 150_000, window: 200_000, percent: 75 } })
   expect(await colorOf(await mount($), '▰')).toContain('warning')
-  expect(w.breakdownAsked).toEqual([])
+  expect(w.breakdownAsked.length).toBe(atStart)
   await measure($, { ...GOOD_USAGE, context: { tokens: 180_000, window: 200_000, percent: 90 } })
   const pane = await mount($)
   expect(await colorOf(pane, '▰')).toContain('error')
   expect(await texts(pane)).toContain('Messages 120k · System prompt 20k')
-  expect(w.breakdownAsked).toEqual(['summary']) // never 'full': that sends one token-count request per tool
+  expect(w.breakdownAsked.length).toBe(atStart + 1)
+  expect(w.breakdownAsked.every(d => d === 'summary')).toBe(true) // never 'full': that sends one token-count request per tool
   await measure($, { ...GOOD_USAGE, context: { tokens: 90_000, window: 200_000, percent: 45 } })
   expect(await texts(await mount($))).not.toContain('Messages 120k')
 })

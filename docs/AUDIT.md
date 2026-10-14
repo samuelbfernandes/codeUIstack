@@ -15,6 +15,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | cache-tax | no | none | no | yes | classic.SessionStart, command.run, prompt.submit, session.end, session.start, turn.complete, turn.start |
 | checkpoint | no | cmd, git, rm | no | no | command.run, prompt.submit, session.start |
 | color-lab | no | none | no | no | command.run, session.start, ui.render |
+| concise | no | none | no | no | command.run, prompt.submit, session.compact, session.start |
 | csv-table | no | none | no | no | command.run, session.start, ui.render |
 | data-guard | no | git | yes | no | command.run, session.start, tool.call |
 | decision-log | no | none | yes | no | command.run, session.start, ui.render |

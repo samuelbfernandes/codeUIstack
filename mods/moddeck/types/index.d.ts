@@ -73,6 +73,12 @@ declare module 'claude-code' {
       permMode: string | undefined
       /** The Side Question panel is expanded. */
       btwOpen: boolean
+      /** Lines each list shows (`skills`, `prompts`), as its more/fewer buttons set it (also kept in the store); null = not loaded. */
+      listRows: Record<string, number> | null
+      /** Starred skill ids, drawn at the top of the Skills box (also kept in the store); null = not loaded. */
+      starred: string[] | null
+      /** Every skill the session has (name, and the matching slash command's line), read once from the engine; null = not read yet. */
+      installedSkills: { name: string; desc?: string }[] | null
       /** The pane is shown wide (the expand button); false = its usual width. */
       wide: boolean
       /** The Session box layout as `/moddeck rows compact|expanded` set it (also kept in the store as `layout`); null = the settings apply. */

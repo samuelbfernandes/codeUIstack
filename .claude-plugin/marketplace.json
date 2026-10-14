@@ -48,6 +48,11 @@
       "description": "Checks the contrast of a text colour on a background (WCAG 2.x AA and AAA) and suggests the nearest shade that passes. Pure arithmetic; reads no files."
     },
     {
+      "name": "concise",
+      "source": "./mods/concise",
+      "description": "While switched on, every prompt carries rules that shape Claude's replies so you can act on them: the next action first, numbered steps, state restated each turn, no tangents, specific time estimates. Off until you type /concise on."
+    },
+    {
       "name": "csv-table",
       "source": "./mods/csv-table",
       "description": "Previews a csv, tsv or txt table in a pane: delimiter, columns with simple types, row count and the first 20 rows. Reads only the file you name."

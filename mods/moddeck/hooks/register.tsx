@@ -7,8 +7,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BtwEntry } from '../types'
 import { addEntry, buildPrompt, cutAnswer, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
-import { GROUPS, SKILLS, TOOLS, priced, splitCommand } from './catalog'
-import type { Action, Option, SavedPrompt, Tool } from './catalog'
+import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, splitCommand, starFirst, toggleStar } from './catalog'
+import type { Action, InstalledSkill, Option, SavedPrompt, Tool } from './catalog'
 import { CARD_CHROME, barTarget, listAt, pillText, scrollBar } from './layout'
 import type { BottomList } from './layout'
 import { linkedWorktree, parseStatusV2 } from './gitinfo'
@@ -70,7 +70,51 @@ const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[
 const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
 /** The expand button: the pane is drawn wide (`WIDE_COLUMNS`) instead of `COLUMNS`. */
 const wide = atom({ plugin: 'moddeck', key: 'wide' } as const, false)
-const DEFAULT_SKILL_ROWS = 4
+const DEFAULT_SKILL_ROWS = 5
+/** Every skill the session has, as the engine lists it (null = not read yet: the toolkit's own are shown meanwhile). */
+const installed = atom({ plugin: 'moddeck', key: 'installedSkills' } as const, null as InstalledSkill[] | null)
+let skillsAsked = false
+/** Lines each list (`skills`, `prompts`) shows, as its more/fewer buttons set it; kept in the store as `listRows`. null = not loaded. */
+const listRows = atom({ plugin: 'moddeck', key: 'listRows' } as const, null as Record<string, number> | null)
+/** Starred skill ids, shown at the top of the Skills box; kept in the store as `starred`. null = not loaded. */
+const starred = atom({ plugin: 'moddeck', key: 'starred' } as const, null as string[] | null)
+
+/** The list sizes and the stars, loaded from the store the first time they are asked for. */
+async function rowsPicked($: Dollar): Promise<Record<string, number>> {
+  const now = await read($, listRows)
+  if (now !== null) return now
+  const kept = (await stored<Record<string, number>>($, 'listRows')) ?? {}
+  await safe(() => update($, listRows, () => kept))
+  return kept
+}
+async function starsPicked($: Dollar): Promise<string[]> {
+  const now = await read($, starred)
+  if (now !== null) return now
+  const kept = (await stored<string[]>($, 'starred')) ?? []
+  await safe(() => update($, starred, () => kept))
+  return kept
+}
+async function setRows($: Dollar, id: string, n: number): Promise<void> {
+  const next = { ...(await rowsPicked($)), [id]: n }
+  await update($, listRows, () => next)
+  await safe(() => $.store.set('listRows', next))
+}
+async function flipStar($: Dollar, id: string): Promise<void> {
+  const next = toggleStar(await starsPicked($), id)
+  await update($, starred, () => next)
+  await safe(() => $.store.set('starred', next))
+}
+
+/** The session's skills from the engine's own listing (local estimate, no model call), with a description from the matching slash command. */
+async function readSkills($: Dollar): Promise<void> {
+  skillsAsked = true
+  const u = await attempt(() => $.session.usage({ breakdown: 'summary' }))
+  const listed = u?.context.breakdown?.skills?.skillFrontmatter
+  if (!listed) return
+  const cmds = (await attempt(() => $.command.list())) ?? []
+  const descOf = new Map(cmds.map(c => [c.name, c.description]))
+  await safe(() => update($, installed, () => listed.map(k => ({ name: k.name, desc: descOf.get(k.name) }))))
+}
 /** Where the last drawing put the pane's window and its lists, for the wheel (`ui.scroll`); a fresh load starts empty. */
 let paneOffset = 0
 let bottomLists: BottomList[] = []
@@ -142,6 +186,7 @@ const REVIEW_OFF = { plugin: 'review-cost', key: 'isOff' } as const
 const FORMAT_OFF = { plugin: 'format-on-edit', key: 'isOff' } as const
 const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
 const INBOX_OFF = { plugin: 'error-inbox', key: 'isOff' } as const
+const CONCISE_OFF = { plugin: 'concise', key: 'isOff' } as const
 
 async function valueOf(read: Promise<unknown>): Promise<unknown> {
   try {
@@ -677,6 +722,7 @@ export const register: Register = (on, options) => {
     }
     if (updateCheckOn) defer($, async () => void (await checkForUpdate($, false))) // every time it is turned on: a quiet look at the newest release
     if (showSession) defer($, () => primeSession($)) // reading only: never blocks the start
+    defer($, () => readSkills($)) // the Skills box lists every installed skill
     if (isAutoOpen && e.isInteractive && e.surface !== null && PANE_SURFACES.has(e.surface)) defer($, () => autoOpenPane($))
     return next(e)
   })
@@ -888,6 +934,11 @@ export const register: Register = (on, options) => {
             <Text {...dim} wrap="truncate-end">
               {footer(b)}
             </Text>
+            {b.status !== 'thinking' && (
+              <Button key={`btw:close:${b.id}`} plain onPress={() => void update($, btwList, l => l.filter(a => a.id !== b.id))}>
+                <Text color={link}>✕ close</Text>
+              </Button>
+            )}
           </Box>
         ))}
         {Input !== undefined ? (
@@ -914,6 +965,7 @@ export const register: Register = (on, options) => {
       'format-on-edit': flag(await valueOf($.state.get(FORMAT_OFF as never)), true),
       'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
       'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
+      concise: flag(await valueOf($.state.get(CONCISE_OFF as never)), true),
     }
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)
@@ -991,14 +1043,26 @@ export const register: Register = (on, options) => {
     // Skills and saved prompts: a card each, `rows` lines at a time, with a scroll bar on the right when there are more.
     // A click on the bar's track moves a page; the wheel over the list moves it a line.
     const scrolled = await read($, tops)
-    const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string) => {
-      const shown = Math.min(rows, items.length)
+    const picked = await rowsPicked($)
+    const stars = await starsPicked($)
+    const rowsOf = (id: string) => listRowsOf(picked, id, rows)
+    const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string, star?: (item: T) => string) => {
+      const starredCount = star === undefined ? 0 : items.filter(i => stars.includes(star(i))).length
+      const want = rowsOf(id)
+      const shown = listSize(starredCount, want, items.length)
       const top = clampTop(scrolled[id] ?? 0, items.length, shown)
       // In the app a name starts with "/": a click puts its command in the prompt box.
       const nameOf = (item: T) => (desk ? `/${label(item)}` : label(item))
       const nameWidth = Math.max(...items.map(i => nameOf(i).length))
       const lines = items.slice(top, top + shown).map(item => (
         <Box key={`${id}:line:${keyOf(item)}`} columnGap={1} {...fit}>
+          {star !== undefined && (
+            <Box flexShrink={0}>
+              <Button key={`star:${star(item)}`} plain label={desk ? undefined : `star ${label(item)}`} onPress={() => void flipStar($, star(item))}>
+                <Text color={stars.includes(star(item)) ? link : (ink?.desc ?? 'inactive')}>{stars.includes(star(item)) ? '★' : '☆'}</Text>
+              </Button>
+            </Box>
+          )}
           <Box flexShrink={0}>
             <Button key={keyOf(item)} plain onPress={() => act($, { text: text(item), run: false })}>
               <Text bold color={link}>
@@ -1029,18 +1093,35 @@ export const register: Register = (on, options) => {
           </Box>
           {bar as never}
         </Box>,
+        <Box key={`${id}:size`} columnGap={2} {...fit}>
+                    {starredCount === 0 && want < Math.min(items.length, MAX_LIST_ROWS) && (
+            <Button key={`${id}:more`} plain onPress={() => void setRows($, id, want + 1)}>
+              <Text {...dim}>＋ more</Text>
+            </Button>
+          )}
+          {starredCount === 0 && shown > MIN_LIST_ROWS && (
+            <Button key={`${id}:fewer`} plain onPress={() => void setRows($, id, shown - 1)}>
+              <Text {...dim}>− fewer</Text>
+            </Button>
+          )}
+        </Box>,
       ])
     }
-    const skillCard = SKILLS.length > 0 ? listCard('skills', 'Skills', SKILLS, k => `skill:${k.id}`, k => k.label, k => k.desc, k => k.text) : null
+    if (!skillsAsked) defer($, () => readSkills($))
+    const skills = starFirst(allSkills((await read($, installed)) ?? []), stars, k => k.id)
+    const skillCard = skills.length > 0 ? listCard('skills', 'Skills', skills, k => `skill:${k.id}`, k => k.label, k => k.desc, k => k.text, k => k.id) : null
     // Saved prompts (prompt-library): a click puts the text in the prompt box. Not drawn while that mod is not readable.
     const saved = await valueOf($.state.get(PROMPTS as never))
-    const prompts: SavedPrompt[] = Array.isArray(saved)
+    const savedPrompts: SavedPrompt[] = Array.isArray(saved)
       ? (saved as unknown[]).filter((p): p is SavedPrompt => typeof (p as SavedPrompt)?.name === 'string' && typeof (p as SavedPrompt)?.text === 'string')
       : []
-    const promptCard = prompts.length > 0 ? listCard('prompts', 'Prompts', prompts, p => `prompt:${p.name}`, p => p.name, p => p.text, p => p.text) : null
+    const prompts = starFirst(savedPrompts, stars, p => `prompt:${p.name}`)
+    const promptCard = prompts.length > 0 ? listCard('prompts', 'Prompts', prompts, p => `prompt:${p.name}`, p => p.name, p => p.text, p => p.text, p => `prompt:${p.name}`) : null
     // Where the lists sit, counted from the bottom, for the wheel: the lowest first.
-    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: Math.min(rows, prompts.length) }] : []), ...(SKILLS.length > 0 ? [{ id: 'skills', shown: Math.min(rows, SKILLS.length) }] : [])]
-    scrollables = { skills: { total: SKILLS.length, shown: Math.min(rows, SKILLS.length) }, prompts: { total: prompts.length, shown: Math.min(rows, prompts.length) } }
+    const skillShown = listSize(skills.filter(k => stars.includes(k.id)).length, rowsOf('skills'), skills.length)
+    const promptShown = listSize(prompts.filter(p => stars.includes(`prompt:${p.name}`)).length, rowsOf('prompts'), prompts.length)
+    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: promptShown }] : []), ...(skills.length > 0 ? [{ id: 'skills', shown: skillShown }] : [])]
+    scrollables = { skills: { total: skills.length, shown: skillShown }, prompts: { total: prompts.length, shown: promptShown } }
 
     const wideNow = await read($, wide)
     const updateNow = await read($, updateAvail)
