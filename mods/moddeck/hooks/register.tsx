@@ -162,6 +162,7 @@ const backupAt = atom({ plugin: 'moddeck', key: 'backupAt' } as const, undefined
 /** The configured permission mode. */
 const permMode = atom({ plugin: 'moddeck', key: 'permMode' } as const, undefined as string | undefined)
 const EFFORT_ADVICE = { plugin: 'suggest-model', key: 'effortAdvice' } as const
+const ROUTED_TO = { plugin: 'suggest-model', key: 'routedTo' } as const
 const envCounts = atom({ plugin: 'moddeck', key: 'env' } as const, null as EnvCounts | null)
 /** The rows shown (a comma list in display order) and the layout, as /moddeck rows set them; null = not set by the person (the settings apply). */
 const rowsList = atom({ plugin: 'moddeck', key: 'rows' } as const, null as string | null)
@@ -741,6 +742,7 @@ async function snapshotOf($: Dollar): Promise<Snapshot> {
     git: await read($, gitState),
     permissionMode: await read($, permMode),
     backupAt: await read($, backupAt),
+    routedTo: ((v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined))(await valueOf($.state.get(ROUTED_TO as never))),
     effortAdvice: ((v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined))(await valueOf($.state.get(EFFORT_ADVICE as never))),
     tokens: await read($, tokenTotals),
     activity: await read($, activity),

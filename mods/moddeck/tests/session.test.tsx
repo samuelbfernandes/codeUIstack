@@ -613,3 +613,9 @@ test('effort fit: the model row shows suggest-model\'s advice beside the effort,
   await run($, 'seed-effort', 'none')
   expect(await texts(await mount($))).not.toContain('⚠')
 })
+
+test('a conversation suggest-model routed shows the session model dimmed, then → the routed one', () => {
+  const rows = buildRows({ now: T0, model: 'claude-opus-5-5', routedTo: 'Haiku' }, DEFAULT_BOX)
+  const text = rows.model!.parts.map(p => p.text).join('')
+  expect(text).toContain('claude-opus-5-5 → Haiku (routed)')
+})

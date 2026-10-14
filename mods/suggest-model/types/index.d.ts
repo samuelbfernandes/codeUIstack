@@ -23,6 +23,8 @@ declare module 'claude-code' {
       effort: string
       /** Short effort advice for the moddeck's model row (`medium would do`, `try high`); empty = the effort fits. */
       effortAdvice: string
+      /** The model this conversation was routed to at its first prompt (`Haiku`); '' when not routed. */
+      routedTo: string
       /** The last predictions, newest last (at most 5). */
       recent: SuggestModelEntry[]
     }

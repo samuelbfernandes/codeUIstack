@@ -25,7 +25,7 @@ const word = ($: Engine, text: string) => $.prompt.submit({ text, wait: false, o
 const command = ($: Engine, args: string) =>
   $.command.run({ command: 'suggest-model', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } } as never)
 
-test('the switch: /suggest-model on|off flips one persisted flag, and off clears the status line', async ($, on) => {
+test('the switch: /suggest-model on|off flips one persisted flag, and off clears the status line', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
   await command($, 'off')
   expect(w.store.get('off')).toBe(true)
@@ -35,21 +35,21 @@ test('the switch: /suggest-model on|off flips one persisted flag, and off clears
   expect(w.statuses.at(-1)).toBeUndefined()
 })
 
-test('while off, a mismatch is not even checked', async ($, on) => {
+test('while off, a mismatch is not even checked', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
   w.store.set('off', true)
   const out = await word($, 'derive the BLUP variance of the genomic breeding value under REML')
   expect(out.text).toContain('BLUP')
 })
 
-test('a switch left off in an earlier session shows OFF at once', async ($, on) => {
+test('a switch left off in an earlier session shows OFF at once', { options: { autoRoute: false } }, async ($, on) => {
   const w = world(on)
   w.store.set('off', true)
   await $.session.start({ cwd: '/work' } as never)
   expect(w.statuses.at(-1)).toContain('suggest-model: off')
 })
 
-test('nothing is drawn above the prompt any more', async ($, on) => {
+test('nothing is drawn above the prompt any more', { options: { autoRoute: false } }, async ($, on) => {
   world(on)
   on('ui.render', ($, e) => {
     const { Box } = $.ui.resolve(e)

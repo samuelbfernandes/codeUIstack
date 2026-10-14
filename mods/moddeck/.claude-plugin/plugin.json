@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check.",
   "author": {
     "name": "Samuel Fernandes"

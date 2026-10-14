@@ -4,6 +4,15 @@ Install (Claude Code 2.1.287 or later): `/plugin install suggest-model --marketp
 
 Checks every prompt you type and tells you when your current model looks wrong for it, and which model to use instead. Nothing changes unless you pick it.
 
+## Routing without a switch (new in 0.6.0)
+- **A new conversation starts on the cheapest model that fits.** On the first prompt of a conversation (or after `/clear`),
+  when the rules are confident a cheaper model will do, the whole conversation runs on it: every request names that
+  model, so the cache is never thrown away. A toast says so, and the moddeck Session box shows `your model → Haiku (routed)`.
+  It never goes above the model you chose, and `/model` ends it until the next conversation. Setting `autoRoute`.
+- **Subagents get a fitting model.** A subagent Claude starts without naming a model gets the cheapest one its task needs,
+  never above the session's. A named model or a fork is left alone. Setting `routeSubagents`.
+- Both are local rules: no model call, no proxy. The idea of routing once per conversation comes from laya-router (MIT).
+
 ## What it does
 - Every prompt is checked locally with keyword and size rules: no model call, zero tokens, instant. Slash commands, bare "yes/ok", and pasted tool output are skipped. A prompt the rules cannot place stays silent.
 - Two risks, named plainly. UNDER-POWERED: "Don't use Sonnet for this task" (proofs, derivations, design, hard debugging, big refactors, statistical-method changes, review of method code, REML/GWAS/kinship/simulation, Rust unsafe/lifetimes). OVER-POWERED: "Opus is overkill for this" (typos, renames, formatting, simple lookups). The cues that matched are shown as the reason.

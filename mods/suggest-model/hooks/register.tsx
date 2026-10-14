@@ -30,6 +30,7 @@ import type { Alias, Family } from './gate'
 import { isNotATask } from './input'
 import { TIER_WORD, isStrong, predict, wordCount } from './predict'
 import type { Prediction } from './predict'
+import { MODEL_ID, cheaperFit } from './route'
 import type { SuggestModelEntry } from '../types'
 
 type Dollar = EngineInterface
@@ -42,6 +43,8 @@ const codexOk = atom({ plugin: 'suggest-model', key: 'codexOk' } as const, null)
 const recent = atom({ plugin: 'suggest-model', key: 'recent' } as const, [])
 /** The session's effort level as the last model request named it (empty: none seen, or a model without effort). */
 /** What the side bar's model row shows beside the effort when it does not fit the last task (`medium would do`). */
+/** The routed model's name for the moddeck Session box ('' when not routed). */
+const routedTo = atom({ plugin: 'suggest-model', key: 'routedTo' } as const, '')
 const effortHint = atom({ plugin: 'suggest-model', key: 'effortAdvice' } as const, '')
 const effortNow = atom({ plugin: 'suggest-model', key: 'effort' } as const, '')
 
@@ -64,6 +67,10 @@ type Cfg = {
   effortWatch: boolean
   /** Draw the on/off button in the band above the prompt. */
   costs: Costs
+  /** The first prompt of a conversation picks a cheaper model for the whole conversation when one will do. */
+  autoRoute: boolean
+  /** A subagent started without a model gets the cheapest one that fits its task (never above the session's). */
+  routeSubagents: boolean
   /** Pieces of the cost setting that were ignored (shown by explain and status). */
   costProblems: string[]
 }
@@ -84,6 +91,8 @@ export function readConfig(o: Readonly<Record<string, unknown>>): Cfg {
     statusLine: o.statusLine !== false,
     effortWatch: o.effortWatch !== false,
     costs,
+    autoRoute: o.autoRoute !== false,
+    routeSubagents: o.routeSubagents !== false,
     costProblems: problems,
   }
 }
@@ -184,7 +193,23 @@ async function review($: Dollar, e: { text: string; origin: { kind: string }; tu
   let p = predict(text)
   if (wordCount(text) < cfg.minWords && !isStrong(p)) return PASS
 
-  const current = familyOf((await quietly(() => $.session.model())) ?? '')
+  const chosen = familyOf((await quietly(() => $.session.model())) ?? '')
+  // The first prompt of a conversation: nothing is cached yet, so running it on a cheaper model costs nothing extra.
+  // The pick holds for the whole conversation (turn.step names it on every request), so the cache is never thrown away.
+  if (cfg.autoRoute && routed === undefined && lastResponseAt === undefined && !routeOff) {
+    const pick = cheaperFit(p, chosen, cfg.costs, cfg.minConfidence)
+    if (pick !== undefined) {
+      routed = pick
+      routedFrom = chosen
+      await quietly(() => update($, routedTo, () => nameOf(pick)))
+      await note($, text, p, `routed to ${pick}`)
+      await setOutcome($, `routed this conversation to ${pick}`)
+      $.ui.toast(`suggest-model · this conversation runs on ${nameOf(pick)} (${p.tier} task) · /model to choose yourself`, { timeoutMs: 10_000 })
+      await showStatus($, cfg, `suggest-model: on ${nameOf(pick)} for this conversation`)
+      return PASS
+    }
+  }
+  const current = routed ?? chosen
   const minConfidence = cfg.minConfidence // fixed: dismissing a dialog never raises the bar
   let fit = judge(p, current, minConfidence, cfg.costs, cfg.askOnStandard)
 
@@ -237,6 +262,13 @@ async function isCacheWarm($: Dollar, windows: readonly { kind: string }[]): Pro
   const now = await $.clock.now().catch(() => Date.now())
   return now - lastResponseAt < ttlMs
 }
+
+/** The model this conversation was routed to at its first prompt; undefined = the session's own. */
+let routed: Alias | undefined
+/** A model you picked yourself (/model) ends routing until the next conversation. */
+let routeOff = false
+/** The session model when routing began: a different one later means you switched with /model. */
+let routedFrom: Family | undefined
 
 async function offer($: Dollar, cfg: Cfg, text: string, p: Prediction, m: Ask, current: Family): Promise<Outcome> {
   const usage = await quietly(() => $.session.usage())
@@ -390,9 +422,23 @@ export const register: Register = (on, options) => {
   const cfg = readConfig(options)
 
   // The main conversation's last response: its cache is warm for a TTL from here (subagents keep caches of their own).
-  // /clear starts an empty conversation: nothing cached to lose.
+  // A subagent Claude starts without naming a model gets the cheapest one its task needs (never above the session's).
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
+    const input = e as unknown as { prompt?: unknown; model?: unknown; subagent_type?: unknown }
+    if (!cfg.routeSubagents || input.model !== undefined || input.subagent_type === 'fork' || typeof input.prompt !== 'string') return next(e)
+    const parent = routed ?? familyOf((await quietly(() => $.session.model())) ?? '')
+    const pick = cheaperFit(predict(input.prompt), parent, cfg.costs, cfg.minConfidence)
+    return next(pick === undefined ? e : ({ ...e, model: pick } as typeof e))
+  }).catch(($, e, next) => next(e))
+
+  // /clear starts an empty conversation: nothing cached to lose, and routing may pick again.
   on('session.end', async ($, e, next) => {
-    if (e.reason === 'clear') lastResponseAt = undefined
+    if (e.reason === 'clear') {
+      lastResponseAt = undefined
+      routed = undefined
+      routeOff = false
+      await quietly(() => update($, routedTo, () => ''))
+    }
     return next(e)
   })
 
@@ -422,12 +468,22 @@ export const register: Register = (on, options) => {
   }))
 
   // Effort-watch only reads: the level of each main-thread request is kept (off the request's path) for the next prompt's status line.
+  // Each main-loop request: note its effort for the status line, and in a routed conversation name the routed model, so
+  // the conversation stays on one model (and one cache) throughout. A model you pick yourself with /model wins: routing
+  // stops until the next conversation.
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId === undefined) {
-      const level = typeof e.effort === 'string' ? e.effort : '' // state holds JSON data: empty means none
-      $.clock.after(1, () => void quietly(() => update($, effortNow, () => level)))
+    if (e.agentId !== undefined) return yield* next(e)
+    const level = typeof e.effort === 'string' ? e.effort : '' // state holds JSON data: empty means none
+    $.clock.after(1, () => void quietly(() => update($, effortNow, () => level)))
+    if (routed === undefined) return yield* next(e)
+    const now = familyOf((await quietly(() => $.session.model())) ?? '')
+    if (now !== routedFrom) {
+      routed = undefined
+      routeOff = true
+      await quietly(() => update($, routedTo, () => ''))
+      return yield* next(e)
     }
-    return yield* next(e)
+    return yield* next({ ...e, model: MODEL_ID[routed] })
   })
 
   // Exactly one `next` per path. A drop is answered WITHOUT `next`: after a subagent really started
