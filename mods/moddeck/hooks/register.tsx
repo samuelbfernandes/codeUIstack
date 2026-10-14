@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BtwEntry } from '../types'
 import { INSTRUCTION, addEntry, buildPrompt, cutAnswer, digest, fallbackPrompt, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
-import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, rankTools, splitCommand, starFirst, toggleStar } from './catalog'
+import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, rankTools, searchFirst, splitCommand, starFirst, toggleStar } from './catalog'
 import type { Action, InstalledSkill, Option, SavedPrompt, Tool } from './catalog'
 import { CARD_CHROME, barTarget, listAt, pillText, scrollBar, stepTop, trackCells } from './layout'
 import type { BottomList } from './layout'
@@ -67,6 +67,8 @@ let updateCheckOn = true
 const btwOpen = atom({ plugin: 'moddeck', key: 'btwOpen' } as const, false)
 const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[])
 /** What the Ask here field holds: kept as it is typed, emptied after asking and by ✕ close. */
+/** What each list's search field holds (`skills`, `prompts`); matching names move to the top. */
+const listQuery = atom({ plugin: 'moddeck', key: 'listQuery' } as const, {} as Record<string, string>)
 const btwDraft = atom({ plugin: 'moddeck', key: 'btwDraft' } as const, '')
 /** A newer release the person has not updated to yet (null = none known); the side bar shows a one-line button for it. */
 const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
@@ -1122,15 +1124,22 @@ export const register: Register = (on, options) => {
     const picked = await rowsPicked($)
     const stars = await starsPicked($)
     const rowsOf = (id: string) => listRowsOf(picked, id, rows)
-    const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string, star?: (item: T) => string) => {
+    const queries = await read($, listQuery)
+    const listCard = <T,>(id: string, title: string, listed: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string, star?: (item: T) => string) => {
+      // Typing in the search field moves the names that match to the top (those that start with it first); Enter picks the first.
+      const query = queries[id] ?? ''
+      const found = searchFirst(listed, query, label)
+      const items = found.items
+      const isSearching = query.trim() !== ''
       const starredCount = star === undefined ? 0 : items.filter(i => stars.includes(star(i))).length
       const want = rowsOf(id)
       const shown = listSize(starredCount, want, items.length)
-      const top = clampTop(scrolled[id] ?? 0, items.length, shown)
+      const top = isSearching ? 0 : clampTop(scrolled[id] ?? 0, items.length, shown)
+      const isHit = (n: number) => isSearching && top + n < found.matches
       // In the app a name starts with "/": a click puts its command in the prompt box.
       const nameOf = (item: T) => (desk ? `/${label(item)}` : label(item))
       const nameWidth = Math.max(...items.map(i => nameOf(i).length))
-      const lines = items.slice(top, top + shown).map(item => (
+      const lines = items.slice(top, top + shown).map((item, n) => (
         <Box key={`${id}:line:${keyOf(item)}`} columnGap={1} {...fit}>
           {star !== undefined && (
             <Box flexShrink={0}>
@@ -1141,7 +1150,7 @@ export const register: Register = (on, options) => {
           )}
           <Box flexShrink={0}>
             <Button key={keyOf(item)} plain onPress={() => act($, { text: text(item), run: false })}>
-              <Text bold color={link}>
+              <Text bold color={link} underline={isHit(n) && n === 0}>
                 {nameOf(item).padEnd(nameWidth)}
               </Text>
             </Button>
@@ -1172,25 +1181,43 @@ export const register: Register = (on, options) => {
           {arrows && arrow('down')}
         </Box>
       )
-      return card(`group:${id}`, items.length > shown ? `${title} · ${items.length}` : title, [
+      const heading = isSearching ? `${title} · ${found.matches === 0 ? 'no match' : `${found.matches} found`}` : items.length > shown ? `${title} · ${items.length}` : title
+      return card(`group:${id}`, heading, [
         <Box key={`${id}:window`} columnGap={1} {...fit}>
           <Box flexDirection="column" flexGrow={1} flexShrink={1} {...fit}>
             {lines}
           </Box>
           {bar as never}
         </Box>,
-        <Box key={`${id}:size`} columnGap={2} {...fit}>
-                    {starredCount === 0 && want < Math.min(items.length, MAX_LIST_ROWS) && (
-            <Button key={`${id}:more`} plain onPress={() => void setRows($, id, want + 1)}>
-              <Text {...dim}>＋ more</Text>
+        <Box key={`${id}:size`} columnGap={1} {...fit}>
+          <Box flexGrow={1} flexShrink={1} {...fit}>
+            {Input !== undefined ? (
+              <Input
+                key={`${id}:search`}
+                placeholder={`Search ${title.toLowerCase()}`}
+                submitLabel="use"
+                value={query}
+                onInput={(v: string) => void update($, listQuery, q => ({ ...q, [id]: v }))}
+                onSubmit={() => {
+                  const first = isSearching && found.matches > 0 ? items[0] : undefined
+                  if (first !== undefined) void act($, { text: text(first), run: false })
+                  void update($, listQuery, q => ({ ...q, [id]: '' }))
+                }}
+              />
+            ) : (
+              <Text {...dim}> </Text>
+            )}
+          </Box>
+          {starredCount === 0 && !isSearching && want < Math.min(items.length, MAX_LIST_ROWS) && (
+            <Button key={`${id}:more`} plain label={desk ? undefined : 'more lines'} onPress={() => void setRows($, id, want + 1)}>
+              <Text {...dim}>＋</Text>
             </Button>
           )}
-          {starredCount === 0 && shown > MIN_LIST_ROWS && (
-            <Button key={`${id}:fewer`} plain onPress={() => void setRows($, id, shown - 1)}>
-              <Text {...dim}>− fewer</Text>
+          {starredCount === 0 && !isSearching && shown > MIN_LIST_ROWS && (
+            <Button key={`${id}:fewer`} plain label={desk ? undefined : 'fewer lines'} onPress={() => void setRows($, id, shown - 1)}>
+              <Text {...dim}>−</Text>
             </Button>
           )}
-          {(starredCount > 0 || (want >= Math.min(items.length, MAX_LIST_ROWS) && shown <= MIN_LIST_ROWS)) && <Text {...dim}>{starredCount > 0 ? '★ on top' : ' '}</Text>}
         </Box>,
       ])
     }

@@ -324,6 +324,22 @@ test('a group with more than 8 tools shows 8, scrolls with ▲ ▼, and a starre
   expect(store.get('starred')).toEqual([last.slice('star:'.length)])
 })
 
+test('typing in the Skills search moves the matches to the top; Enter puts the first in the prompt box and clears the field', async ($, on) => {
+  const w = world(on)
+  const pane = await mount($, 'desktop')
+  const shown = async () => (await pane.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key).filter((k): k is string => k?.startsWith('skill:') === true)
+  expect(JSON.stringify(await pane.find({ key: 'skills:search' }))).toContain('Search skills')
+  await pane.input({ key: 'skills:search', text: 'no', kind: 'change' })
+  expect((await shown())[0]).toBe('skill:no-ai-text')
+  expect(await texts(pane)).toContain('Skills · 1 found')
+  await pane.input({ key: 'skills:search', text: 'zz', kind: 'change' })
+  expect(await texts(pane)).toContain('Skills · no match')
+  await pane.input({ key: 'skills:search', text: 'bu', kind: 'change' })
+  await pane.input({ key: 'skills:search', text: 'bu', kind: 'submit' })
+  expect(w.filled.at(-1)).toContain('burst skill')
+  expect(JSON.stringify(await pane.find({ key: 'skills:search' }))).toContain('"value":""')
+})
+
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
   const w = world(on)
   await run($, 'blast-radius', 'high')

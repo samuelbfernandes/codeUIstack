@@ -236,6 +236,17 @@ export function rankTools<T>(items: readonly T[], isStarred: (item: T) => boolea
   return items.map((item, at) => ({ item, at })).sort((a, b) => band(a.item) - band(b.item) || a.at - b.at).map(x => x.item)
 }
 
+/** Items whose name matches `query` first (names that start with it, then names that contain it), then the rest; and how many match. */
+export function searchFirst<T>(items: readonly T[], query: string, nameOf: (item: T) => string): { items: T[]; matches: number } {
+  const q = query.trim().toLowerCase().replace(/^\//, '')
+  if (q === '') return { items: [...items], matches: 0 }
+  const name = (i: T) => nameOf(i).toLowerCase()
+  const starts = items.filter(i => name(i).startsWith(q))
+  const contains = items.filter(i => !name(i).startsWith(q) && name(i).includes(q))
+  const rest = items.filter(i => !name(i).includes(q))
+  return { items: [...starts, ...contains, ...rest], matches: starts.length + contains.length }
+}
+
 /** Toggles one id in the starred list. */
 export const toggleStar = (starred: readonly string[], id: string): string[] => (starred.includes(id) ? starred.filter(s => s !== id) : [...starred, id])
 
