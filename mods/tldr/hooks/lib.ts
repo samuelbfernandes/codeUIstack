@@ -4,6 +4,8 @@ import type { TldrDigest } from '../types'
 export const MAX_MARKS = 40 // sentences kept for marking, across recent replies
 export const MAX_REPLY_CHARS = 24_000 // what the small model is shown of a very long reply
 export const MARK = '⚑'
+/** Yellow at 5% opacity (95% transparent), as #RRGGBBAA: the background of a paragraph that holds a must-read sentence. */
+export const HIGHLIGHT = '#FACC150D'
 
 export const SYSTEM = [
   'You help a busy reader skim a coding assistant\'s reply.',
@@ -74,4 +76,22 @@ function isInCode(text: string, at: number): boolean {
   if ((before.match(/^```/gm) ?? []).length % 2 === 1) return true
   const line = before.slice(before.lastIndexOf('\n') + 1)
   return (line.match(/`/g) ?? []).length % 2 === 1
+}
+
+/** The reply cut at blank lines into paragraphs, never inside a ``` fence, so each can be drawn (and tinted) on its own. */
+export function splitBlocks(text: string): string[] {
+  const out: string[] = []
+  let cur: string[] = []
+  let inFence = false
+  for (const line of text.split('\n')) {
+    if (/^```/.test(line)) inFence = !inFence
+    if (!inFence && line.trim() === '' && cur.length > 0) {
+      out.push(cur.join('\n'))
+      cur = []
+      continue
+    }
+    if (!(line.trim() === '' && cur.length === 0)) cur.push(line)
+  }
+  if (cur.length > 0) out.push(cur.join('\n'))
+  return out
 }

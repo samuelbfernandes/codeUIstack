@@ -1,6 +1,6 @@
 {
   "name": "tldr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "While switched on, after each long reply a small model picks the sentences you must not skip (decisions, warnings, questions for you, failures, things to do) and marks them inside the reply with ⚑, and a box above the prompt sums the reply up: Summary, Needs you, Next. One Haiku call per long reply. Off until /tldr on.",
   "author": { "name": "Samuel Fernandes" },
   "types": "./types/index.d.ts",

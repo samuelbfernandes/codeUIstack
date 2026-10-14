@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { TldrDigest } from '../types'
-import { SYSTEM, addMarks, markText, parseDigest, promptFor } from './lib'
+import { HIGHLIGHT, MARK, SYSTEM, addMarks, markText, parseDigest, promptFor, splitBlocks } from './lib'
 
 type Dollar = EngineInterface
 
@@ -104,7 +104,24 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (!(await isOn($))) return next(e)
     const marked = markText(e.props.text, await read($, marks))
-    return marked === undefined ? next(e) : next({ ...e, props: { ...e.props, text: marked } })
+    if (marked === undefined) return next(e)
+    // The terminal draws the rewritten markdown (bold with ⚑). The app also tints each paragraph holding a must-read
+    // sentence pale yellow: the reply is drawn here paragraph by paragraph, the marked ones on the tint.
+    if (e.surface !== 'desktop') return next({ ...e, props: { ...e.props, text: marked } })
+    const { Box, Markdown } = $.ui.resolve(e)
+    return (
+      <Box key="tldr-reply" flexDirection="column" gap={1}>
+        {splitBlocks(marked).map((block, i) =>
+          block.includes(MARK) ? (
+            <Box key={`tldr-p${i}`} backgroundColor={HIGHLIGHT}>
+              <Markdown text={block} />
+            </Box>
+          ) : (
+            <Markdown key={`tldr-p${i}`} text={block} />
+          ),
+        )}
+      </Box>
+    )
   }).catch(($, e, next) => next(e))
 
   // The box above the prompt: Summary, Needs you, Next; ▾ folds it to one line, ✕ puts it away until the next reply.

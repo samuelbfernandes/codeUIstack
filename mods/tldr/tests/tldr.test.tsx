@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { MARK, addMarks, markText, parseDigest } from '../hooks/lib'
+import { HIGHLIGHT, MARK, addMarks, markText, parseDigest, splitBlocks } from '../hooks/lib'
 
 const REPLY = [
   'I renamed the eight mods and ran every test.',
@@ -87,4 +87,20 @@ test('on: a long reply gets one call, a box above the prompt and ⚑ on the must
   await band.press({ key: 'tldr:close' })
   expect(await texts(band)).not.toContain('Eight mods renamed')
   expect(await cmd($, 'off')).toBe('tldr · off')
+})
+
+test('splitBlocks cuts at blank lines but keeps a code fence whole', () => {
+  expect(splitBlocks('a\nb\n\nc\n\n```\nx\n\ny\n```\n\nd')).toEqual(['a\nb', 'c', '```\nx\n\ny\n```', 'd'])
+})
+
+test('in the app the paragraph holding a must-read sentence is drawn on a pale yellow tint', async ($, on) => {
+  const w = world(on)
+  await $.session.start({ cwd: '/p', surface: 'desktop', isInteractive: true } as never)
+  await cmd($, 'on')
+  await reply($, `First paragraph, nothing to see.\n\n${REPLY}`)
+  await w.clock.advance(5)
+  const msg = await $.ui.mount({ plugin: 'tldr', surface: 'desktop', component: 'AssistantMessage', props: { text: `First paragraph, nothing to see.\n\n${REPLY}`, isFirstOfReply: true } } as never)
+  const tree = JSON.stringify(await msg.find({ key: 'tldr-reply' }))
+  expect(tree).toContain(`"backgroundColor":"${HIGHLIGHT}"`)
+  expect(tree.split(HIGHLIGHT).length - 1).toBe(1) // only the paragraph with the sentence
 })

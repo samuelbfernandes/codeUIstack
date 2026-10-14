@@ -1111,7 +1111,7 @@ export const register: Register = (on, options) => {
       // The name in a small box drawn like the group cards, tight around the name (no padding), its line dimmed for a
       // lighter stroke. The box itself lights on hover, so the box and the hover highlight are one area.
       const pillOf = (key: string, color: string, onPress: () => unknown) => (
-        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" borderDimColor backgroundColor={color} hover={{ backgroundColor: ink?.run }} flexShrink={0}>
+        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" borderDimColor backgroundColor={color} hover={{ backgroundColor: ink?.run }} paddingX={0} paddingY={0} margin={0} flexShrink={0}>
           <Button key={key} plain onPress={onPress as () => void}>
             <Text bold color={ink?.text}>
               {nameOf(t)}

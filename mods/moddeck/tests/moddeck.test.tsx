@@ -552,7 +552,7 @@ test('desktop: no button carries a label (the app would draw it instead of the n
   expect(await switchOf(pane, 'desktop', 'suggest')).toContain(ON('desktop'))
   expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"borderStyle":"round"') // every name: a box like the group cards
   expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).toContain('"backgroundColor":"#1F1F1E"') // a switch too, filled like the Side Question box; only its dot says on or off
-  expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).not.toContain('padding') // the whole coloured area is the button
+  expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).toContain('"paddingX":0') // tight: no padding between the box and the name
   for (const key of ['row:suggest', 'row:command-guard', 'group:Prompt helpers', 'session', 'btw']) {
     const box = await pane.find({ key })
     if (box) expect(JSON.stringify((box as { props?: unknown }).props)).toContain('"minWidth":0')
