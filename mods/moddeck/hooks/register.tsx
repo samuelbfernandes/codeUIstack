@@ -212,6 +212,7 @@ const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
 const INBOX_OFF = { plugin: 'error-inbox', key: 'isOff' } as const
 const CONCISE_OFF = { plugin: 'concise', key: 'isOff' } as const
 const TLDR_OFF = { plugin: 'tldr', key: 'isOff' } as const
+const TLDR_MODE = { plugin: 'tldr', key: 'mode' } as const
 
 async function valueOf(read: Promise<unknown>): Promise<unknown> {
   try {
@@ -269,7 +270,7 @@ async function offerAdvisorFix($: Dollar, blockedBy: string, model: string): Pro
   const YES = 'Yes, go ahead'
   const NO = 'No'
   const text = isTelemetry
-    ? `Using the advisor turns Claude Code's telemetry back on (DISABLE_TELEMETRY is removed from your settings). OK to proceed?`
+    ? `Using the advisor turns Claude Code's telemetry back on (DISABLE_TELEMETRY is removed from your settings), so usage data is sent to Anthropic again. Error reports stay off. OK to proceed?`
     : `Using the advisor removes CLAUDE_CODE_DISABLE_ADVISOR_TOOL from your settings. OK to proceed?`
   let answer: string
   try {
@@ -304,7 +305,7 @@ async function pick($: Dollar, id: string, command: string, value: string, fills
 
 /** command-guard's name is a switch too: off, or back to the level it had (medium the first time). */
 async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>, blockedBy?: string): Promise<void> {
-  const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
+  const back = chosen[`${t.id}:last`] ?? t.defaultLevel ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
   if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
   await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off', t.fillsPrompt === true, blockedBy)
 }
@@ -1083,9 +1084,12 @@ export const register: Register = (on, options) => {
     const noTelemetry = envOf(await attempt(() => $.env.get('DISABLE_TELEMETRY')), settingsNow?.env?.DISABLE_TELEMETRY)
     const noAdvisor = envOf(await attempt(() => $.env.get('CLAUDE_CODE_DISABLE_ADVISOR_TOOL')), settingsNow?.env?.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)
     const advisorBlock = noAdvisor === '1' ? 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL' : noTelemetry === '1' ? 'DISABLE_TELEMETRY' : undefined
+    // tldr's level: off, or the mode it is in (highlight or summary); undefined while the mod is not readable.
+    const tldrModeNow = await valueOf($.state.get(TLDR_MODE as never))
     const levelOf: Record<string, string | undefined> = {
       'command-guard': chosen['command-guard'] ?? (typeof blast === 'string' ? blast : undefined),
       advisor: savedAdvisor, // the setting: /advisor writes it, a pick here only fills the prompt box
+      tldr: ons.tldr === undefined ? undefined : ons.tldr ? (tldrModeNow === 'highlight' ? 'highlight' : 'summary') : 'off',
     }
     // A level the list does not name (a saved "sonnet") is still shown as picked.
     const levelsOf = (t: Tool): string[] => (t.levels !== undefined && levelOf[t.id] !== undefined && !t.levels.includes(levelOf[t.id]!) ? [...t.levels, levelOf[t.id]!] : (t.levels ?? []))

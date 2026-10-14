@@ -210,6 +210,9 @@ def cmd_status(args) -> int:
         old = old or bool(tag)
         print(f"- scope {st.get('scope')}" + (f" ({st.get('project')})" if st.get("project") else "") + f", profile {st.get('profile')}, version {st.get('version')}{tag}")
         print(f"    items: {', '.join(st.get('selected', []))}")
+    env = read_json(home / ".claude" / "settings.json").get("env") or {}
+    if env.get("DISABLE_TELEMETRY") == "1":
+        print("Telemetry is off (DISABLE_TELEMETRY=1), so /advisor stays off. Picking the advisor in moddeck asks first, then turns telemetry back on.")
     if old:
         where = "" if all(read_json(f).get("scope") == "user" for _, f in found) else "  (add --scope project --project DIR for a project install)"
         print(f"An install from the earlier name is still there. Run `{ident['cli']} update`: it removes it and installs the current version with the same choices.{where}")

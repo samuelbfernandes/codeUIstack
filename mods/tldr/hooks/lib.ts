@@ -4,8 +4,23 @@ import type { TldrDigest } from '../types'
 export const MAX_MARKS = 40 // sentences kept for marking, across recent replies
 export const MAX_REPLY_CHARS = 24_000 // what the small model is shown of a very long reply
 export const MARK = '⚑'
-/** Yellow at 5% opacity (95% transparent), as #RRGGBBAA: the background of a paragraph that holds a must-read sentence. */
-export const HIGHLIGHT = '#FACC150D'
+/**
+ * The tint behind a paragraph that holds a must-read sentence, in the app. The colours are the ones of the highlighter
+ * sample (estimated by eye from the screenshot); green is the default. As #RRGGBBAA, at 30% opacity.
+ */
+export const HIGHLIGHT_COLORS = {
+  red: '#FF5C5C4D',
+  yellow: '#FFE0664D',
+  olive: '#A8A82A4D',
+  green: '#66BB6A4D',
+  blue: '#6F7CFF4D',
+  purple: '#9C6BD64D',
+  plum: '#5C1F5C4D',
+} as const
+export type HighlightColor = keyof typeof HIGHLIGHT_COLORS
+export const HIGHLIGHT_DEFAULT: HighlightColor = 'green'
+export const HIGHLIGHT = HIGHLIGHT_COLORS[HIGHLIGHT_DEFAULT]
+export const isHighlightColor = (v: unknown): v is HighlightColor => typeof v === 'string' && v in HIGHLIGHT_COLORS
 
 export const SYSTEM = [
   'You help a busy reader skim a coding assistant\'s reply.',

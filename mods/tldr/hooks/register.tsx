@@ -6,13 +6,16 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { TldrDigest } from '../types'
-import { HIGHLIGHT, MARK, SYSTEM, addMarks, markText, parseDigest, promptFor, splitBlocks } from './lib'
+import type { TldrDigest, TldrMode } from '../types'
+import { HIGHLIGHT_COLORS, HIGHLIGHT_DEFAULT, MARK, SYSTEM, addMarks, isHighlightColor, markText, parseDigest, promptFor, splitBlocks, type HighlightColor } from './lib'
 
 type Dollar = EngineInterface
 
 const COMMAND = 'tldr'
+const MODES: readonly TldrMode[] = ['highlight', 'summary']
 const isOff = atom({ plugin: 'tldr', key: 'isOff' } as const, true)
+const mode = atom({ plugin: 'tldr', key: 'mode' } as const, 'summary' as TldrMode)
+const color = atom({ plugin: 'tldr', key: 'color' } as const, HIGHLIGHT_DEFAULT as HighlightColor)
 const digest = atom({ plugin: 'tldr', key: 'digest' } as const, null as TldrDigest | null)
 const marks = atom({ plugin: 'tldr', key: 'marks' } as const, [] as string[])
 const isFolded = atom({ plugin: 'tldr', key: 'isFolded' } as const, false)
@@ -25,6 +28,38 @@ async function isOn($: Dollar): Promise<boolean> {
   }
 }
 
+/** The highlight colour the reader last chose (green by default). */
+async function colorOf($: Dollar): Promise<HighlightColor> {
+  try {
+    const c = await $.store.get('color')
+    return isHighlightColor(c) ? c : HIGHLIGHT_DEFAULT
+  } catch {
+    return HIGHLIGHT_DEFAULT
+  }
+}
+
+/** `/tldr color <name>`: the tint of the paragraphs that hold a must-read sentence. */
+async function setColor($: Dollar, word: string): Promise<string> {
+  if (!isHighlightColor(word)) return `tldr · colour "${word.slice(0, 20)}" is not one of ${Object.keys(HIGHLIGHT_COLORS).join(', ')}`
+  try {
+    await $.store.set('color', word)
+    await update($, color, () => word)
+  } catch {
+    return 'tldr · that did not work, nothing changed'
+  }
+  return `tldr · highlight colour · ${word}`
+}
+
+/** The mode the reader last chose (summary by default). */
+async function modeOf($: Dollar): Promise<TldrMode> {
+  try {
+    const m = await $.store.get('mode')
+    return MODES.find(x => x === m) ?? 'summary'
+  } catch {
+    return 'summary'
+  }
+}
+
 async function flip($: Dollar, to: boolean): Promise<string> {
   try {
     if (to) await $.store.set('on', true)
@@ -34,7 +69,25 @@ async function flip($: Dollar, to: boolean): Promise<string> {
   } catch {
     return 'tldr · that did not work, nothing changed'
   }
-  return to ? 'tldr · on · long replies get a summary above the prompt and ⚑ on what you must not skip (one Haiku call each)' : 'tldr · off'
+  return to ? `tldr · on · ${MODE_TEXT[await modeOf($)]}` : 'tldr · off'
+}
+
+/** `highlight` or `summary`: turns tldr on in that mode (the switch and the dropdown both use it). */
+async function setMode($: Dollar, to: TldrMode): Promise<string> {
+  try {
+    await $.store.set('mode', to)
+    await $.store.set('on', true)
+    await update($, mode, () => to)
+    await update($, isOff, () => false)
+  } catch {
+    return 'tldr · that did not work, nothing changed'
+  }
+  return `tldr · on · ${MODE_TEXT[to]}`
+}
+
+const MODE_TEXT: Record<TldrMode, string> = {
+  highlight: 'highlight: must-read sentences are marked in the reply, no box',
+  summary: 'summary: must-read sentences are marked, and a box above the prompt sums the reply up (one Haiku call each)',
 }
 
 /** One small-model call over the reply; the digest and its must-read sentences replace the last ones. */
@@ -57,13 +110,17 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     try {
-      const isOnNow = await isOn($) // the switch outlives the session
+      const isOnNow = await isOn($) // the switch and its mode outlive the session
+      const modeNow = await modeOf($)
+      const colorNow = await colorOf($)
       await update($, isOff, () => !isOnNow)
+      await update($, mode, () => modeNow)
+      await update($, color, () => colorNow)
     } catch {
       // reads as off
     }
     try {
-      await $.command.register({ name: COMMAND, description: 'Sum up long replies and flag what you must not skip: /tldr [on|off]', argumentHint: '[on|off]', immediate: true })
+      await $.command.register({ name: COMMAND, description: 'Mark what you must not skip in long replies: /tldr [highlight|summary|on|off]', argumentHint: '[highlight|summary|on|off]', immediate: true })
     } catch {
       // the side bar switch still works
     }
@@ -73,8 +130,10 @@ export const register: Register = (on, options) => {
   on('command.run', { command: COMMAND }, async ($, e) => {
     const word = e.args.trim().toLowerCase()
     if (word === 'on' || word === 'off') return { text: await flip($, word === 'on') }
-    if (word === '' || word === 'status') return { text: (await isOn($)) ? 'tldr · on' : 'tldr · off' }
-    return { text: `tldr · unknown word "${e.args.trim().slice(0, 30)}" · use /tldr on or /tldr off` }
+    if (word === 'highlight' || word === 'summary') return { text: await setMode($, word) }
+    if (word.startsWith('color')) return { text: await setColor($, word.slice('color'.length).trim()) }
+    if (word === '' || word === 'status') return { text: ((await isOn($)) ? `tldr · on · ${MODE_TEXT[await modeOf($)]}` : 'tldr · off') + ` · colour ${await colorOf($)}` }
+    return { text: `tldr · unknown word "${e.args.trim().slice(0, 30)}" · use /tldr highlight, /tldr summary, /tldr color <name>, /tldr on or /tldr off` }
   }).catch(() => ({ text: 'tldr · that did not work, nothing changed' }))
 
   // A long answer of the main conversation: digest it once the turn is over (a timer, so the turn never waits).
@@ -109,11 +168,12 @@ export const register: Register = (on, options) => {
     // sentence pale yellow: the reply is drawn here paragraph by paragraph, the marked ones on the tint.
     if (e.surface !== 'desktop') return next({ ...e, props: { ...e.props, text: marked } })
     const { Box, Markdown } = $.ui.resolve(e)
+    const tint = HIGHLIGHT_COLORS[await read($, color)]
     return (
       <Box key="tldr-reply" flexDirection="column" gap={1}>
         {splitBlocks(marked).map((block, i) =>
           block.includes(MARK) ? (
-            <Box key={`tldr-p${i}`} backgroundColor={HIGHLIGHT}>
+            <Box key={`tldr-p${i}`} backgroundColor={tint}>
               <Markdown text={block} />
             </Box>
           ) : (
@@ -127,7 +187,7 @@ export const register: Register = (on, options) => {
   // The box above the prompt: Summary, Needs you, Next; ▾ folds it to one line, ✕ puts it away until the next reply.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const d = await read($, digest)
-    if (d === null || !(await isOn($)) || e.props.hasSurvey) return next(e)
+    if (d === null || !(await isOn($)) || (await read($, mode)) !== 'summary' || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const folded = await read($, isFolded)
     const head = (

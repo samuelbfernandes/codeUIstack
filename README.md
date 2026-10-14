@@ -71,7 +71,7 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 **Prompt helpers**
 - `model-picker`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
 - `reflect`: offers to save a rule when you correct Claude (spends a few tokens).
-- `tldr`: a switch, off until you turn it on; then each long reply gets a TL;DR box above the prompt (Summary, Needs you, Next) and its must-read sentences are drawn bold with ⚑ inside the reply. One Haiku call per long reply.
+- `tldr`: a dropdown, off until you pick a mode. **highlight** draws each long reply's must-read sentences bold with ⚑; **summary** also adds a TL;DR box above the prompt (Summary, Needs you, Next). One Haiku call per long reply.
 - `concise`: a switch, off until you turn it on; then Claude's replies lead with the next action, number the steps, restate where you are and leave tangents for later (adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd), MIT).
 - `prompt-library`: `/prompts` keeps saved prompts per project, one click away in the side bar.
 

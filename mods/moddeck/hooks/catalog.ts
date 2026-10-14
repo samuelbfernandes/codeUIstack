@@ -32,6 +32,8 @@ export type Tool = {
   click?: Action
   /** A dropdown of levels, one of them `off`: the name is green while on, red while off. The pick runs `/<command> <level>` at once. */
   levels?: string[]
+  /** The level a switch goes back to when it is turned on again (else the first level that is not off). */
+  defaultLevel?: string
   /** A level is set by Claude Code's own command, which a mod cannot run: a pick puts `/<command> <level>` in the prompt box instead. */
   fillsPrompt?: true
   /** A row with nothing to type says when it appears instead. */
@@ -64,7 +66,7 @@ export const TOOLS: Tool[] = [
     isSwitch: true,
     command: 'reflect',
   },
-  { id: 'tldr', label: 'tldr', group: 'Prompt helpers', icon: '⚑', desc: 'Sums up long replies, flags what you must not skip', costs: true, isSwitch: true, command: 'tldr' },
+  { id: 'tldr', label: 'tldr', group: 'Prompt helpers', icon: '⚑', desc: 'Marks what you must not skip in long replies; summary adds a box above the prompt', costs: true, command: 'tldr', levels: ['off', 'highlight', 'summary'], defaultLevel: 'summary' },
   { id: 'concise', label: 'concise', group: 'Prompt helpers', icon: '»', desc: 'Short, action-first replies', isSwitch: true, command: 'concise' },
   // Each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
   { id: 'secret-guard', label: 'secret-guard', group: 'Guards', icon: '🔒', desc: 'Keeps secrets out of the context', isSwitch: true, command: 'secret-guard' },

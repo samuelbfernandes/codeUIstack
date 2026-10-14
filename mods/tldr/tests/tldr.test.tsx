@@ -89,6 +89,32 @@ test('on: a long reply gets one call, a box above the prompt and ⚑ on the must
   expect(await cmd($, 'off')).toBe('tldr · off')
 })
 
+test('highlight: the must-read sentences are marked but the box above the prompt stays away; summary brings it back', async ($, on) => {
+  const w = world(on)
+  await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
+  expect(await cmd($, 'highlight')).toContain('tldr · on · highlight')
+  await reply($)
+  await w.clock.advance(5)
+  expect(w.calls).toBe(1)
+  const band = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AbovePrompt', props: BAND } as never)
+  expect(await texts(band)).not.toContain('Eight mods renamed; tests pass.')
+  await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AssistantMessage', props: { text: REPLY, isFirstOfReply: true } } as never)
+  expect(w.drawn.at(-1)).toContain(`**${MARK} You need to restart the app before the new names load.**`)
+  expect(await cmd($, 'summary')).toContain('tldr · on · summary')
+  const again = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AbovePrompt', props: BAND } as never)
+  expect(await texts(again)).toContain('Eight mods renamed; tests pass.')
+  expect(await cmd($, 'off')).toBe('tldr · off')
+})
+
+test('colour: green by default, /tldr color changes the tint, an unknown name is refused', async ($, on) => {
+  mock.store(on)
+  await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
+  expect(await cmd($, 'status')).toContain('colour green')
+  expect(await cmd($, 'color red')).toBe('tldr · highlight colour · red')
+  expect(await cmd($, 'color pink')).toContain('is not one of red, yellow, olive, green, blue, purple, plum')
+  expect(await cmd($, 'status')).toContain('colour red')
+})
+
 test('splitBlocks cuts at blank lines but keeps a code fence whole', () => {
   expect(splitBlocks('a\nb\n\nc\n\n```\nx\n\ny\n```\n\nd')).toEqual(['a\nb', 'c', '```\nx\n\ny\n```', 'd'])
 })
