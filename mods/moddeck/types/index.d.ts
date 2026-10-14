@@ -73,6 +73,8 @@ declare module 'claude-code' {
       permMode: string | undefined
       /** The Side Question panel is expanded. */
       btwOpen: boolean
+      /** Cards folded down to their title (`group:<name>`); also kept in the store. null = not loaded. */
+      folded: string[] | null
       /** What each list's search field holds (`skills`, `prompts`). */
       listQuery: Record<string, string>
       /** The text in the Side Question's Ask here field, emptied after asking and by ✕ close. */

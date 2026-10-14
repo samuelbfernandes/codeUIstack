@@ -33,7 +33,7 @@ export function barTarget(top: number, shown: number, total: number, cell: numbe
 }
 
 /** A scrolling list near the bottom of the pane: its id and how many rows it shows now. */
-export type BottomList = { id: string; shown: number; under?: number }
+export type BottomList = { id: string; shown: number; under?: number; folded?: boolean }
 
 /**
  * Which list a tree row is over. The lists are given bottom-up (the last one drawn first) and sit directly above
@@ -43,6 +43,10 @@ export function listAt(lists: readonly BottomList[], contentRows: number, row: n
   const fromBottom = contentRows - 1 - row
   let cursor = below // the bottom border of the lowest list's box
   for (const l of lists) {
+    if (l.folded) {
+      cursor += 2 // a folded list is its title row and the gap above it
+      continue
+    }
     const under = l.under ?? 0 // rows inside the box below the list (the more/fewer row and the rule above it)
     const lowest = cursor + 1 + under
     const highest = lowest + l.shown - 1

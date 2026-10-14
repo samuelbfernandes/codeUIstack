@@ -50,6 +50,14 @@ test('the arrows take a cell each from the bar; stepTop moves one line and stays
   expect(stepTop(5, 1, 5, 10)).toBe(5)
 })
 
+test('listAt skips a folded list: only its title row and the gap above it', () => {
+  // from the end: footer, gap, prompts' title (folded), gap, skills' bottom border, 3 skills
+  const lists = [{ id: 'prompts', shown: 0, folded: true }, { id: 'skills', shown: 3 }]
+  expect(listAt(lists, 40, 40 - 3)).toBeUndefined() // the folded title
+  expect(listAt(lists, 40, 40 - 6)).toEqual({ id: 'skills', index: 2 })
+  expect(listAt(lists, 40, 40 - 8)).toEqual({ id: 'skills', index: 0 })
+})
+
 test('pillText pads a name so the pills of one card line up', () => {
   expect(pillText('suggest', 9)).toBe(' suggest   ')
 })

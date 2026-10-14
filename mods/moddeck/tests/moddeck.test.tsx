@@ -340,6 +340,25 @@ test('typing in the Skills search moves the matches to the top; Enter puts the f
   expect(JSON.stringify(await pane.find({ key: 'skills:search' }))).toContain('"value":""')
 })
 
+test('▾ folds a card down to its title (with its count), ▸ opens it again, and the choice is kept', async ($, on) => {
+  world(on)
+  const store = new Map<string, unknown>()
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => (store.set(e.key, e.value), { value: undefined }))
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'fold:group:Workspace utilities' }))).toContain('▾')
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+  await pane.press({ key: 'fold:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeUndefined() // the box is gone
+  expect(await texts(pane)).toContain('Workspace utilities · 11')
+  expect(JSON.stringify(await pane.find({ key: 'fold:group:Workspace utilities' }))).toContain('▸')
+  expect(store.get('folded')).toEqual(['group:Workspace utilities'])
+  await pane.press({ key: 'fold:group:Guards' })
+  expect(await texts(pane)).toMatch(/Guards · \d/) // a small group shows its count once folded
+  await pane.press({ key: 'fold:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+})
+
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
   const w = world(on)
   await run($, 'blast-radius', 'high')

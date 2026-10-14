@@ -69,6 +69,8 @@ const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[
 /** What the Ask here field holds: kept as it is typed, emptied after asking and by ✕ close. */
 /** What each list's search field holds (`skills`, `prompts`); matching names move to the top. */
 const listQuery = atom({ plugin: 'moddeck', key: 'listQuery' } as const, {} as Record<string, string>)
+/** Cards folded down to their title by their ▾ button (`group:<name>`, `group:skills`, `group:prompts`); kept in the store as `folded`. null = not loaded. */
+const folded = atom({ plugin: 'moddeck', key: 'folded' } as const, null as string[] | null)
 const btwDraft = atom({ plugin: 'moddeck', key: 'btwDraft' } as const, '')
 /** A newer release the person has not updated to yet (null = none known); the side bar shows a one-line button for it. */
 const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
@@ -99,6 +101,18 @@ async function starsPicked($: Dollar): Promise<string[]> {
   const kept = (await stored<string[]>($, 'starred')) ?? []
   await safe(() => update($, starred, () => kept))
   return kept
+}
+async function foldedPicked($: Dollar): Promise<string[]> {
+  const now = await read($, folded)
+  if (now !== null) return now
+  const kept = (await stored<string[]>($, 'folded')) ?? []
+  await safe(() => update($, folded, () => kept))
+  return kept
+}
+async function flipFold($: Dollar, key: string): Promise<void> {
+  const next = toggleStar(await foldedPicked($), key)
+  await update($, folded, () => next)
+  await safe(() => $.store.set('folded', next))
 }
 async function setRows($: Dollar, id: string, n: number): Promise<void> {
   const next = { ...(await rowsPicked($)), [id]: n }
@@ -877,16 +891,29 @@ export const register: Register = (on, options) => {
         {'─'.repeat(300)}
       </Text>
     )
-    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number | string; rules?: boolean } = {}) => (
-      <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
-        <Text bold wrap="truncate-end">
-          {title}
-        </Text>
-        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} {...fill} {...fit}>
-          {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
+    // A card: its title with a ▾ that folds the card down to the title alone (▸ opens it again), then its bordered box.
+    const foldedNow = await foldedPicked($)
+    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number | string; rules?: boolean; count?: number } = {}) => {
+      const isFolded = foldedNow.includes(key)
+      const shownTitle = isFolded && opts.count !== undefined && !title.includes(' · ') ? `${title} · ${opts.count}` : title
+      return (
+        <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
+          <Box columnGap={1} {...fit}>
+            <Text bold wrap="truncate-end">
+              {shownTitle}
+            </Text>
+            <Button key={`fold:${key}`} plain label={desk ? undefined : isFolded ? `open ${title}` : `fold ${title}`} onPress={() => void flipFold($, key)}>
+              <Text color={link}>{isFolded ? '▸' : '▾'}</Text>
+            </Button>
+          </Box>
+          {!isFolded && (
+            <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} {...fill} {...fit}>
+              {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
+            </Box>
+          )}
         </Box>
-      </Box>
-    )
+      )
+    }
 
     // The Session box at the top: live figures from the engine, each row hidden when its figure is missing.
     let sessionBox: unknown = null
@@ -1082,7 +1109,7 @@ export const register: Register = (on, options) => {
       const isBig = listed.length > GROUP_SCROLL_AT
       // Starred tools first (only big groups have stars), then switches that are on; redone on every draw.
       const tools = rankTools(listed, t => isBig && groupStars.includes(starOf(t)), t => isOnOf(t) === true)
-      if (!isBig) return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)))
+      if (!isBig) return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)), { count: tools.length })
       const starredCount = tools.filter(t => groupStars.includes(starOf(t))).length
       const shown = listSize(starredCount, GROUP_SCROLL_AT, tools.length)
       const listId = `group:${g}`
@@ -1234,7 +1261,8 @@ export const register: Register = (on, options) => {
     // Where the lists sit, counted from the bottom, for the wheel: the lowest first.
     const skillShown = listSize(skills.filter(k => stars.includes(k.id)).length, rowsOf('skills'), skills.length)
     const promptShown = listSize(prompts.filter(p => stars.includes(`prompt:${p.name}`)).length, rowsOf('prompts'), prompts.length)
-    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: promptShown, under: 2 }] : []), ...(skills.length > 0 ? [{ id: 'skills', shown: skillShown, under: 2 }] : [])]
+    const listFor = (id: string, shown: number) => (foldedNow.includes(`group:${id}`) ? { id, shown: 0, folded: true } : { id, shown, under: 2 })
+    bottomLists = [...(prompts.length > 0 ? [listFor('prompts', promptShown)] : []), ...(skills.length > 0 ? [listFor('skills', skillShown)] : [])]
     scrollables = { skills: { total: skills.length, shown: skillShown }, prompts: { total: prompts.length, shown: promptShown } }
 
     const wideNow = await read($, wide)
