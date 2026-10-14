@@ -210,6 +210,7 @@ const FORMAT_OFF = { plugin: 'format-on-edit', key: 'isOff' } as const
 const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
 const INBOX_OFF = { plugin: 'error-inbox', key: 'isOff' } as const
 const CONCISE_OFF = { plugin: 'concise', key: 'isOff' } as const
+const TLDR_OFF = { plugin: 'tldr', key: 'isOff' } as const
 
 async function valueOf(read: Promise<unknown>): Promise<unknown> {
   try {
@@ -1064,6 +1065,7 @@ export const register: Register = (on, options) => {
       'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
       'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
       concise: flag(await valueOf($.state.get(CONCISE_OFF as never)), true),
+      tldr: flag(await valueOf($.state.get(TLDR_OFF as never)), true),
       'branch-janitor': flag(await valueOf($.state.get(JANITOR_OFF as never)), true), // null outside a repository: not drawn
       'progress': flag(await valueOf($.state.get(BAND_HIDDEN as never)), true),
       // cache-guard's switch is keep-warm: on while /keepwarm runs (its state holds the run), off when it is null.
@@ -1106,13 +1108,13 @@ export const register: Register = (on, options) => {
       const run = () => (t.click ? act($, t.click) : undefined)
       // In the app every name is a pill (INK): green or red for a switch, gray for a command that runs on click. The pill box
       // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
-      // The name in a small box drawn like the group cards (round, the cards' border colour), filled like the Side
-      // Question box. The whole box is the button.
+      // The name in a small box drawn like the group cards, tight around the name (no padding), its line dimmed for a
+      // lighter stroke. The box itself lights on hover, so the box and the hover highlight are one area.
       const pillOf = (key: string, color: string, onPress: () => unknown) => (
-        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" backgroundColor={color} flexShrink={0}>
+        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" borderDimColor backgroundColor={color} hover={{ backgroundColor: ink?.run }} flexShrink={0}>
           <Button key={key} plain onPress={onPress as () => void}>
-            <Text bold color={ink?.text} backgroundColor={color}>
-              {text}
+            <Text bold color={ink?.text}>
+              {nameOf(t)}
             </Text>
           </Button>
         </Box>

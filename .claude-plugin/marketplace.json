@@ -148,6 +148,11 @@
       "description": "Keeps a list of the test, lint, build, format and check commands Claude runs this session (pytest, R CMD check, cargo, npm, ruff, ...) with pass or fail and duration. Watches only; never blocks."
     },
     {
+      "name": "tldr",
+      "source": "./mods/tldr",
+      "description": "While switched on, after each long reply a small model picks the sentences you must not skip (decisions, warnings, questions for you, failures, things to do) and marks them inside the reply with ⚑, and a box above the prompt sums the reply up: Summary, Needs you, Next. One Haiku call per long reply. Off until /tldr on."
+    },
+    {
       "name": "ui-preview",
       "source": "./mods/ui-preview",
       "description": "Runs the app in this project (a plumber API first; also npm run dev, Shiny for R or Python, Streamlit) on 127.0.0.1 and shows it in a pane: the plumber routes, the output, a headless-browser screenshot, and a button that drafts a review prompt. Starts nothing until you ask."

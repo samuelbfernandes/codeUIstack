@@ -35,6 +35,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | suggest-model | no | codex | no | yes | command.run, prompt.submit, session.end, session.start, turn.complete, turn.step |
 | table-preview | no | none | no | no | command.run, session.start, ui.render |
 | test-ledger | no | none | no | no | command.run, session.start, tool.call, ui.render |
+| tldr | no | none | no | yes | command.run, session.end, session.start, turn.complete, ui.render |
 | ui-preview | yes | Rscript, shiny, streamlit | yes | no | command.run, session.end, session.start, ui.render |
 | usage-meter | no | none | no | no | command.run, prompt.submit, session.end, session.measure, session.start, turn.complete, turn.start, ui.render |
 

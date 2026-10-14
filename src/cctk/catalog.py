@@ -90,6 +90,7 @@ MOD_META: dict[str, tuple[str, str, bool]] = {
     "prompt-library": ("none", "", False),
     "checkpoint": ("none", "", True),
     "long-run-ping": ("none", "", False),
+    "tldr": ("none until switched on; then one Haiku call per long reply", "", False),
     "concise": ("none until switched on; then about 1,500 tokens of rules once per session and one line per prompt", "", False),
 }
 # Mods that spend model credit when used: listed, but not switched on until the person chooses them.

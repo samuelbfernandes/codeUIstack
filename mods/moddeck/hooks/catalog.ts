@@ -64,6 +64,7 @@ export const TOOLS: Tool[] = [
     isSwitch: true,
     command: 'reflect',
   },
+  { id: 'tldr', label: 'tldr', group: 'Prompt helpers', icon: '⚑', desc: 'Sums up long replies, flags what you must not skip', costs: true, isSwitch: true, command: 'tldr' },
   { id: 'concise', label: 'concise', group: 'Prompt helpers', icon: '»', desc: 'Short, action-first replies', isSwitch: true, command: 'concise' },
   // Each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
   { id: 'secret-guard', label: 'secret-guard', group: 'Guards', icon: '🔒', desc: 'Keeps secrets out of the context', isSwitch: true, command: 'secret-guard' },

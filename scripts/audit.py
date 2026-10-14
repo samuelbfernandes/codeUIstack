@@ -47,6 +47,7 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "scope-watch": set(),
     "error-inbox": set(),
     "concise": set(),
+    "tldr": set(),
     "decision-log": set(),
     "format-on-edit": {"air", "ruff", "jarl", "prettier", "biome"},   # only when switched on, on the one file Claude just edited, if the tool is installed
     "ui-preview": {"Rscript", "npm", "shiny", "streamlit", "google-chrome", "chromium", "chromium-browser"},   # your app's own server, and a headless browser for a screenshot; only on /ui-preview start|shot
