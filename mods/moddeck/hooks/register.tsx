@@ -258,7 +258,33 @@ async function act($: Dollar, action: Action): Promise<void> {
 }
 
 /** A dropdown pick: remember it for the drawing, then run the mod's own command with it. */
-async function pick($: Dollar, id: string, command: string, value: string, fillsPrompt = false): Promise<void> {
+/** Asked when the advisor is picked while a variable keeps it off: what is in the way, and a way out. */
+async function offerAdvisorFix($: Dollar, blockedBy: string, model: string): Promise<void> {
+  const isTelemetry = blockedBy === 'DISABLE_TELEMETRY'
+  const FIX = 'Ask Claude to fix it'
+  const KEEP = isTelemetry ? 'Keep telemetry off' : 'Leave it off'
+  const text = [
+    `The advisor cannot run: ${blockedBy}=1 is set in your environment.`,
+    isTelemetry
+      ? 'Claude Code turns the advisor on through a feature flag it fetches, and DISABLE_TELEMETRY stops that fetch. Removing it turns usage telemetry back on.'
+      : 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL turns the advisor tool off entirely.',
+    `"${FIX}" puts a request in the prompt box; nothing changes until you send it and approve the edit. Restart afterwards, then run /advisor ${model}.`,
+  ].join('\n')
+  let answer: string
+  try {
+    answer = await $.ui.ask(text, { options: [FIX, KEEP], header: 'Advisor off' })
+  } catch {
+    return // Esc: nothing changes
+  }
+  if (answer !== FIX) return
+  const request = isTelemetry
+    ? 'Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json, and if ~/.claude/moddeck/state/user.json lists "telemetry-off" under "selected", take it out so a moddeck update does not put it back. Back up both files first. This is so the advisor tool can run.'
+    : 'Remove CLAUDE_CODE_DISABLE_ADVISOR_TOOL from the env block of ~/.claude/settings.json (back the file up first) so the advisor tool can run.'
+  await act($, { text: request, run: false })
+}
+
+async function pick($: Dollar, id: string, command: string, value: string, fillsPrompt = false, blockedBy?: string): Promise<void> {
+  if (fillsPrompt && blockedBy !== undefined && value !== 'off') return offerAdvisorFix($, blockedBy, value)
   if (fillsPrompt) {
     // Claude Code's own command: a mod cannot run it, so it goes in the prompt box; the row follows the setting once sent.
     await act($, { text: `/${command} ${value}`, run: false })
@@ -275,10 +301,10 @@ async function pick($: Dollar, id: string, command: string, value: string, fills
 }
 
 /** blast-radius's name is a switch too: off, or back to the level it had (medium the first time). */
-async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>): Promise<void> {
+async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>, blockedBy?: string): Promise<void> {
   const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
   if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
-  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off', t.fillsPrompt === true)
+  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off', t.fillsPrompt === true, blockedBy)
 }
 
 async function safe(f: () => Promise<unknown>): Promise<void> {
@@ -1056,7 +1082,7 @@ export const register: Register = (on, options) => {
     // A level the list does not name (a saved "sonnet") is still shown as picked.
     const levelsOf = (t: Tool): string[] => (t.levels !== undefined && levelOf[t.id] !== undefined && !t.levels.includes(levelOf[t.id]!) ? [...t.levels, levelOf[t.id]!] : (t.levels ?? []))
     const descOf = (t: Tool): string | undefined =>
-      t.id === 'advisor' && advisorBlock !== undefined ? `Kept off by ${advisorBlock}=1 in your environment; remove it to use the advisor` : t.desc
+      t.id === 'advisor' && advisorBlock !== undefined ? `Kept off by ${advisorBlock}=1 · pick a model to see the fix` : t.desc
 
     // One line per tool: its name (a green or red pill when it is a switch), its controls, then its description, which
     // takes what is left and is cut with "…". The descriptions, icons and groups are presentation only.
@@ -1072,7 +1098,7 @@ export const register: Register = (on, options) => {
     const line = (t: Tool, nameWidth: number) => {
       const isOn = isOnOf(t)
       const text = pillText(nameOf(t), nameWidth)
-      const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn!))
+      const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen, t.id === 'advisor' ? advisorBlock : undefined) : flip($, t, isOn!))
       const run = () => (t.click ? act($, t.click) : undefined)
       // In the app every name is a pill (INK): green or red for a switch, gray for a command that runs on click. The pill box
       // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
@@ -1100,7 +1126,7 @@ export const register: Register = (on, options) => {
           </Button>
         )
       const level = t.levels !== undefined && (
-        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v, t.fillsPrompt === true)} />
+        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v, t.fillsPrompt === true, t.id === 'advisor' ? advisorBlock : undefined)} />
       )
       return (
         <Box key={`row:${t.id}`} columnGap={1} {...fit}>

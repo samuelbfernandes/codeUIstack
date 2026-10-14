@@ -374,6 +374,23 @@ test('advisor: a dropdown and a red/green name like blast-radius; a pick or a cl
   expect(w.filled.at(-1)).toBe('/advisor opus')
 })
 
+test('advisor kept off by DISABLE_TELEMETRY: picking a model explains why and offers to ask Claude for the fix', async ($, on) => {
+  const w = world(on)
+  const asked: string[] = []
+  on('env.get', (_$, e) => ({ value: (e as { name: string }).name === 'DISABLE_TELEMETRY' ? '1' : undefined }) as never)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_, e) => {
+    const q = e.questions[0]!
+    asked.push(q.question)
+    return { result: { questions: e.questions, answers: { [q.question]: 'Ask Claude to fix it' } } } as never
+  })
+  const pane = await mount($, 'desktop')
+  expect(await texts(pane)).toContain('Kept off by DISABLE_TELEMETRY=1')
+  await pane.select({ key: 'level:advisor', value: 'opus' } as never)
+  expect(asked[0]).toContain('DISABLE_TELEMETRY=1')
+  expect(w.filled.at(-1)).toContain('Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json')
+  expect(w.filled).not.toContain('/advisor opus') // nothing to run until the variable is gone
+})
+
 test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
   const w = world(on)
   await run($, 'blast-radius', 'high')
