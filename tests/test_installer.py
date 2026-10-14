@@ -44,7 +44,7 @@ class UserScope(Base):
         hp = self.sb.git("config", "--global", "core.hooksPath")
         self.assertTrue(hp.endswith("global/githooks"))
         self.assertTrue(os.access(Path(hp) / "pre-push", os.X_OK))
-        self.assertIn(f"blast-radius@{MP}", self.plugins())
+        self.assertIn(f"command-guard@{MP}", self.plugins())
 
     def test_no_codex_means_review_cost_and_theory_review_start_off(self):
         self.install("--scope", "user")
@@ -54,7 +54,7 @@ class UserScope(Base):
     def test_standard_is_one_line_and_asks_nothing(self):
         rc, out, err = run_cli(["install", "--standard", "--scope", "user", *SKIP_PLUGINS])
         self.assertEqual(rc, 0, out + err)
-        self.assertIn(f"blast-radius@{MP}", self.plugins())
+        self.assertIn(f"command-guard@{MP}", self.plugins())
 
     def test_all_installs_every_mod_including_the_ones_that_start_off(self):
         rc, out, err = run_cli(["install", "--all", "--scope", "user", *SKIP_PLUGINS])
@@ -123,7 +123,7 @@ class UserScope(Base):
         snap = {k: v for k, v in self.sb.tree().items() if "state/" not in k}
         self.install("--scope", "user")
         self.assertEqual({k: v for k, v in self.sb.tree().items() if "state/" not in k}, snap)
-        self.assertEqual(len([p for p in self.sb.fake_db()["plugins"] if p["id"].startswith("blast-radius")]), 1)
+        self.assertEqual(len([p for p in self.sb.fake_db()["plugins"] if p["id"].startswith("command-guard")]), 1)
 
     def test_lab_profile_turns_attribution_off_and_uninstall_removes_it(self):
         self.install("--scope", "user", "--profile", "lab")
@@ -134,8 +134,8 @@ class UserScope(Base):
         self.assertFalse((self.home / ".claude" / "settings.json").exists() and "attribution" in (self.home / ".claude" / "settings.json").read_text())
 
     def test_mods_flag_selects_exactly_those(self):
-        self.install("--scope", "user", "--mods", "blast-radius,suggest-model")
-        self.assertEqual({p for p in self.plugins()}, {f"blast-radius@{MP}", f"suggest-model@{MP}"})
+        self.install("--scope", "user", "--mods", "command-guard,model-picker")
+        self.assertEqual({p for p in self.plugins()}, {f"command-guard@{MP}", f"model-picker@{MP}"})
 
     def test_unknown_ids_are_refused_before_anything_changes(self):
         before = self.sb.tree()
@@ -154,11 +154,11 @@ class UserScope(Base):
         self.assertEqual((self.home / ".claude" / "settings.json").read_text(), "{ broken")
 
     def test_failed_plugin_is_reported_and_others_continue(self):
-        os.environ["FAKE_FAIL"] = f"suggest-model@{MP}"
+        os.environ["FAKE_FAIL"] = f"model-picker@{MP}"
         out = self.install("--scope", "user")
-        self.assertIn("could not install suggest-model", out)
-        self.assertIn(f"blast-radius@{MP}", self.plugins())
-        self.assertNotIn(f"suggest-model@{MP}", self.plugins())
+        self.assertIn("could not install model-picker", out)
+        self.assertIn(f"command-guard@{MP}", self.plugins())
+        self.assertNotIn(f"model-picker@{MP}", self.plugins())
 
     def test_old_claude_code_skips_mods_with_a_clear_message(self):
         os.environ["FAKE_CLAUDE_VERSION"] = "2.0.1"
@@ -278,7 +278,7 @@ class ProjectScope(Base):
         self.install("--scope", "project", "--project", str(self.proj))
         run_cli(["uninstall", "--yes", "--scope", "project", "--project", str(self.proj)])
         self.assertTrue((self.home / ".claude" / "CLAUDE.md").exists())
-        self.assertIn(f"blast-radius@{MP}", self.plugins())
+        self.assertIn(f"command-guard@{MP}", self.plugins())
         self.assertTrue((self.home / ".claude" / NAME / "global").exists())
 
     def test_non_git_folder_skips_git_parts_with_a_note(self):
@@ -316,13 +316,13 @@ class Interactive(Base):
             self.assertEqual(q, [], "unused answers")
 
     def test_questions_toggle_and_confirm(self):
-        # scope=1 (user), rules=Enter (neutral), mods: toggle blast-radius then Enter, rules: Enter, add-ons: Enter, UI: Enter, confirm y
+        # scope=1 (user), rules=Enter (neutral), mods: toggle command-guard then Enter, rules: Enter, add-ons: Enter, UI: Enter, confirm y
         names = [m["name"] for m in payload.mods()]
-        number = str(names.index("blast-radius") + 1)  # the list follows marketplace.json, so look the number up
+        number = str(names.index("command-guard") + 1)  # the list follows marketplace.json, so look the number up
         rc, out, err = self.run_with(["1", "", number, "", "", "", "", "y"])
         self.assertEqual(rc, 0, out + err)
-        self.assertNotIn(f"blast-radius@{MP}", self.plugins())
-        self.assertIn(f"suggest-model@{MP}", self.plugins())
+        self.assertNotIn(f"command-guard@{MP}", self.plugins())
+        self.assertIn(f"model-picker@{MP}", self.plugins())
 
     def test_saying_no_changes_nothing(self):
         before = self.sb.tree()
@@ -413,7 +413,7 @@ class NewModDefaults(unittest.TestCase):
     def test_safety_mods_start_on(self):
         by_name = {i.id: i for i in catalog.items(catalog.Detected())}
         self.assertTrue(by_name["secret-guard"].default)
-        self.assertTrue(by_name["budget-guard"].default)
+        self.assertTrue(by_name["usage-meter"].default)
 
 
 class ReleaseConstant(unittest.TestCase):

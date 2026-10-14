@@ -76,7 +76,14 @@ export async function scan(run: Run, root: string, cfg: ScanConfig, opts: ScanOp
   const facts: Facts[] = []
   for (const ref of refs) {
     const exclusion = excluded(ref)
-    const f: Facts = { ref, exclusion, hasStash: stashed.has(ref.name) }
+    let why = exclusion
+    // The current branch is never deleted; say when it still holds work the default branch lacks, which is what keeps it
+    // alive on the server too (for example new commits pushed after its pull request was merged).
+    if (exclusion === 'current branch' && bases[0] !== undefined) {
+      const n = Number((await git('rev-list', '--count', `${bases[0]}..${ref.sha}`)).stdout.trim())
+      if (n > 0) why = `current branch · ${n} ${n === 1 ? 'commit' : 'commits'} not in ${defaultName}: open a pull request for ${n === 1 ? 'it' : 'them'}`
+    }
+    const f: Facts = { ref, exclusion: why, hasStash: stashed.has(ref.name) }
     if (exclusion === undefined && examined.includes(ref)) await gatherEvidence(git, f, bases, merged)
     facts.push(f)
   }

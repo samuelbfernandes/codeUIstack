@@ -61,11 +61,11 @@ command it would run, then stops. Nothing is changed. (From a checkout: `sh inst
 ## 5. Things that are real, and you should know
 
 - **Mods are code that runs inside Claude Code with your permissions.** That is how every Claude Code plugin works. These
-  mods are small, make no network calls, and start only the programs in `docs/AUDIT.md`. `blast-radius` and the git guards add
+  mods are small, make no network calls, and start only the programs in `docs/AUDIT.md`. `command-guard` and the git guards add
   questions or refusals; they never approve anything for you.
 - **A global install runs shell scripts on every `git commit` and `git push`** in every repository (git guards). They are in
   `global/githooks/`. A one-project install limits them to that repository. A repository's own hooks keep running.
-- **Codex sends code to OpenAI.** If you tick the second-model review (or choose Codex in `suggest-model`), the changed code or
+- **Codex sends code to OpenAI.** If you tick the second-model review (or choose Codex in `model-picker`), the changed code or
   your prompt is sent to Codex. That is why those items start unticked when Codex is not installed, and why `review-cost`
   shows the size first.
 - **`gh`.** `branch-janitor` runs a read-only `gh pr list` (only if you have `gh`) to see whether a pull request was merged.

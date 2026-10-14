@@ -55,20 +55,33 @@ class Detected:
         return bool(self.tools.get(tool))
 
 
+# Mods renamed so their names say what they do: an install that chose the old name keeps the choice under the new one
+# (the installer then removes the old plugin and installs the new). tool-skins was dropped: the app draws tool rows itself.
+RENAMED: dict[str, str] = {
+    "savvy-progress": "progress", "blast-radius": "command-guard", "budget-guard": "usage-meter", "cache-tax": "cache-guard",
+    "replay-theater": "edit-replay", "color-lab": "contrast-check", "csv-table": "table-preview", "staged-review": "staged-diff",
+    "suggest-model": "model-picker",
+}
+
+
+def renamed(ids) -> set[str]:
+    """Saved item ids with renamed mods under their new names."""
+    return {RENAMED.get(i, i) for i in ids}
+
+
 # name -> (token note, needs, start-here)
 MOD_META: dict[str, tuple[str, str, bool]] = {
-    "blast-radius": ("none", "", True),
-    "suggest-model": ("none (local rules)", "", True),
+    "command-guard": ("none", "", True),
+    "model-picker": ("none (local rules)", "", True),
     "branch-janitor": ("none", "", True),
-    "cache-tax": ("none (keep-warm pings are optional)", "", True),
+    "cache-guard": ("none (keep-warm pings are optional)", "", True),
     "review-cost": ("none (only estimates)", "codex", True),
     "reflect": ("small: a corrected prompt goes once to a small model", "", False),
-    "savvy-progress": ("none", "", False),
+    "progress": ("none", "", False),
     "filetree": ("none", "", False),
-    "replay-theater": ("none", "", False),
-    "tool-skins": ("none", "", False),
+    "edit-replay": ("none", "", False),
     "secret-guard": ("none", "", True),
-    "budget-guard": ("none", "", True),
+    "usage-meter": ("none", "", True),
     "diagram": ("none", "", False),
     "moddeck": ("none", "", True),
     "data-guard": ("none", "", True),
@@ -78,6 +91,7 @@ MOD_META: dict[str, tuple[str, str, bool]] = {
     "prompt-library": ("none", "", False),
     "checkpoint": ("none", "", True),
     "long-run-ping": ("none", "", False),
+    "tldr": ("none until switched on; then one Haiku call per long reply", "", False),
     "concise": ("none until switched on; then about 1,500 tokens of rules once per session and one line per prompt", "", False),
 }
 # Mods that spend model credit when used: listed, but not switched on until the person chooses them.
@@ -100,7 +114,7 @@ def items(det: Detected, root=None) -> list[Item]:
         Item("you-should-know", GROUP_ADDON, "You Should Know (built in)", "Anthropic's own tips during long jobs. Turned on by one line in settings.", plugin="cc-plugin-you-should-know@builtin"),
         Item("hardened-settings", GROUP_ADDON, "Hardened settings", "Claude's file tools may not read SSH, cloud, GPG, registry and .env files; a cloned repo cannot start MCP servers by itself. Does not stop shell commands (see sandbox).", star=True),
         Item("sandbox", GROUP_ADDON, "Sandbox (built in)", "Runs commands in Claude Code's own sandbox so they cannot write outside the project. Can break tools that need the network or other folders, including Codex.", "none", default=False, platforms=("darwin", "linux")),
-        Item("telemetry-off", GROUP_ADDON, "Turn off telemetry and error reports", "Sets DISABLE_TELEMETRY and DISABLE_ERROR_REPORTING for Claude Code. A privacy choice; nothing else changes.", default=False),
+        Item("telemetry-off", GROUP_ADDON, "Turn off telemetry and error reports", "Sets DISABLE_TELEMETRY and DISABLE_ERROR_REPORTING for Claude Code. A privacy choice; it also keeps the experimental advisor tool (/advisor) off, since that is switched on by a fetched feature flag.", default=False),
         Item("plugin:rust-analyzer-lsp", GROUP_ADDON, "Rust diagnostics (official plugin)", "Rust compiler errors reach Claude right after an edit. Needs rust-analyzer on PATH.", "only when there are errors", default=det.has("rust-analyzer"), needs="rust-analyzer", plugin=f"rust-analyzer-lsp@{OFFICIAL}"),
         Item("plugin:pyright-lsp", GROUP_ADDON, "Python type checking (official plugin)", "Pyright diagnostics reach Claude right after an edit. Needs pyright-langserver on PATH.", "only when there are errors", default=det.has("pyright-langserver"), needs="pyright-langserver", plugin=f"pyright-lsp@{OFFICIAL}"),
         Item("plugin:security-guidance", GROUP_ADDON, "Security review (official plugin)", "Warns about risky patterns on edits, and reviews diffs with a model when a turn ends.", "yes: a model reviews diffs at the end of turns", default=False, plugin=f"security-guidance@{OFFICIAL}"),

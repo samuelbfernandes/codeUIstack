@@ -25,8 +25,10 @@ export type Snapshot = {
   model?: string
   provider?: string
   effort?: string | number
-  /** suggest-model's advice when the effort level does not fit the last task (`medium would do`), else absent. */
+  /** model-picker's advice when the effort level does not fit the last task (`medium would do`), else absent. */
   effortAdvice?: string
+  /** The model model-picker routed this conversation to (`Haiku`), when it differs from the session's; else absent. */
+  routedTo?: string
   /** The configured permission mode (`default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions`). */
   permissionMode?: string
   /** When the newest commit or checkpoint was made (ms); null = none; absent = not read. */
@@ -110,7 +112,8 @@ const RUN_MARK: Record<ToolRun['state'], { icon: string; color: string }> = {
 
 function modelRow(s: Snapshot): Row | undefined {
   const parts: Part[] = []
-  if (s.model) parts.push({ text: s.model, bold: true })
+  if (s.model) parts.push({ text: s.model, bold: s.routedTo === undefined, dim: s.routedTo !== undefined })
+  if (s.routedTo) parts.push({ text: ` → ${s.routedTo}`, bold: true }, { text: ' (routed)', dim: true })
   if (s.provider) parts.push(sep(), { text: s.provider, dim: true })
   if (s.effort !== undefined && s.effort !== '') parts.push(sep(), { text: String(s.effort), dim: s.effortAdvice === undefined, color: s.effortAdvice === undefined ? undefined : 'warning' })
   if (s.effortAdvice) parts.push({ text: ` ⚠ ${s.effortAdvice}`, color: 'warning' })

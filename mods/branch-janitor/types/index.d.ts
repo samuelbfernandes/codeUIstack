@@ -11,6 +11,8 @@ declare module 'claude-code' {
       memory: Record<string, unknown>
       /** The "watching branches" line was already shown this session. */
       watching: boolean
+      /** Off for this repository (git config toolkit.branchJanitor false); null outside a repository. */
+      isOff: boolean | null
     }
   }
 }

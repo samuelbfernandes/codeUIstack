@@ -1,0 +1,10 @@
+{
+  "name": "tldr",
+  "version": "0.2.0",
+  "description": "While switched on, after each long reply a small model picks the sentences you must not skip (decisions, warnings, questions for you, failures, things to do) and marks them inside the reply with ⚑, and a box above the prompt sums the reply up: Summary, Needs you, Next. One Haiku call per long reply. Off until /tldr on.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "minChars": { "type": "number", "title": "Shortest reply to sum up", "description": "Replies shorter than this many characters are left alone.", "default": 800, "min": 200 }
+  }
+}

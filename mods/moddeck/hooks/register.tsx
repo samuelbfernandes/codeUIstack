@@ -7,7 +7,7 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { BtwEntry } from '../types'
 import { INSTRUCTION, addEntry, buildPrompt, cutAnswer, digest, fallbackPrompt, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
-import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, rankTools, splitCommand, starFirst, toggleStar } from './catalog'
+import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, rankTools, searchFirst, splitCommand, starFirst, toggleStar } from './catalog'
 import type { Action, InstalledSkill, Option, SavedPrompt, Tool } from './catalog'
 import { CARD_CHROME, barTarget, listAt, pillText, scrollBar, stepTop, trackCells } from './layout'
 import type { BottomList } from './layout'
@@ -48,10 +48,10 @@ const PANE_SURFACES = new Set(['terminal', 'desktop'])
  * theme's colour (light on a dark theme, dark on a light one), so a pill's fill is chosen to read under that text:
  * deep on a dark theme, a pale tint of the same hue on a light one.
  */
-type Ink = { fill: string; text: string; desc: string; link: string; on: string; off: string; run: string }
+type Ink = { fill: string; text: string; desc: string; link: string; on: string; off: string; run: string; dotOn: string; dotOff: string }
 const INK: Record<'dark' | 'light', Ink> = {
-  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5', on: '#166534', off: '#991B1B', run: '#374151' },
-  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5', on: '#BBF7D0', off: '#FECACA', run: '#E5E7EB' },
+  dark: { fill: '#1F1F1E', text: '#ECEAE4', desc: '#9A9893', link: '#7FB2E5', on: '#166534', off: '#991B1B', run: '#374151', dotOn: '#22C55E', dotOff: '#EF4444' },
+  light: { fill: '#FAF9F5', text: '#1F1F1E', desc: '#6B6A65', link: '#185FA5', on: '#BBF7D0', off: '#FECACA', run: '#E5E7EB', dotOn: '#16A34A', dotOff: '#DC2626' },
 }
 type ThemePick = 'light' | 'dark'
 const THEMES: readonly ThemePick[] = ['light', 'dark']
@@ -67,6 +67,10 @@ let updateCheckOn = true
 const btwOpen = atom({ plugin: 'moddeck', key: 'btwOpen' } as const, false)
 const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[])
 /** What the Ask here field holds: kept as it is typed, emptied after asking and by ✕ close. */
+/** What each list's search field holds (`skills`, `prompts`); matching names move to the top. */
+const listQuery = atom({ plugin: 'moddeck', key: 'listQuery' } as const, {} as Record<string, string>)
+/** Cards folded down to their title by their ▾ button (`group:<name>`, `group:skills`, `group:prompts`); kept in the store as `folded`. null = not loaded. */
+const folded = atom({ plugin: 'moddeck', key: 'folded' } as const, null as string[] | null)
 const btwDraft = atom({ plugin: 'moddeck', key: 'btwDraft' } as const, '')
 /** A newer release the person has not updated to yet (null = none known); the side bar shows a one-line button for it. */
 const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
@@ -98,6 +102,18 @@ async function starsPicked($: Dollar): Promise<string[]> {
   await safe(() => update($, starred, () => kept))
   return kept
 }
+async function foldedPicked($: Dollar): Promise<string[]> {
+  const now = await read($, folded)
+  if (now !== null) return now
+  const kept = (await stored<string[]>($, 'folded')) ?? []
+  await safe(() => update($, folded, () => kept))
+  return kept
+}
+async function flipFold($: Dollar, key: string): Promise<void> {
+  const next = toggleStar(await foldedPicked($), key)
+  await update($, folded, () => next)
+  await safe(() => $.store.set('folded', next))
+}
 async function setRows($: Dollar, id: string, n: number): Promise<void> {
   const next = { ...(await rowsPicked($)), [id]: n }
   await update($, listRows, () => next)
@@ -124,7 +140,7 @@ let paneOffset = 0
 let bottomLists: BottomList[] = []
 let scrollables: Record<string, { total: number; shown: number }> = {}
 const clampTop = (top: number, total: number, shown: number): number => Math.max(0, Math.min(top, total - shown))
-/** What the person last picked in a dropdown here (`blast-radius`, and `blast-radius:last`, the level its switch goes back to): the pick shows at once, even where the other mod's state is not watched for redraws. */
+/** What the person last picked in a dropdown here (`command-guard`, and `command-guard:last`, the level its switch goes back to): the pick shows at once, even where the other mod's state is not watched for redraws. */
 const picks = atom({ plugin: 'moddeck', key: 'picks' } as const, {} as Record<string, string>)
 
 // ---- the Session box: what is kept in memory (never in the transcript), and read by the pane ---------------------------------
@@ -145,7 +161,8 @@ const activity = atom({ plugin: 'moddeck', key: 'activity' } as const, EMPTY_ACT
 const backupAt = atom({ plugin: 'moddeck', key: 'backupAt' } as const, undefined as number | null | undefined) // state is JSON data: only a number or null is ever written
 /** The configured permission mode. */
 const permMode = atom({ plugin: 'moddeck', key: 'permMode' } as const, undefined as string | undefined)
-const EFFORT_ADVICE = { plugin: 'suggest-model', key: 'effortAdvice' } as const
+const EFFORT_ADVICE = { plugin: 'model-picker', key: 'effortAdvice' } as const
+const ROUTED_TO = { plugin: 'model-picker', key: 'routedTo' } as const
 const envCounts = atom({ plugin: 'moddeck', key: 'env' } as const, null as EnvCounts | null)
 /** The rows shown (a comma list in display order) and the layout, as /moddeck rows set them; null = not set by the person (the settings apply). */
 const rowsList = atom({ plugin: 'moddeck', key: 'rows' } as const, null as string | null)
@@ -153,8 +170,11 @@ const layoutPick = atom({ plugin: 'moddeck', key: 'layout' } as const, null as L
 /** `/moddeck theme light|dark`, this session's pick (kept in the store too); null = the setting. */
 const themePick = atom({ plugin: 'moddeck', key: 'theme' } as const, null as ThemePick | null)
 
-const LEDGER = { plugin: 'budget-guard', key: 'ledger' } as const
-const CACHE = { plugin: 'cache-tax', key: 'cache' } as const
+const LEDGER = { plugin: 'usage-meter', key: 'ledger' } as const
+const CACHE = { plugin: 'cache-guard', key: 'cache' } as const
+const KEEPWARM = { plugin: 'cache-guard', key: 'keepwarm' } as const
+const JANITOR_OFF = { plugin: 'branch-janitor', key: 'isOff' } as const
+const BAND_HIDDEN = { plugin: 'progress', key: 'isHidden' } as const
 
 const HELP = [
   'Moddeck · /moddeck shows or hides the side bar',
@@ -176,7 +196,7 @@ function defer($: Dollar, work: () => Promise<void>): void {
 
 // The other mods' state this side bar reads. The engine wants each reference written out here, so the list of what a
 // module reads can be checked; a mod that is not installed (or a read that is refused) reads as "cannot see".
-const SUGGEST_OFF = { plugin: 'suggest-model', key: 'isOff' } as const
+const SUGGEST_OFF = { plugin: 'model-picker', key: 'isOff' } as const
 const REFLECT_OFF = { plugin: 'reflect', key: 'isOff' } as const
 const SECRET_ON = { plugin: 'secret-guard', key: 'isOn' } as const
 const DATA_OFF = { plugin: 'data-guard', key: 'isOff' } as const
@@ -185,12 +205,13 @@ const REPRO_OFF = { plugin: 'repro-log', key: 'isOff' } as const
 const AUTOTEST_OFF = { plugin: 'auto-test', key: 'isOff' } as const
 const PING_OFF = { plugin: 'long-run-ping', key: 'isOff' } as const
 const PROMPTS = { plugin: 'prompt-library', key: 'items' } as const
-const BLAST_LEVEL = { plugin: 'blast-radius', key: 'level' } as const
+const BLAST_LEVEL = { plugin: 'command-guard', key: 'level' } as const
 const REVIEW_OFF = { plugin: 'review-cost', key: 'isOff' } as const
 const FORMAT_OFF = { plugin: 'format-on-edit', key: 'isOff' } as const
 const LEDGER_OFF = { plugin: 'test-ledger', key: 'isOff' } as const
 const INBOX_OFF = { plugin: 'error-inbox', key: 'isOff' } as const
 const CONCISE_OFF = { plugin: 'concise', key: 'isOff' } as const
+const TLDR_OFF = { plugin: 'tldr', key: 'isOff' } as const
 
 async function valueOf(read: Promise<unknown>): Promise<unknown> {
   try {
@@ -242,7 +263,36 @@ async function act($: Dollar, action: Action): Promise<void> {
 }
 
 /** A dropdown pick: remember it for the drawing, then run the mod's own command with it. */
-async function pick($: Dollar, id: string, command: string, value: string): Promise<void> {
+/** Asked when the advisor is picked while a variable keeps it off: what is in the way, and a way out. */
+async function offerAdvisorFix($: Dollar, blockedBy: string, model: string): Promise<void> {
+  const isTelemetry = blockedBy === 'DISABLE_TELEMETRY'
+  const YES = 'Yes, go ahead'
+  const NO = 'No'
+  const text = isTelemetry
+    ? `Using the advisor turns Claude Code's telemetry back on (DISABLE_TELEMETRY is removed from your settings). OK to proceed?`
+    : `Using the advisor removes CLAUDE_CODE_DISABLE_ADVISOR_TOOL from your settings. OK to proceed?`
+  let answer: string
+  try {
+    answer = await $.ui.ask(text, { options: [YES, NO], header: 'Advisor' })
+  } catch {
+    return // Esc: nothing changes
+  }
+  if (answer !== YES) return
+  const request = isTelemetry
+    ? `Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json, and if ~/.claude/moddeck/state/user.json lists "telemetry-off" under "selected", take it out so a moddeck update does not put it back. Back up both files first. Then tell me to restart and run /advisor ${model}.`
+    : `Remove CLAUDE_CODE_DISABLE_ADVISOR_TOOL from the env block of ~/.claude/settings.json (back the file up first). Then tell me to restart and run /advisor ${model}.`
+  await act($, { text: request, run: false })
+  $.ui.toast('Press Enter to make the change')
+}
+
+async function pick($: Dollar, id: string, command: string, value: string, fillsPrompt = false, blockedBy?: string): Promise<void> {
+  if (fillsPrompt && blockedBy !== undefined && value !== 'off') return offerAdvisorFix($, blockedBy, value)
+  if (fillsPrompt) {
+    // Claude Code's own command: a mod cannot run it, so it goes in the prompt box; the row follows the setting once sent.
+    await act($, { text: `/${command} ${value}`, run: false })
+    $.ui.toast(`Press Enter to run /${command} ${value}`)
+    return
+  }
   await safe(() => update($, picks, p => ({ ...p, [id]: value })))
   try {
     const out = (await $.command.run({ command, args: value })) as { text?: string } | undefined
@@ -252,11 +302,11 @@ async function pick($: Dollar, id: string, command: string, value: string): Prom
   }
 }
 
-/** blast-radius's name is a switch too: off, or back to the level it had (medium the first time). */
-async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>): Promise<void> {
+/** command-guard's name is a switch too: off, or back to the level it had (medium the first time). */
+async function flipLevel($: Dollar, t: Tool, level: string, chosen: Record<string, string>, blockedBy?: string): Promise<void> {
   const back = chosen[`${t.id}:last`] ?? (t.levels?.includes('medium') ? 'medium' : t.levels?.find(l => l !== 'off')) ?? 'on'
   if (level !== 'off') await safe(() => update($, picks, p => ({ ...p, [`${t.id}:last`]: level })))
-  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off')
+  await pick($, t.id, t.command ?? t.id, level === 'off' ? back : 'off', t.fillsPrompt === true, blockedBy)
 }
 
 async function safe(f: () => Promise<unknown>): Promise<void> {
@@ -692,6 +742,7 @@ async function snapshotOf($: Dollar): Promise<Snapshot> {
     git: await read($, gitState),
     permissionMode: await read($, permMode),
     backupAt: await read($, backupAt),
+    routedTo: ((v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined))(await valueOf($.state.get(ROUTED_TO as never))),
     effortAdvice: ((v: unknown) => (typeof v === 'string' && v !== '' ? v : undefined))(await valueOf($.state.get(EFFORT_ADVICE as never))),
     tokens: await read($, tokenTotals),
     activity: await read($, activity),
@@ -875,16 +926,31 @@ export const register: Register = (on, options) => {
         {'─'.repeat(300)}
       </Text>
     )
-    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number | string; rules?: boolean } = {}) => (
-      <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
-        <Text bold wrap="truncate-end">
-          {title}
-        </Text>
-        <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} {...fill} {...fit}>
-          {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
+    // A card: its title with a ▾ that folds the card down to the title alone (▸ opens it again), then its bordered box.
+    const foldedNow = await foldedPicked($)
+    const card = (key: string, title: string, rowsOf: unknown[], opts: { width?: number | string; rules?: boolean; count?: number } = {}) => {
+      const isFolded = foldedNow.includes(key)
+      const shownTitle = isFolded && opts.count !== undefined && !title.includes(' · ') ? `${title} · ${opts.count}` : title
+      return (
+        <Box key={key} flexDirection="column" width={opts.width} flexShrink={1} {...fit}>
+          <Box columnGap={1} {...fit}>
+            <Button key={`title:${key}`} plain label={desk ? undefined : isFolded ? `open ${title}` : `fold ${title}`} onPress={() => void flipFold($, key)}>
+              <Text bold wrap="truncate-end">
+                {shownTitle}
+              </Text>
+            </Button>
+            <Button key={`fold:${key}`} plain label={desk ? undefined : isFolded ? `open ${title}` : `fold ${title}`} onPress={() => void flipFold($, key)}>
+              <Text color={link}>{isFolded ? '▸' : '▾'}</Text>
+            </Button>
+          </Box>
+          {!isFolded && (
+            <Box flexDirection="column" borderStyle="round" borderColor="inactive" paddingX={1} {...fill} {...fit}>
+              {(opts.rules === false ? rowsOf : rowsOf.flatMap((r, i) => (i === 0 ? [r] : [rule(`${key}:rule:${i}`), r]))) as never}
+            </Box>
+          )}
         </Box>
-      </Box>
-    )
+      )
+    }
 
     // The Session box at the top: live figures from the engine, each row hidden when its figure is missing.
     let sessionBox: unknown = null
@@ -988,7 +1054,7 @@ export const register: Register = (on, options) => {
     // installed (or not readable) is simply not drawn.
     const flag = (v: unknown, isOff: boolean): boolean | undefined => (typeof v === 'boolean' ? (isOff ? !v : v) : undefined)
     const ons: Record<string, boolean | undefined> = {
-      suggest: flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
+      'model-picker': flag(await valueOf($.state.get(SUGGEST_OFF as never)), true),
       reflect: flag(await valueOf($.state.get(REFLECT_OFF as never)), true),
       'secret-guard': flag(await valueOf($.state.get(SECRET_ON as never)), false),
       'data-guard': flag(await valueOf($.state.get(DATA_OFF as never)), true),
@@ -1001,13 +1067,30 @@ export const register: Register = (on, options) => {
       'test-ledger': flag(await valueOf($.state.get(LEDGER_OFF as never)), true),
       'error-inbox': flag(await valueOf($.state.get(INBOX_OFF as never)), true),
       concise: flag(await valueOf($.state.get(CONCISE_OFF as never)), true),
+      tldr: flag(await valueOf($.state.get(TLDR_OFF as never)), true),
+      'branch-janitor': flag(await valueOf($.state.get(JANITOR_OFF as never)), true), // null outside a repository: not drawn
+      'progress': flag(await valueOf($.state.get(BAND_HIDDEN as never)), true),
+      // cache-guard's switch is keep-warm: on while /keepwarm runs (its state holds the run), off when it is null.
+      'cache-guard': await (async () => { const kw = await valueOf($.state.get(KEEPWARM as never)); return kw === undefined ? undefined : kw !== null })(),
     }
     const blast = await valueOf($.state.get(BLAST_LEVEL as never))
     const chosen = await read($, picks)
     // The level the dropdown shows: the person's last pick, else the mod's own state; undefined = the mod is not readable.
+    // The advisor is Claude Code's own (/advisor): its model is the advisorModel setting; two variables keep it off.
+    const settingsNow = (await attempt(() => $.settings.read())) as { advisorModel?: unknown; env?: Record<string, string> } | undefined
+    const savedAdvisor = typeof settingsNow?.advisorModel === 'string' && settingsNow.advisorModel !== '' ? settingsNow.advisorModel : 'off'
+    const envOf = (v: string | undefined, fromSettings: string | undefined) => (v !== undefined && v !== "" ? v : fromSettings)
+    const noTelemetry = envOf(await attempt(() => $.env.get('DISABLE_TELEMETRY')), settingsNow?.env?.DISABLE_TELEMETRY)
+    const noAdvisor = envOf(await attempt(() => $.env.get('CLAUDE_CODE_DISABLE_ADVISOR_TOOL')), settingsNow?.env?.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)
+    const advisorBlock = noAdvisor === '1' ? 'CLAUDE_CODE_DISABLE_ADVISOR_TOOL' : noTelemetry === '1' ? 'DISABLE_TELEMETRY' : undefined
     const levelOf: Record<string, string | undefined> = {
-      'blast-radius': chosen['blast-radius'] ?? (typeof blast === 'string' ? blast : undefined),
+      'command-guard': chosen['command-guard'] ?? (typeof blast === 'string' ? blast : undefined),
+      advisor: savedAdvisor, // the setting: /advisor writes it, a pick here only fills the prompt box
     }
+    // A level the list does not name (a saved "sonnet") is still shown as picked.
+    const levelsOf = (t: Tool): string[] => (t.levels !== undefined && levelOf[t.id] !== undefined && !t.levels.includes(levelOf[t.id]!) ? [...t.levels, levelOf[t.id]!] : (t.levels ?? []))
+    const descOf = (t: Tool): string | undefined =>
+      t.id === 'advisor' && advisorBlock !== undefined ? `Kept off by ${advisorBlock}=1 · pick a model to see the fix` : t.desc
 
     // One line per tool: its name (a green or red pill when it is a switch), its controls, then its description, which
     // takes what is left and is cut with "…". The descriptions, icons and groups are presentation only.
@@ -1023,46 +1106,50 @@ export const register: Register = (on, options) => {
     const line = (t: Tool, nameWidth: number) => {
       const isOn = isOnOf(t)
       const text = pillText(nameOf(t), nameWidth)
-      const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen) : flip($, t, isOn!))
+      const press = () => (t.levels !== undefined ? flipLevel($, t, levelOf[t.id]!, chosen, t.id === 'advisor' ? advisorBlock : undefined) : flip($, t, isOn!))
       const run = () => (t.click ? act($, t.click) : undefined)
       // In the app every name is a pill (INK): green or red for a switch, gray for a command that runs on click. The pill box
       // has no padding of its own, so the whole coloured area is the button (its text carries the air on each side).
+      // The name in a small box drawn like the group cards, tight around the name (no padding), its line dimmed for a
+      // lighter stroke. The box itself lights on hover, so the box and the hover highlight are one area.
       const pillOf = (key: string, color: string, onPress: () => unknown) => (
-        <Box key={`pill:${t.id}`} backgroundColor={color} flexShrink={0}>
+        <Box key={`pill:${t.id}`} borderStyle="round" borderColor="inactive" borderDimColor backgroundColor={color} hover={{ backgroundColor: ink?.run }} paddingX={0} paddingY={0} margin={0} flexShrink={0}>
           <Button key={key} plain onPress={onPress as () => void}>
-            <Text bold color={ink?.text} backgroundColor={color}>
-              {text}
+            <Text bold color={ink?.text}>
+              {nameOf(t)}
             </Text>
           </Button>
         </Box>
       )
-      const name =
-        desk ? (
-          isOn === undefined ? pillOf(`tool:${t.id}`, ink!.run, run) : pillOf(`switch:${t.id}`, isOn ? ink!.on : ink!.off, press)
-        ) : isOn === undefined ? (
-          <Button key={`tool:${t.id}`} plain onPress={run}>
-            <Text bold>{text}</Text>
-          </Button>
-        ) : (
-          <Button key={`switch:${t.id}`} plain label={`${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={press}>
-            <Text bold color="inverseText" backgroundColor={isOn ? 'success' : 'error'}>
-              {text}
-            </Text>
-          </Button>
-        )
+      // Every name sits in the same neutral box; a switch says on or off only by the dot after it (green on, red off).
+      const name = desk ? (
+        pillOf(isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`, ink!.fill, isOn === undefined ? run : press)
+      ) : (
+        <Button key={isOn === undefined ? `tool:${t.id}` : `switch:${t.id}`} plain label={isOn === undefined ? undefined : `${t.label} switch, ${isOn ? 'on' : 'off'}`} onPress={isOn === undefined ? run : press}>
+          <Text bold inverse>
+            {text}
+          </Text>
+        </Button>
+      )
+      const dot = isOn !== undefined && (
+        <Box key={`dot:${t.id}`} flexShrink={0}>
+          <Text color={isOn ? (ink?.dotOn ?? 'success') : (ink?.dotOff ?? 'error')}>●</Text>
+        </Box>
+      )
       const level = t.levels !== undefined && (
-        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={t.levels.map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v)} />
+        <Select key={`level:${t.id}`} value={levelOf[t.id]!} options={levelsOf(t).map(v => ({ value: v }))} onSelect={(v: string) => pick($, t.id, t.command ?? t.id, v, t.fillsPrompt === true, t.id === 'advisor' ? advisorBlock : undefined)} />
       )
       return (
         <Box key={`row:${t.id}`} columnGap={1} {...fit}>
           <Box flexShrink={0} columnGap={1}>
             {name}
+            {dot as never}
             {level as never}
             {actionsShown(t).map(o => action(`option:${t.id}:${o.text}`, o.label, o, o.costs))}
           </Box>
           <Box flexGrow={1} flexShrink={1} {...fit}>
             <Text {...dim} wrap="truncate-end">
-              {t.desc ?? t.note ?? ''}
+              {descOf(t) ?? t.note ?? ''}
             </Text>
           </Box>
         </Box>
@@ -1080,7 +1167,7 @@ export const register: Register = (on, options) => {
       const isBig = listed.length > GROUP_SCROLL_AT
       // Starred tools first (only big groups have stars), then switches that are on; redone on every draw.
       const tools = rankTools(listed, t => isBig && groupStars.includes(starOf(t)), t => isOnOf(t) === true)
-      if (!isBig) return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)))
+      if (!isBig) return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)), { count: tools.length })
       const starredCount = tools.filter(t => groupStars.includes(starOf(t))).length
       const shown = listSize(starredCount, GROUP_SCROLL_AT, tools.length)
       const listId = `group:${g}`
@@ -1122,15 +1209,22 @@ export const register: Register = (on, options) => {
     const picked = await rowsPicked($)
     const stars = await starsPicked($)
     const rowsOf = (id: string) => listRowsOf(picked, id, rows)
-    const listCard = <T,>(id: string, title: string, items: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string, star?: (item: T) => string) => {
+    const queries = await read($, listQuery)
+    const listCard = <T,>(id: string, title: string, listed: readonly T[], keyOf: (item: T) => string, label: (item: T) => string, desc: (item: T) => string, text: (item: T) => string, star?: (item: T) => string) => {
+      // Typing in the search field moves the names that match to the top (those that start with it first); Enter picks the first.
+      const query = queries[id] ?? ''
+      const found = searchFirst(listed, query, label)
+      const items = found.items
+      const isSearching = query.trim() !== ''
       const starredCount = star === undefined ? 0 : items.filter(i => stars.includes(star(i))).length
       const want = rowsOf(id)
       const shown = listSize(starredCount, want, items.length)
-      const top = clampTop(scrolled[id] ?? 0, items.length, shown)
+      const top = isSearching ? 0 : clampTop(scrolled[id] ?? 0, items.length, shown)
+      const isHit = (n: number) => isSearching && top + n < found.matches
       // In the app a name starts with "/": a click puts its command in the prompt box.
       const nameOf = (item: T) => (desk ? `/${label(item)}` : label(item))
       const nameWidth = Math.max(...items.map(i => nameOf(i).length))
-      const lines = items.slice(top, top + shown).map(item => (
+      const lines = items.slice(top, top + shown).map((item, n) => (
         <Box key={`${id}:line:${keyOf(item)}`} columnGap={1} {...fit}>
           {star !== undefined && (
             <Box flexShrink={0}>
@@ -1141,7 +1235,7 @@ export const register: Register = (on, options) => {
           )}
           <Box flexShrink={0}>
             <Button key={keyOf(item)} plain onPress={() => act($, { text: text(item), run: false })}>
-              <Text bold color={link}>
+              <Text bold color={link} underline={isHit(n) && n === 0}>
                 {nameOf(item).padEnd(nameWidth)}
               </Text>
             </Button>
@@ -1172,25 +1266,43 @@ export const register: Register = (on, options) => {
           {arrows && arrow('down')}
         </Box>
       )
-      return card(`group:${id}`, items.length > shown ? `${title} · ${items.length}` : title, [
+      const heading = isSearching ? `${title} · ${found.matches === 0 ? 'no match' : `${found.matches} found`}` : items.length > shown ? `${title} · ${items.length}` : title
+      return card(`group:${id}`, heading, [
         <Box key={`${id}:window`} columnGap={1} {...fit}>
           <Box flexDirection="column" flexGrow={1} flexShrink={1} {...fit}>
             {lines}
           </Box>
           {bar as never}
         </Box>,
-        <Box key={`${id}:size`} columnGap={2} {...fit}>
-                    {starredCount === 0 && want < Math.min(items.length, MAX_LIST_ROWS) && (
-            <Button key={`${id}:more`} plain onPress={() => void setRows($, id, want + 1)}>
-              <Text {...dim}>＋ more</Text>
+        <Box key={`${id}:size`} columnGap={1} {...fit}>
+          <Box flexGrow={1} flexShrink={1} {...fit}>
+            {Input !== undefined ? (
+              <Input
+                key={`${id}:search`}
+                placeholder={`Search ${title.toLowerCase()}`}
+                submitLabel="use"
+                value={query}
+                onInput={(v: string) => void update($, listQuery, q => ({ ...q, [id]: v }))}
+                onSubmit={() => {
+                  const first = isSearching && found.matches > 0 ? items[0] : undefined
+                  if (first !== undefined) void act($, { text: text(first), run: false })
+                  void update($, listQuery, q => ({ ...q, [id]: '' }))
+                }}
+              />
+            ) : (
+              <Text {...dim}> </Text>
+            )}
+          </Box>
+          {starredCount === 0 && !isSearching && want < Math.min(items.length, MAX_LIST_ROWS) && (
+            <Button key={`${id}:more`} plain label={desk ? undefined : 'more lines'} onPress={() => void setRows($, id, want + 1)}>
+              <Text {...dim}>＋</Text>
             </Button>
           )}
-          {starredCount === 0 && shown > MIN_LIST_ROWS && (
-            <Button key={`${id}:fewer`} plain onPress={() => void setRows($, id, shown - 1)}>
-              <Text {...dim}>− fewer</Text>
+          {starredCount === 0 && !isSearching && shown > MIN_LIST_ROWS && (
+            <Button key={`${id}:fewer`} plain label={desk ? undefined : 'fewer lines'} onPress={() => void setRows($, id, shown - 1)}>
+              <Text {...dim}>−</Text>
             </Button>
           )}
-          {(starredCount > 0 || (want >= Math.min(items.length, MAX_LIST_ROWS) && shown <= MIN_LIST_ROWS)) && <Text {...dim}>{starredCount > 0 ? '★ on top' : ' '}</Text>}
         </Box>,
       ])
     }
@@ -1207,7 +1319,8 @@ export const register: Register = (on, options) => {
     // Where the lists sit, counted from the bottom, for the wheel: the lowest first.
     const skillShown = listSize(skills.filter(k => stars.includes(k.id)).length, rowsOf('skills'), skills.length)
     const promptShown = listSize(prompts.filter(p => stars.includes(`prompt:${p.name}`)).length, rowsOf('prompts'), prompts.length)
-    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: promptShown, under: 2 }] : []), ...(skills.length > 0 ? [{ id: 'skills', shown: skillShown, under: 2 }] : [])]
+    const listFor = (id: string, shown: number) => (foldedNow.includes(`group:${id}`) ? { id, shown: 0, folded: true } : { id, shown, under: 2 })
+    bottomLists = [...(prompts.length > 0 ? [listFor('prompts', promptShown)] : []), ...(skills.length > 0 ? [listFor('skills', skillShown)] : [])]
     scrollables = { skills: { total: skills.length, shown: skillShown }, prompts: { total: prompts.length, shown: promptShown } }
 
     const wideNow = await read($, wide)

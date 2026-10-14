@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { SKILLS, allSkills, listRowsOf, listSize, rankTools, starFirst, toggleStar } from '../hooks/catalog'
+import { SKILLS, allSkills, listRowsOf, listSize, rankTools, searchFirst, starFirst, toggleStar } from '../hooks/catalog'
 
 test('allSkills keeps the toolkit skills first, then every other installed skill by name, once', () => {
   const list = allSkills([{ name: 'zeta', desc: 'Z  line' }, { name: 'burst' }, { name: 'plug:align' }, { name: 'alpha' }, { name: 'zeta' }, { name: ' ' }])
@@ -41,4 +41,12 @@ test('rankTools: starred first, then switches that are on, catalogue order kept 
   const on = new Set(['b', 'e'])
   expect(rankTools(items, i => star.has(i), i => on.has(i))).toEqual(['e', 'd', 'b', 'a', 'c'])
   expect(rankTools(items, () => false, () => false)).toEqual(items)
+})
+
+test('searchFirst puts names that start with the query first, then names that contain it, then the rest', () => {
+  const names = ['burst', 'align', 'assess-plugin', 'dual-model-review', 'agents-md-scaffold']
+  expect(searchFirst(names, 'a', n => n)).toEqual({ items: ['align', 'assess-plugin', 'agents-md-scaffold', 'dual-model-review', 'burst'], matches: 4 })
+  expect(searchFirst(names, '/Bu', n => n).items[0]).toBe('burst') // a leading slash and case are ignored
+  expect(searchFirst(names, 'zzz', n => n)).toEqual({ items: names, matches: 0 })
+  expect(searchFirst(names, '  ', n => n)).toEqual({ items: names, matches: 0 })
 })

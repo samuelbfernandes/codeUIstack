@@ -50,7 +50,7 @@ test('every probe is read-only until the confirmed delete', async ($, on) => {
   const w = world(on, repo({ done: merged(), sq: squashed(SHA('2')) }))
   await merge($)
   const verbs = new Set(w.cmds.map(c => c[6]))
-  expect([...verbs].sort()).toEqual(['cherry', 'config', 'for-each-ref', 'merge-base', 'reflog', 'rev-parse', 'stash', 'symbolic-ref', 'worktree'].filter(v => verbs.has(v)))
+  expect([...verbs].sort()).toEqual(['cherry', 'config', 'for-each-ref', 'merge-base', 'reflog', 'rev-list', 'rev-parse', 'stash', 'symbolic-ref', 'worktree'].filter(v => verbs.has(v)))
   expect(w.cmds.some(c => ['branch', 'push'].includes(c[6]!))).toBe(false)
   expect(w.cmds.every(c => c.slice(0, 6).join(' ') === 'git -c core.quotepath=off --no-optional-locks --no-pager --literal-pathspecs')).toBe(true)
   expect(w.cmds.every(c => c[0] === 'git')).toBe(true)

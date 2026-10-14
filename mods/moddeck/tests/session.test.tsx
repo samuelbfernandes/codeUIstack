@@ -15,28 +15,28 @@ const H = 60 * MIN
 const MODS = {
   plugins: [
     {
-      name: 'budget-guard',
+      name: 'usage-meter',
       register(on: On) {
         on('command.run', { command: 'seed-budget-guard' }, async ($, e) => {
-          await $.state.set({ plugin: 'budget-guard', key: 'ledger' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
+          await $.state.set({ plugin: 'usage-meter', key: 'ledger' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
           return { text: 'seeded' }
         })
       },
     },
     {
-      name: 'suggest-model',
+      name: 'model-picker',
       register(on: On) {
         on('command.run', { command: 'seed-effort' }, async ($, e) => {
-          await $.state.set({ plugin: 'suggest-model', key: 'effortAdvice' } as never, (e.args === 'none' ? '' : e.args) as never)
+          await $.state.set({ plugin: 'model-picker', key: 'effortAdvice' } as never, (e.args === 'none' ? '' : e.args) as never)
           return { text: 'seeded' }
         })
       },
     },
     {
-      name: 'cache-tax',
+      name: 'cache-guard',
       register(on: On) {
         on('command.run', { command: 'seed-cache-tax' }, async ($, e) => {
-          await $.state.set({ plugin: 'cache-tax', key: 'cache' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
+          await $.state.set({ plugin: 'cache-guard', key: 'cache' } as never, (e.args === 'none' ? null : JSON.parse(e.args)) as never)
           return { text: 'seeded' }
         })
       },
@@ -568,7 +568,7 @@ test('the permission mode shows only when it is not the ordinary one, red for by
 test('no mode row for the default mode', MODS, async ($, on) => {
   const w = world(on, { usage: GOOD_USAGE, settings: { permissions: { defaultMode: 'default' } } })
   await start($, w)
-  expect(await texts(await mount($))).not.toContain('Mode')
+  expect(await texts(await mount($))).not.toContain('Mode:')
 })
 
 test('backup: time since the newest commit or checkpoint; amber after 2 h with files unsaved, red after 8 h', MODS, async ($, on) => {
@@ -603,7 +603,7 @@ test('backup: a clean tree is green however old the commit', MODS, async ($, on)
   expect(await colorOf(pane, '1d 6h ago')).toContain('success')
 })
 
-test('effort fit: the model row shows suggest-model\'s advice beside the effort, in the warning colour, and nothing when it fits', MODS, async ($, on) => {
+test('effort fit: the model row shows model-picker\'s advice beside the effort, in the warning colour, and nothing when it fits', MODS, async ($, on) => {
   const w = world(on, { usage: GOOD_USAGE })
   await start($, w)
   await run($, 'seed-effort', 'medium would do')
@@ -612,4 +612,10 @@ test('effort fit: the model row shows suggest-model\'s advice beside the effort,
   expect(await colorOf(pane, ' ⚠ medium would do')).toContain('warning')
   await run($, 'seed-effort', 'none')
   expect(await texts(await mount($))).not.toContain('⚠')
+})
+
+test('a conversation model-picker routed shows the session model dimmed, then → the routed one', () => {
+  const rows = buildRows({ now: T0, model: 'claude-opus-5-5', routedTo: 'Haiku' }, DEFAULT_BOX)
+  const text = rows.model!.parts.map(p => p.text).join('')
+  expect(text).toContain('claude-opus-5-5 → Haiku (routed)')
 })

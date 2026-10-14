@@ -47,7 +47,7 @@ declare module 'claude-code' {
       autoOpen: AutoOpen
       /** Index of the first row shown in each scrolling list (`skills`, `prompts`): moved by the scroll bar and the wheel. */
       tops: Record<string, number>
-      /** What the person last picked in the dropdown (`blast-radius`), and the level its switch goes back to (`blast-radius:last`). */
+      /** What the person last picked in the dropdown (`command-guard`), and the level its switch goes back to (`command-guard:last`). */
       picks: Record<string, string>
       /** The Session box's latest figures; null before any. */
       measure: DeckMeasure | null
@@ -73,6 +73,10 @@ declare module 'claude-code' {
       permMode: string | undefined
       /** The Side Question panel is expanded. */
       btwOpen: boolean
+      /** Cards folded down to their title (`group:<name>`); also kept in the store. null = not loaded. */
+      folded: string[] | null
+      /** What each list's search field holds (`skills`, `prompts`). */
+      listQuery: Record<string, string>
       /** The text in the Side Question's Ask here field, emptied after asking and by ✕ close. */
       btwDraft: string
       /** Lines each list shows (`skills`, `prompts`), as its more/fewer buttons set it (also kept in the store); null = not loaded. */

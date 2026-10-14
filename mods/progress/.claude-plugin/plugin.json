@@ -1,0 +1,23 @@
+{
+  "name": "progress",
+  "version": "0.5.3",
+  "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "stallMinutes": {
+      "type": "number",
+      "title": "Stall warning (minutes)",
+      "description": "A running helper that reports nothing (no request, no tool call) for this long shows as stalled in the pane, with its Stop button, and a toast says so once. 0 turns it off.",
+      "default": 5,
+      "min": 0,
+      "max": 1440
+    },
+    "priceOverrides": {
+      "type": "string",
+      "title": "Price overrides (USD per million tokens)",
+      "description": "Live band and pane for Claude's plan tasks and subagents: task and helper progress bars, a subagent tree, tokens, est. cost, time and tool counts.",
+      "default": ""
+    }
+  }
+}

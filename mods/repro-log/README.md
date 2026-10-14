@@ -38,4 +38,4 @@ unusual secret, so read the file before you share it.
 - Not verified live: real git, `R` and `shasum` output, and the side bar reading `isOff`. Tested with a mocked engine.
 
 ## Related
-`replay-theater` shows the diffs of the session's edits; `repro-log` records how to re-run the analysis.
+`edit-replay` shows the diffs of the session's edits; `repro-log` records how to re-run the analysis.

@@ -48,6 +48,34 @@ const MODS = {
       },
     },
     {
+      name: 'branch-janitor',
+      register(on: On) {
+        on('command.run', { command: 'branch-janitor' }, async ($, e) => {
+          if (e.args === 'on' || e.args === 'off') await $.state.set({ plugin: 'branch-janitor', key: 'isOff' } as never, (e.args === 'off') as never)
+          return { text: `Branches · ${e.args || 'nothing to delete'}` }
+        })
+      },
+    },
+    {
+      name: 'progress',
+      register(on: On) {
+        on('command.run', { command: 'progress' }, async ($, e) => {
+          if (e.args === 'on' || e.args === 'off') await $.state.set({ plugin: 'progress', key: 'isHidden' } as never, (e.args === 'off') as never)
+          return { text: `Subagent band ${e.args}` }
+        })
+      },
+    },
+    {
+      name: 'cache-guard',
+      register(on: On) {
+        on('command.run', { command: 'keepwarm' }, async ($, e) => {
+          const run = e.args === 'off' ? null : { startedAt: 0, until: 1, intervalMs: 1, pings: 0, usd: 0, failures: 0, lastCacheRead: null, lastWasCold: false }
+          await $.state.set({ plugin: 'cache-guard', key: 'keepwarm' } as never, run as never)
+          return { text: e.args === 'off' ? 'Keep-warm stopped' : 'Keep-warm on for 6h' }
+        })
+      },
+    },
+    {
       name: 'long-run-ping',
       register(on: On) {
         on('command.run', { command: 'long-run-ping' }, async ($, e) => {
@@ -66,14 +94,14 @@ const MODS = {
       },
     },
     {
-      name: 'suggest-model',
+      name: 'model-picker',
       register(on: On) {
-        on('command.run', { command: 'suggest-model' }, async ($, e) => {
+        on('command.run', { command: 'model-picker' }, async ($, e) => {
           if (e.args === 'on' || e.args === 'off') {
-            await $.state.set({ plugin: 'suggest-model', key: 'isOff' } as never, (e.args === 'off') as never)
-            return { text: `suggest-model · ${e.args}` }
+            await $.state.set({ plugin: 'model-picker', key: 'isOff' } as never, (e.args === 'off') as never)
+            return { text: `model-picker · ${e.args}` }
           }
-          return { text: 'suggest-model · on · Sonnet\nBlocks and asks on a mismatch' }
+          return { text: 'model-picker · on · Sonnet\nBlocks and asks on a mismatch' }
         })
       },
     },
@@ -96,11 +124,11 @@ const MODS = {
       },
     },
     {
-      name: 'blast-radius',
+      name: 'command-guard',
       register(on: On) {
-        on('command.run', { command: 'blast-radius' }, async ($, e) => {
-          if (e.args !== '') await $.state.set({ plugin: 'blast-radius', key: 'level' } as never, e.args as never)
-          return { text: `blast-radius · ${e.args || 'medium'}` }
+        on('command.run', { command: 'command-guard' }, async ($, e) => {
+          if (e.args !== '') await $.state.set({ plugin: 'command-guard', key: 'level' } as never, e.args as never)
+          return { text: `command-guard · ${e.args || 'medium'}` }
         })
       },
     },
@@ -136,33 +164,33 @@ const mount = ($: Engine, surface: (typeof SURFACES)[number]) =>
   $.ui.mount({ plugin: 'moddeck', surface, component: 'Pane', requestId: 'moddeck', props: PANE_PROPS, viewport: FULLSCREEN } as never)
 
 /** A switch's drawing: the terminal colours the Text in its Button, the desktop the box around the name. */
-const switchOf = async (pane: { find: (q: { key: string }) => Promise<unknown> }, surface: string, id: string) =>
-  JSON.stringify(await pane.find({ key: surface === 'desktop' ? `pill:${id}` : `switch:${id}` }))
+const switchOf = async (pane: { find: (q: { key: string }) => Promise<unknown> }, _surface: string, id: string) =>
+  JSON.stringify(await pane.find({ key: `dot:${id}` }))
 
 /** The pill fill a surface draws: the app's "Deep solid" colours, the terminal's theme keys. */
-const ON = (surface: string) => `"backgroundColor":"${surface === 'desktop' ? '#166534' : 'success'}"`
-const OFF = (surface: string) => `"backgroundColor":"${surface === 'desktop' ? '#991B1B' : 'error'}"`
+const ON = (surface: string) => `"color":"${surface === 'desktop' ? '#22C55E' : 'success'}"`
+const OFF = (surface: string) => `"color":"${surface === 'desktop' ? '#EF4444' : 'error'}"`
 
 const texts = async (ui: { findAll: (q: { type: string }) => Promise<{ text: string }[]> }) =>
   (await ui.findAll({ type: 'Text' })).map(t => t.text).join('\n')
 
 for (const surface of SURFACES) {
-  test(`${surface}: suggest's name is its switch, green when on and red when off; a click flips it, and its actions show only while it is on`, MODS, async ($, on) => {
+  test(`${surface}: model-picker's name is its switch, green when on and red when off; a click flips it, and its actions show only while it is on`, MODS, async ($, on) => {
     const w = world(on)
-    await run($, 'suggest-model', 'on')
+    await run($, 'model-picker', 'on')
     const pane = await mount($, surface)
     const pill = (id: string) => switchOf(pane, surface, id)
-    expect(await pill('suggest')).toContain(ON(surface))
-    expect(await pill('suggest')).toContain('suggest')
-    expect(await pill('suggest')).not.toContain('on ●') // no on/off word: the colour says it
-    expect(await pane.find({ key: 'option:suggest:/suggest-model' })).toBeDefined()
-    await pane.press({ key: 'switch:suggest' })
-    expect(await pill('suggest')).toContain(OFF(surface))
-    expect(await pill('suggest')).toContain('suggest')
-    expect(await pane.find({ key: 'option:suggest:/suggest-model' })).toBeUndefined() // hidden while off
-    expect(w.toasts.at(-1)).toBe('suggest-model · off')
-    await pane.press({ key: 'switch:suggest' })
-    expect(await pill('suggest')).toContain(ON(surface))
+    expect(await pill('model-picker')).toContain(ON(surface))
+    expect(await pill('model-picker')).toContain('model-picker')
+    expect(await pill('model-picker')).not.toContain('on ●') // no on/off word: the colour says it
+    expect(await pane.find({ key: 'option:model-picker:/model-picker' })).toBeDefined()
+    await pane.press({ key: 'switch:model-picker' })
+    expect(await pill('model-picker')).toContain(OFF(surface))
+    expect(await pill('model-picker')).toContain('model-picker')
+    expect(await pane.find({ key: 'option:model-picker:/model-picker' })).toBeUndefined() // hidden while off
+    expect(w.toasts.at(-1)).toBe('model-picker · off')
+    await pane.press({ key: 'switch:model-picker' })
+    expect(await pill('model-picker')).toContain(ON(surface))
   })
 
   test(`${surface}: reflect and secret-guard are coloured switches too; a click flips each at once`, MODS, async ($, on) => {
@@ -185,47 +213,50 @@ for (const surface of SURFACES) {
   test(`${surface}: a one-task tool is just its row and runs at once; the reply goes to a toast and the transcript`, MODS, async ($, on) => {
     const w = world(on)
     const pane = await mount($, surface)
-    await pane.press({ key: 'tool:budget-guard' })
-    expect(w.toasts.at(-1)).toBe('Moddeck · could not run /budget-guard') // no such command in this test: the failure is said, nothing breaks
-    expect(await pane.find({ key: 'option:budget-guard:/budget-guard' })).toBeUndefined() // no repeated indented button
+    await pane.press({ key: 'tool:usage-meter' })
+    expect(w.toasts.at(-1)).toBe('Moddeck · could not run /usage-meter') // no such command in this test: the failure is said, nothing breaks
+    expect(await pane.find({ key: 'option:usage-meter:/usage-meter' })).toBeUndefined() // no repeated indented button
   })
 
   test(`${surface}: a command that needs your text, or changes something, goes in the prompt box (with its slash) and nothing is sent`, MODS, async ($, on) => {
     const w = world(on)
     await run($, 'reflect', 'on')
+    await run($, 'branch-janitor', 'on')
     const pane = await mount($, surface)
     await pane.press({ key: 'option:checkpoint:/checkpoint restore ' })
     await pane.press({ key: 'option:branch-janitor:/branch-janitor clean' })
-    await pane.press({ key: 'option:cache-tax:/keepwarm 90m' })
     await pane.press({ key: 'skill:dual-model-review' })
-    expect(w.filled).toEqual(['/checkpoint restore ', '/branch-janitor clean', '/keepwarm 90m', 'Use the dual-model-review skill to review my last change'])
+    expect(w.filled).toEqual(['/checkpoint restore ', '/branch-janitor clean', 'Use the dual-model-review skill to review my last change'])
   })
 }
 
-test('with suggest-model missing its switch is not drawn, and the other rows still are', MODS_NONE, async ($, on) => {
+test('with model-picker missing its switch is not drawn, and the other rows still are', MODS_NONE, async ($, on) => {
   world(on)
   const pane = await mount($, 'desktop')
-  expect(await pane.find({ key: 'switch:suggest' })).toBeUndefined()
-  expect(await pane.find({ key: 'tool:branch-janitor' })).toBeDefined()
+  expect(await pane.find({ key: 'switch:model-picker' })).toBeUndefined()
+  expect(await pane.find({ key: 'tool:checkpoint' })).toBeDefined()
 })
 
 test('every tool is one row inside its group card, rules separate rows, and there is no separate Options list', MODS, async ($, on) => {
   world(on)
-  await run($, 'suggest-model', 'on')
+  await run($, 'model-picker', 'on')
   await run($, 'reflect', 'on')
   await run($, 'secret-guard', 'on')
-  await run($, 'blast-radius', 'medium')
+  await run($, 'command-guard', 'medium')
   await run($, 'review-cost', 'on')
   for (const c of ['data-guard', 'big-file-guard', 'repro', 'auto-test', 'long-run-ping']) await run($, c, 'on')
+  await run($, 'keepwarm', 'on')
+  await run($, 'branch-janitor', 'on')
+  await run($, 'progress', 'on')
   const pane = await mount($, 'desktop')
-  for (const id of ['suggest', 'reflect', 'secret-guard', 'data-guard', 'big-file-guard', 'repro-log', 'auto-test', 'long-run-ping', 'checkpoint', 'blast-radius', 'review-cost', 'branch-janitor', 'cache-tax', 'budget-guard', 'savvy-progress', 'filetree', 'replay-theater', 'diagram']) {
+  for (const id of ['model-picker', 'reflect', 'secret-guard', 'data-guard', 'big-file-guard', 'repro-log', 'auto-test', 'long-run-ping', 'checkpoint', 'command-guard', 'review-cost', 'branch-janitor', 'cache-guard', 'usage-meter', 'progress', 'filetree', 'edit-replay', 'diagram']) {
     expect(await pane.find({ key: `row:${id}` })).toBeDefined()
   }
   const shown = await texts(pane)
   expect(shown).toContain('Skills')
   expect(shown).not.toContain('Options')
   // two-or-more options sit under their own row; one-task tools have none
-  expect(await pane.find({ key: 'option:cache-tax:/keepwarm off' })).toBeDefined()
+  expect(await pane.find({ key: 'option:cache-guard:/cache-guard' })).toBeDefined() // the report, shown while keep-warm is on
   expect(await pane.find({ key: 'option:checkpoint:/checkpoint' })).toBeUndefined()
 })
 
@@ -304,11 +335,12 @@ test('a star moves a skill to the top; the list still shows five and scrolls; a 
   expect((await shown())[0]).toBe('skill:dual-model-review')
 })
 
-test('a group with more than 8 tools shows 8, scrolls with ▲ ▼, and a starred tool moves to the top', async ($, on) => {
+test('a group with more than 8 tools shows 8, scrolls with ▲ ▼, and a starred tool moves to the top', MODS, async ($, on) => {
   world(on)
   const store = new Map<string, unknown>()
   on('store.get', (_$, e) => ({ value: store.get(e.key) }))
   on('store.set', (_$, e) => (store.set(e.key, e.value), { value: undefined }))
+  for (const [c, v] of [['keepwarm', 'on'], ['branch-janitor', 'on'], ['progress', 'on']]) await run($, c!, v!)
   const pane = await mount($, 'desktop')
   const rowsOf = async () => (await pane.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key).filter((k): k is string => k?.startsWith('star:tool:') === true)
   const first = await rowsOf()
@@ -324,21 +356,101 @@ test('a group with more than 8 tools shows 8, scrolls with ▲ ▼, and a starre
   expect(store.get('starred')).toEqual([last.slice('star:'.length)])
 })
 
-test('blast-radius keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
+test('typing in the Skills search moves the matches to the top; Enter puts the first in the prompt box and clears the field', async ($, on) => {
   const w = world(on)
-  await run($, 'blast-radius', 'high')
   const pane = await mount($, 'desktop')
-  expect(JSON.stringify(await pane.find({ key: 'level:blast-radius' }))).toContain('high')
-  expect(await switchOf(pane, 'desktop', 'blast-radius')).toContain(ON('desktop'))
-  await pane.select({ key: 'level:blast-radius', value: 'off' } as never)
-  expect(w.toasts.at(-1)).toBe('blast-radius · off')
-  expect(await switchOf(pane, 'desktop', 'blast-radius')).toContain(OFF('desktop'))
-  await pane.select({ key: 'level:blast-radius', value: 'low' } as never)
-  await pane.press({ key: 'switch:blast-radius' }) // on -> off
-  expect(w.toasts.at(-1)).toBe('blast-radius · off')
-  await pane.press({ key: 'switch:blast-radius' }) // off -> the level it had
-  expect(w.toasts.at(-1)).toBe('blast-radius · low')
-  expect(JSON.stringify(await pane.find({ key: 'level:blast-radius' }))).toContain('low')
+  const shown = async () => (await pane.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key).filter((k): k is string => k?.startsWith('skill:') === true)
+  expect(JSON.stringify(await pane.find({ key: 'skills:search' }))).toContain('Search skills')
+  await pane.input({ key: 'skills:search', text: 'no', kind: 'change' })
+  expect((await shown())[0]).toBe('skill:no-ai-text')
+  expect(await texts(pane)).toContain('Skills · 1 found')
+  await pane.input({ key: 'skills:search', text: 'zz', kind: 'change' })
+  expect(await texts(pane)).toContain('Skills · no match')
+  await pane.input({ key: 'skills:search', text: 'bu', kind: 'change' })
+  await pane.input({ key: 'skills:search', text: 'bu', kind: 'submit' })
+  expect(w.filled.at(-1)).toContain('burst skill')
+  expect(JSON.stringify(await pane.find({ key: 'skills:search' }))).toContain('"value":""')
+})
+
+test('▾ folds a card down to its title (with its count), ▸ opens it again, and the choice is kept', MODS, async ($, on) => {
+  world(on)
+  const store = new Map<string, unknown>()
+  on('store.get', (_$, e) => ({ value: store.get(e.key) }))
+  on('store.set', (_$, e) => (store.set(e.key, e.value), { value: undefined }))
+  for (const [c, v] of [['keepwarm', 'on'], ['branch-janitor', 'on'], ['progress', 'on']]) await run($, c!, v!)
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'fold:group:Workspace utilities' }))).toContain('▾')
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+  await pane.press({ key: 'fold:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeUndefined() // the box is gone
+  expect(await texts(pane)).toContain('Workspace utilities · 11')
+  expect(JSON.stringify(await pane.find({ key: 'fold:group:Workspace utilities' }))).toContain('▸')
+  expect(store.get('folded')).toEqual(['group:Workspace utilities'])
+  await pane.press({ key: 'fold:group:Guards' })
+  expect(await texts(pane)).toMatch(/Guards · \d/) // a small group shows its count once folded
+  await pane.press({ key: 'fold:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+  await pane.press({ key: 'title:group:Workspace utilities' }) // the name folds it too
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeUndefined()
+  await pane.press({ key: 'title:group:Workspace utilities' })
+  expect(await pane.find({ key: 'group:Workspace utilities:down' })).toBeDefined()
+})
+
+test('advisor: a dropdown and a red/green name like command-guard; a pick or a click puts /advisor in the prompt box', async ($, on) => {
+  const w = world(on)
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'level:advisor' }))).toContain('"value":"off"')
+  expect(await switchOf(pane, 'desktop', 'advisor')).toContain(OFF('desktop'))
+  await pane.select({ key: 'level:advisor', value: 'fable' } as never)
+  expect(w.filled.at(-1)).toBe('/advisor fable') // Claude Code's own command: a mod cannot run it
+  await pane.press({ key: 'switch:advisor' }) // off -> the first model
+  expect(w.filled.at(-1)).toBe('/advisor opus')
+})
+
+test('advisor kept off by DISABLE_TELEMETRY: picking a model explains why and offers to ask Claude for the fix', async ($, on) => {
+  const w = world(on)
+  const asked: string[] = []
+  on('env.get', (_$, e) => ({ value: (e as { name: string }).name === 'DISABLE_TELEMETRY' ? '1' : undefined }) as never)
+  on('tool.call', { tool: 'AskUserQuestion' }, (_, e) => {
+    const q = e.questions[0]!
+    asked.push(q.question)
+    return { result: { questions: e.questions, answers: { [q.question]: 'Yes, go ahead' } } } as never
+  })
+  const pane = await mount($, 'desktop')
+  expect(await texts(pane)).toContain('Kept off by DISABLE_TELEMETRY=1')
+  await pane.select({ key: 'level:advisor', value: 'opus' } as never)
+  expect(asked[0]).toContain('turns Claude Code\'s telemetry back on')
+  expect(asked[0]).toContain('OK to proceed?')
+  expect(w.filled.at(-1)).toContain('Remove DISABLE_TELEMETRY from the env block of ~/.claude/settings.json')
+  expect(w.filled).not.toContain('/advisor opus') // nothing to run until the variable is gone
+})
+
+test('cache-guard is a switch: green while keep-warm runs, red when off; a click runs /keepwarm on or off', MODS, async ($, on) => {
+  world(on)
+  await run($, 'keepwarm', 'off')
+  const pane = await mount($, 'desktop')
+  expect(await switchOf(pane, 'desktop', 'cache-guard')).toContain(OFF('desktop'))
+  await pane.press({ key: 'switch:cache-guard' })
+  expect(await switchOf(pane, 'desktop', 'cache-guard')).toContain(ON('desktop'))
+  await pane.press({ key: 'switch:cache-guard' })
+  expect(await switchOf(pane, 'desktop', 'cache-guard')).toContain(OFF('desktop'))
+})
+
+test('command-guard keeps its level dropdown right after its name, and its name is a switch back to the last level', MODS, async ($, on) => {
+  const w = world(on)
+  await run($, 'command-guard', 'high')
+  const pane = await mount($, 'desktop')
+  expect(JSON.stringify(await pane.find({ key: 'level:command-guard' }))).toContain('high')
+  expect(await switchOf(pane, 'desktop', 'command-guard')).toContain(ON('desktop'))
+  await pane.select({ key: 'level:command-guard', value: 'off' } as never)
+  expect(w.toasts.at(-1)).toBe('command-guard · off')
+  expect(await switchOf(pane, 'desktop', 'command-guard')).toContain(OFF('desktop'))
+  await pane.select({ key: 'level:command-guard', value: 'low' } as never)
+  await pane.press({ key: 'switch:command-guard' }) // on -> off
+  expect(w.toasts.at(-1)).toBe('command-guard · off')
+  await pane.press({ key: 'switch:command-guard' }) // off -> the level it had
+  expect(w.toasts.at(-1)).toBe('command-guard · low')
+  expect(JSON.stringify(await pane.find({ key: 'level:command-guard' }))).toContain('low')
 })
 
 test('review-cost has only on and off, so it is a switch, not a dropdown', MODS, async ($, on) => {
@@ -354,23 +466,23 @@ test('review-cost has only on and off, so it is a switch, not a dropdown', MODS,
 
 test('the plugins are grouped in cards, one line per tool: name, its controls, then the description last', MODS, async ($, on) => {
   world(on)
-  await run($, 'suggest-model', 'on')
-  await run($, 'blast-radius', 'medium')
+  await run($, 'model-picker', 'on')
+  await run($, 'command-guard', 'medium')
   const pane = await mount($, 'desktop')
   const shown = await texts(pane)
   const at = ['Side Question', 'Prompt helpers', 'Model controls', 'Workspace utilities', 'Skills'].map(h => shown.indexOf(h))
   expect(at.every(i => i !== -1)).toBe(true)
   expect([...at].sort((x, y) => x - y)).toEqual(at) // in the design's order
   const row = await pane.drawn()
-  const line = JSON.stringify(row).match(/"key":"row:suggest".*?Checks each prompt against the model/)?.[0] ?? ''
-  expect(line.indexOf('switch:suggest')).toBeLessThan(line.indexOf('[explain]')) // name, then actions, then the description
+  const line = JSON.stringify(row).match(/"key":"row:model-picker".*?Picks the model for new conversations/)?.[0] ?? ''
+  expect(line.indexOf('switch:model-picker')).toBeLessThan(line.indexOf('[explain]')) // name, then actions, then the description
   expect(line).toContain('"wrap":"truncate-end"') // a narrow pane cuts the description with "…"
 })
 
 test('the cards stand in one column, however wide the pane', MODS, async ($, on) => {
   world(on)
-  await run($, 'suggest-model', 'off')
-  await run($, 'blast-radius', 'medium')
+  await run($, 'model-picker', 'off')
+  await run($, 'command-guard', 'medium')
   for (const columns of [40, 120]) {
     const pane = await $.ui.mount({ plugin: 'moddeck', surface: 'desktop', component: 'Pane', requestId: 'moddeck', props: { ...PANE_PROPS, bodyColumns: columns }, viewport: FULLSCREEN } as never)
     const tree = JSON.stringify(await pane.drawn())
@@ -418,29 +530,30 @@ test('without prompt-library there is no Prompts section', MODS_NONE, async ($, 
 
 test('a reply shows its first line as a toast and adds no moddeck note to the transcript (the engine prints the reply already)', MODS, async ($, on) => {
   const w = world(on)
-  await run($, 'suggest-model', 'on')
+  await run($, 'model-picker', 'on')
   const pane = await mount($, 'terminal')
-  await pane.press({ key: 'option:suggest:/suggest-model' })
-  expect(w.toasts.at(-1)).toBe('suggest-model · on · Sonnet')
+  await pane.press({ key: 'option:model-picker:/model-picker' })
+  expect(w.toasts.at(-1)).toBe('model-picker · on · Sonnet')
   expect(w.logs).toEqual([])
 })
 
 test('desktop: no button carries a label (the app would draw it instead of the name), the switch colour is the box around the name, and every box may shrink and clips its text', MODS, async ($, on) => {
   world(on)
-  for (const c of ['suggest-model', 'reflect', 'secret-guard', 'data-guard', 'big-file-guard', 'repro', 'auto-test', 'long-run-ping', 'review-cost']) await run($, c, 'on')
-  await run($, 'blast-radius', 'low')
+  for (const c of ['model-picker', 'reflect', 'secret-guard', 'data-guard', 'big-file-guard', 'repro', 'auto-test', 'long-run-ping', 'review-cost']) await run($, c, 'on')
+  await run($, 'command-guard', 'low')
   await run($, 'prompts', '')
   const pane = await mount($, 'desktop')
   const tree = JSON.stringify(await pane.drawn())
   expect(tree).not.toContain('switch, ')
   expect(tree).not.toContain('Expand the panel')
   // a Button's label is its own text: the engine fills it in from the children, nothing else
-  expect(JSON.stringify(await pane.find({ key: 'switch:suggest' }))).toMatch(/"label":" ?suggest *"/)
+  expect(JSON.stringify(await pane.find({ key: 'switch:model-picker' }))).toMatch(/"label":" ?model-picker *"/)
   expect(await pane.find({ key: 'expand' })).toBeUndefined() // the app's own frame has expand and close
-  expect(await switchOf(pane, 'desktop', 'suggest')).toContain(ON('desktop'))
-  expect(await switchOf(pane, 'desktop', 'checkpoint')).toContain('"backgroundColor":"#374151"') // a command: a gray pill
-  expect(JSON.stringify(await pane.find({ key: 'pill:suggest' }))).not.toContain('padding') // the whole coloured area is the button
-  for (const key of ['row:suggest', 'row:blast-radius', 'group:Prompt helpers', 'session', 'btw']) {
+  expect(await switchOf(pane, 'desktop', 'model-picker')).toContain(ON('desktop'))
+  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"borderStyle":"round"') // every name: a box like the group cards
+  expect(JSON.stringify(await pane.find({ key: 'pill:model-picker' }))).toContain('"backgroundColor":"#1F1F1E"') // a switch too, filled like the Side Question box; only its dot says on or off
+  expect(JSON.stringify(await pane.find({ key: 'pill:model-picker' }))).toContain('"paddingX":0') // tight: no padding between the box and the name
+  for (const key of ['row:model-picker', 'row:command-guard', 'group:Prompt helpers', 'session', 'btw']) {
     const box = await pane.find({ key })
     if (box) expect(JSON.stringify((box as { props?: unknown }).props)).toContain('"minWidth":0')
   }
@@ -467,22 +580,22 @@ test('desktop: the boxes are filled in the dark colours by default, the light on
 
 test('terminal: rows keep the plain tree (no minWidth or overflow props), the switch colour is on its text, and the top bar is drawn', MODS, async ($, on) => {
   world(on)
-  await run($, 'suggest-model', 'on')
+  await run($, 'model-picker', 'on')
   const pane = await mount($, 'terminal')
   const tree = JSON.stringify(await pane.drawn())
   expect(tree).not.toContain('minWidth')
   expect(tree).not.toContain('overflow')
-  expect(await switchOf(pane, 'terminal', 'suggest')).toContain('"backgroundColor":"success"')
+  expect(await switchOf(pane, 'terminal', 'model-picker')).toContain('"color":"success"') // the dot
   expect(await pane.find({ key: 'expand' })).toBeDefined()
 })
 
 test('desktop: /moddeck theme light gives the light fill and pale pills (the app draws button text dark there); dark changes it back, whatever /config says', MODS, async ($, on) => {
   world(on)
   on('config.list', () => ({ value: [{ key: 'theme', value: 'dark' }] as never })) // the app can be light while /config says dark
-  await run($, 'suggest-model', 'on')
+  await run($, 'model-picker', 'on')
   const look = async () => {
     const pane = await mount($, 'desktop')
-    const out = { box: JSON.stringify(await pane.find({ key: 'group:Workspace utilities' })), pill: await switchOf(pane, 'desktop', 'suggest') }
+    const out = { box: JSON.stringify(await pane.find({ key: 'group:Workspace utilities' })), pill: await switchOf(pane, 'desktop', 'model-picker') }
     await pane.unmount()
     return out
   }
@@ -490,7 +603,7 @@ test('desktop: /moddeck theme light gives the light fill and pale pills (the app
   expect(await run($, 'moddeck', 'theme light')).toMatchObject({ text: 'Moddeck · theme light' })
   const light = await look()
   expect(light.box).toContain('"backgroundColor":"#FAF9F5"')
-  expect(light.pill).toContain('"backgroundColor":"#BBF7D0"')
+  expect(light.pill).toContain('"color":"#16A34A"') // the light theme's green dot
   expect(await run($, 'moddeck', 'theme dark')).toMatchObject({ text: 'Moddeck · theme dark' })
   expect((await look()).box).toContain('"backgroundColor":"#1F1F1E"')
   expect(((await run($, 'moddeck', 'theme pink')) as { text: string }).text).toContain('light or dark')
@@ -500,7 +613,7 @@ test('desktop: the appTheme setting picks the light colours without a command', 
   world(on)
   const pane = await mount($, 'desktop')
   expect(JSON.stringify(await pane.find({ key: 'group:Workspace utilities' }))).toContain('"backgroundColor":"#FAF9F5"')
-  expect(await switchOf(pane, 'desktop', 'checkpoint')).toContain('"backgroundColor":"#E5E7EB"')
+  expect(JSON.stringify(await pane.find({ key: 'pill:checkpoint' }))).toContain('"backgroundColor":"#FAF9F5"')
 })
 
 test('desktop: the sun and the moon at the top switch the colours, the one in use at full strength; the terminal has neither', MODS, async ($, on) => {

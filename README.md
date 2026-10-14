@@ -7,7 +7,7 @@ stay quiet until they have something useful to say.
 > **Credit where it is due.** Not everything here is my own creation. Some mods and skills are adapted from other people's
 > ideas and guides, and some features already exist inside Claude Code or as
 > Anthropic's official plugins: Moddeck simply switches them on and makes them easier to reach.
-> Seven mods (staged-review, color-lab, csv-table, test-ledger, scope-watch, error-inbox, decision-log) are adapted from
+> Seven mods (staged-diff, contrast-check, table-preview, test-ledger, scope-watch, error-inbox, decision-log) are adapted from
 > [whyashthakker/awesome-claude-code-mods](https://github.com/whyashthakker/awesome-claude-code-mods) (MIT, © 2026 Yash
 > Thakker and contributors), rewritten for moddeck; each keeps the original licence and says what changed in its README.
 
@@ -69,13 +69,14 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 ### Mods
 
 **Prompt helpers**
-- `suggest-model`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
+- `model-picker`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
 - `reflect`: offers to save a rule when you correct Claude (spends a few tokens).
+- `tldr`: a switch, off until you turn it on; then each long reply gets a TL;DR box above the prompt (Summary, Needs you, Next) and its must-read sentences are drawn bold with ⚑ inside the reply. One Haiku call per long reply.
 - `concise`: a switch, off until you turn it on; then Claude's replies lead with the next action, number the steps, restate where you are and leave tangents for later (adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd), MIT).
 - `prompt-library`: `/prompts` keeps saved prompts per project, one click away in the side bar.
 
 **Model controls**
-- `blast-radius`: before a risky command, shows exactly what would be lost, with **Cancel** first.
+- `command-guard`: before a risky command, shows exactly what would be lost, with **Cancel** first.
 - `review-cost`: shows the token cost of a Codex review before a push.
 
 **Guards**
@@ -94,25 +95,24 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 **Workspace utilities**
 - `checkpoint`: `/checkpoint` snapshots your working tree; a restore shows what would change first.
 - `branch-janitor`: notices a finished branch, checks it is safe, offers to delete it.
-- `cache-tax`: warns before a message that would re-pay for a cold prompt cache.
-- `budget-guard`: a quiet usage line and an optional spending limit.
-- `savvy-progress`: a plan progress bar and a tree of helper agents with estimated cost.
+- `cache-guard`: warns before a message that would re-pay for a cold prompt cache.
+- `usage-meter`: a quiet usage line and an optional spending limit.
+- `progress`: a plan progress bar and a tree of helper agents with estimated cost.
 - `filetree`: a live folder tree beside the chat.
-- `replay-theater`: replays Claude's edits one diff at a time.
+- `edit-replay`: replays Claude's edits one diff at a time.
 - `diagram`: draws Claude's mermaid diagrams as box art, offline.
-- `staged-review`*: the staged diff, before you commit.
+- `staged-diff`*: the staged diff, before you commit.
 - `error-inbox`*: the last 30 failed or refused tool calls, secrets scrubbed, with an "ask Claude" button.
 - `decision-log`*: `/decision <text>` adds a dated row to `docs/DECISIONS.md`.
-- `csv-table`*: `/csv-table data.csv` previews a table: delimiter, column types, first rows.
+- `table-preview`*: `/table-preview data.csv` previews a table: delimiter, column types, first rows.
 
 **UI development** (more in [docs/UI-DEV.md](docs/UI-DEV.md))
 - `ui-preview`: runs the app in this project (plumber API first, then a JS dev server, Shiny, Streamlit), lists the
   plumber routes, takes a screenshot and asks Claude to review the page.
-- `color-lab`*: colour formats and WCAG contrast, with the nearest passing shade.
+- `contrast-check`*: colour formats and WCAG contrast, with the nearest passing shade.
 
 **Look and feel**
 - `moddeck`: the side bar above.
-- `tool-skins`: colour themes for tool calls.
 
 \* adapted from [awesome-claude-code-mods](https://github.com/whyashthakker/awesome-claude-code-mods) (see the credit note above).
 
@@ -149,13 +149,13 @@ mkdir demo && cd demo && git init && claude
 Then try any of these:
 
 - **moddeck**: type `/moddeck` and click the green `suggest` name. It turns red (off) at once.
-- **blast-radius**: ask `create a folder build with a file a.txt, then delete the build folder`. A box shows the risk and what would be lost, with **Cancel** first.
-- **suggest-model**: on Opus, type `fix the typo in the README title`. A dialog says Opus is overkill and suggests a cheaper model.
+- **command-guard**: ask `create a folder build with a file a.txt, then delete the build folder`. A box shows the risk and what would be lost, with **Cancel** first.
+- **model-picker**: on Opus, type `fix the typo in the README title`. A dialog says Opus is overkill and suggests a cheaper model.
 - **secret-guard**: type `my token is [secret:github-token], remember it`. A dialog offers to send it redacted.
 - **data-guard**: run `echo "email,age" > people.csv && git add people.csv`, then ask Claude to commit. A dialog names the file and the column `email`.
 - **checkpoint**: type `/checkpoint`, edit a file, then `/checkpoint restore <name>`. It lists the files that would change.
 - **branch-janitor**: merge a finished branch into `main`, then send any prompt. It offers to delete the branch.
-- **budget-guard**: type `/budget-guard 80`, then `/budget-guard` for the report.
+- **usage-meter**: type `/usage-meter 80`, then `/usage-meter` for the report.
 - **diagram**: ask for `a mermaid flowchart of a GBLUP analysis`, then type `/diagram`.
 - **Side Question**: type `/btw what is REML?`. The answer appears in the side bar, not in the chat.
 - **Git guards**: run `echo KEY=1 > .env && git add .env && git commit -m test`. The commit is refused.
@@ -179,7 +179,7 @@ The installer never installs these. Each has a cost or catch worth reading first
 - **thedotmack/claude-mem**: automatic memory; runs model summaries of your tool use and stores them.
 - **github/spec-kit, Fission-AI/OpenSpec**: spec-driven workflows; many manual steps, and OpenSpec has telemetry on by default.
 - **ruvnet/ruflo, SuperClaude Framework**: agent swarms; large always-present instructions and background workers.
-- **musistudio/claude-code-router**: routes requests across providers; built for API keys, and `suggest-model` does the cheap version.
+- **musistudio/claude-code-router**: routes requests across providers; built for API keys, and `model-picker` does the cheap version.
 - **openai/codex-plugin-cc**: Codex commands; its review gate reviews every reply and can drain usage limits.
 - **wshobson/agents, davila7/claude-code-templates**: catalogs of 100+ agents and skills; browse, do not bulk-install.
 
