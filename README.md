@@ -1,7 +1,7 @@
 # Moddeck
 
 **Safety and productivity mods for Claude Code, built for scientists.**
-Thirty small add-ons (mods), five skills and a set of git guards that protect your work, keep your token bill visible, and
+Thirty-one small add-ons (mods), six skills and a set of git guards that protect your work, keep your token bill visible, and
 stay quiet until they have something useful to say.
 
 > **Credit where it is due.** Not everything here is my own creation. Some mods and skills are adapted from other people's
@@ -71,6 +71,7 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 **Prompt helpers**
 - `suggest-model`: suggests a cheaper or stronger model when your prompt calls for it, and flags an effort level that does not fit.
 - `reflect`: offers to save a rule when you correct Claude (spends a few tokens).
+- `concise`: a switch, off until you turn it on; then Claude's replies lead with the next action, number the steps, restate where you are and leave tangents for later (adapted from [ayghri/i-have-adhd](https://github.com/ayghri/i-have-adhd), MIT).
 - `prompt-library`: `/prompts` keeps saved prompts per project, one click away in the side bar.
 
 **Model controls**
@@ -122,6 +123,7 @@ Commands always start with `/`; a word without the slash is an ordinary prompt. 
 - `align`: interviews you before a big build, then writes a spec.
 - `burst`: three independent versions of a text or idea, graded.
 - `assess-plugin`: what a plugin installs, costs and risks, before you install it.
+- `no-ai-text`: edits AI tells out of a draft and keeps the writer's voice (merged from no-ai-slop and humanizer, both MIT).
 
 ### Git guards and settings
 

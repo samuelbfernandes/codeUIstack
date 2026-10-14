@@ -62,6 +62,7 @@ export const TOOLS: Tool[] = [
     isSwitch: true,
     command: 'reflect',
   },
+  { id: 'concise', label: 'concise', group: 'Prompt helpers', icon: '»', desc: 'Short, action-first replies', isSwitch: true, command: 'concise' },
   // Each mod keeps its own on/off and answers /<command> on|off; the side bar only reads their state.
   { id: 'secret-guard', label: 'secret-guard', group: 'Guards', icon: '🔒', desc: 'Keeps secrets out of the context', isSwitch: true, command: 'secret-guard' },
   { id: 'data-guard', label: 'data-guard', group: 'Guards', icon: '▤', desc: 'Asks before data files are committed', isSwitch: true, command: 'data-guard' },
@@ -212,7 +213,47 @@ export const SKILLS: Skill[] = [
   { id: 'align', label: 'align', desc: 'Interviews you, writes a spec, hands off', text: 'Use the align skill: interview me before we build ' },
   { id: 'burst', label: 'burst', desc: 'Three graded versions of a text or idea', text: 'Use the burst skill: three versions of ' },
   { id: 'assess-plugin', label: 'assess-plugin', desc: 'Checks a plugin before you install it', text: 'Use the assess-plugin skill to assess ' },
+  { id: 'no-ai-text', label: 'no-ai-text', desc: 'Edits AI tells out of a draft, keeps the voice', text: 'Use the no-ai-text skill on this draft: ' },
 ]
+
+/** Starred items first (in list order), then the rest; unknown stars are ignored. */
+export function starFirst<T>(items: readonly T[], starred: readonly string[], idOf: (item: T) => string): T[] {
+  const on = new Set(starred)
+  return [...items.filter(i => on.has(idOf(i))), ...items.filter(i => !on.has(idOf(i)))]
+}
+
+/** Fewest lines a list shows (when it has that many items). */
+export const MIN_LIST_ROWS = 5
+
+/** Lines a list shows: enough for every starred item, else the person's pick; at least MIN_LIST_ROWS, never more than it has. */
+export function listSize(starredCount: number, picked: number, total: number): number {
+  return Math.min(total, Math.max(MIN_LIST_ROWS, starredCount > 0 ? starredCount : picked))
+}
+
+/** Toggles one id in the starred list. */
+export const toggleStar = (starred: readonly string[], id: string): string[] => (starred.includes(id) ? starred.filter(s => s !== id) : [...starred, id])
+
+/** Lines a list shows: the person's choice for it, else the default; at least MIN_LIST_ROWS, at most MAX_LIST_ROWS. */
+export const MAX_LIST_ROWS = 30
+export const listRowsOf = (picked: Record<string, number>, id: string, fallback: number): number => Math.max(MIN_LIST_ROWS, Math.min(MAX_LIST_ROWS, Math.floor(picked[id] ?? fallback)))
+
+/** One installed skill as the engine lists it: its name and, when a slash command carries it, that command's line. */
+export type InstalledSkill = { name: string; desc?: string }
+
+/** The toolkit's own skills first, then every other installed skill by name; a plugin skill `plug:name` keeps its prefix. */
+export function allSkills(installed: readonly InstalledSkill[]): Skill[] {
+  const own = new Set(SKILLS.map(k => k.id))
+  const seen = new Set<string>()
+  const rest: Skill[] = []
+  for (const k of installed) {
+    const name = k.name.trim()
+    if (name === '' || own.has(name) || own.has(name.split(':').pop() ?? '') || seen.has(name)) continue
+    seen.add(name)
+    rest.push({ id: name, label: name, desc: (k.desc ?? '').replace(/\s+/g, ' ').trim(), text: `Use the ${name} skill ` })
+  }
+  rest.sort((a, b) => a.label.localeCompare(b.label))
+  return [...SKILLS, ...rest]
+}
 
 export const priced = (label: string, costs: boolean | undefined): string => (costs ? `$ ${label}` : label)
 

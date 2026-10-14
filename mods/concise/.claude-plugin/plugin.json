@@ -1,0 +1,7 @@
+{
+  "name": "concise",
+  "version": "0.1.0",
+  "description": "While switched on, every prompt carries rules that shape Claude's replies so you can act on them: the next action first, numbered steps, state restated each turn, no tangents, specific time estimates. Off until you type /concise on.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts"
+}

@@ -1,6 +1,6 @@
 {
   "name": "moddeck",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "A side bar with a live Session box, a Side Question panel (/btw), every mod in grouped cards (a switch is the mod's name, green on and red off; click it to flip), the skills and saved prompts, and an update check.",
   "author": {
     "name": "Samuel Fernandes"
@@ -16,8 +16,8 @@
     "skillRows": {
       "type": "number",
       "title": "Skills shown at once",
-      "description": "How many skills (and saved prompts) the side bar shows at once; a longer list gets a scroll bar (click its track, or use the mouse wheel over the list).",
-      "default": 4
+      "description": "How many skills (and saved prompts) the side bar shows at once, at least 5; starred items always fit. A longer list gets a scroll bar (click its track, or use the mouse wheel over the list).",
+      "default": 5
     },
     "appTheme": {
       "type": "string",
