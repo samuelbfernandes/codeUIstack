@@ -230,6 +230,12 @@ export function listSize(starredCount: number, picked: number, total: number): n
   return Math.min(total, Math.max(MIN_LIST_ROWS, starredCount > 0 ? starredCount : picked))
 }
 
+/** Starred first, then switches that are on, then the rest; the catalogue order is kept inside each band. */
+export function rankTools<T>(items: readonly T[], isStarred: (item: T) => boolean, isOn: (item: T) => boolean): T[] {
+  const band = (i: T) => (isStarred(i) ? 0 : 2) + (isOn(i) ? 0 : 1)
+  return items.map((item, at) => ({ item, at })).sort((a, b) => band(a.item) - band(b.item) || a.at - b.at).map(x => x.item)
+}
+
 /** Toggles one id in the starred list. */
 export const toggleStar = (starred: readonly string[], id: string): string[] => (starred.includes(id) ? starred.filter(s => s !== id) : [...starred, id])
 

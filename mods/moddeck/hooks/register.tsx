@@ -6,10 +6,10 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { BtwEntry } from '../types'
-import { addEntry, buildPrompt, cutAnswer, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
-import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, splitCommand, starFirst, toggleStar } from './catalog'
+import { INSTRUCTION, addEntry, buildPrompt, cutAnswer, digest, fallbackPrompt, footer, headline, isRunning, maxCharsOf, nextId, patchEntry, tokensOf, whyNot } from './btw'
+import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, listSize, priced, rankTools, splitCommand, starFirst, toggleStar } from './catalog'
 import type { Action, InstalledSkill, Option, SavedPrompt, Tool } from './catalog'
-import { CARD_CHROME, barTarget, listAt, pillText, scrollBar } from './layout'
+import { CARD_CHROME, barTarget, listAt, pillText, scrollBar, stepTop, trackCells } from './layout'
 import type { BottomList } from './layout'
 import { linkedWorktree, parseStatusV2 } from './gitinfo'
 import type { GitInfo } from './gitinfo'
@@ -66,11 +66,15 @@ let updateCheckOn = true
 /** The Side Question panel: collapsed to one button until clicked (or until /btw is used). */
 const btwOpen = atom({ plugin: 'moddeck', key: 'btwOpen' } as const, false)
 const btwList = atom({ plugin: 'moddeck', key: 'btw' } as const, [] as BtwEntry[])
+/** What the Ask here field holds: kept as it is typed, emptied after asking and by ✕ close. */
+const btwDraft = atom({ plugin: 'moddeck', key: 'btwDraft' } as const, '')
 /** A newer release the person has not updated to yet (null = none known); the side bar shows a one-line button for it. */
 const updateAvail = atom({ plugin: 'moddeck', key: 'updateAvail' } as const, null as string | null)
 /** The expand button: the pane is drawn wide (`WIDE_COLUMNS`) instead of `COLUMNS`. */
 const wide = atom({ plugin: 'moddeck', key: 'wide' } as const, false)
 const DEFAULT_SKILL_ROWS = 5
+/** A tool group with more tools than this gets stars and scrolls. */
+const GROUP_SCROLL_AT = 8
 /** Every skill the session has, as the engine lists it (null = not read yet: the toolkit's own are shown meanwhile). */
 const installed = atom({ plugin: 'moddeck', key: 'installedSkills' } as const, null as InstalledSkill[] | null)
 let skillsAsked = false
@@ -303,7 +307,13 @@ async function askBtw($: Dollar, maxChars: number, text: string): Promise<string
   defer($, async () => {
     let patch: Partial<BtwEntry>
     try {
-      const r = await $.model.fork({ prompt: buildPrompt(question) })
+      let r = await $.model.fork({ prompt: buildPrompt(question) })
+      if (!r.isAnswered && r.reason === 'nothing-to-fork') {
+        // A resumed or reloaded session has no request to fork until its next turn: ask over the transcript's text instead.
+        const text = digest((await attempt(() => $.session.messages())) ?? [])
+        const model = (await attempt(() => $.session.model())) ?? 'sonnet'
+        if (text !== '') r = await $.model.complete({ model: typeof model === 'string' && model !== '' ? model : 'sonnet', system: INSTRUCTION, prompt: fallbackPrompt(text, question), maxTokens: 1024 })
+      }
       if (!r.isAnswered) patch = { status: 'failed', note: whyNot(r) }
       else if (r.text.trim() === '') patch = { status: 'failed', note: whyNot({ reason: 'empty-reply' }) }
       else {
@@ -906,46 +916,71 @@ export const register: Register = (on, options) => {
     // The Side Question panel, right under the Session box: one line until clicked, then the last answers and a field.
     const btws = await read($, btwList)
     const isBtwOpen = await read($, btwOpen)
-    const btwHead = (
-      <Button key="btw:toggle" plain onPress={() => void update($, btwOpen, o => !o)}>
-        <Text bold {...inked} wrap="truncate-end">{`${isBtwOpen ? '▾' : '▸'} Side Question${btws.some(b => b.status === 'thinking') ? ' …' : btws.length > 0 && !isBtwOpen ? ` (${btws.length})` : ''}`}</Text>
-      </Button>
+    // The Side Question box: its title (hover it for what it does), an "Ask here" field beside it, and the last answers below.
+    const thinking = btws.some(b => b.status === 'thinking')
+    const draft = await read($, btwDraft)
+    const ask = (v: string) => {
+      void update($, btwDraft, () => '')
+      void askBtw($, btwMax, v).then(t => $.ui.toast(t.split('\n')[0] ?? t))
+    }
+    // Hovering the title lights the "btw-tip" group, which reveals the tip card laid over the box just below the title row.
+    const btwTitle = (
+      <Box key="btw:title" flexShrink={0} hover={{ scope: 'btw-tip' }}>
+        <Text bold {...inked}>{`Side Question${thinking ? ' …' : ''}`}</Text>
+      </Box>
     )
-    const btwBox = !isBtwOpen ? (
-      <Box key="btw" borderStyle="round" paddingX={1} {...fill} {...fit}>
-        {btwHead}
-        <Box flexGrow={1} flexShrink={1} paddingLeft={1} {...fit}>
-          <Text {...dim} wrap="truncate-end">
-            $ ask without touching the chat
-          </Text>
+    const btwTip = (
+      <Box position="absolute" top={1} left={0} right={0} display="none" hover={{ scope: 'btw-tip', display: 'flex' }} borderStyle="round" paddingX={1} {...fill}>
+        <Text {...dim} wrap="wrap">
+          Ask about this session without adding anything to the chat. The answer shows here only. $ spends model tokens.
+        </Text>
+      </Box>
+    )
+    const btwHead = (
+      <Box key="btw:head" columnGap={1} alignItems="center" {...fit}>
+        {btws.length > 0 && (
+          <Button key="btw:toggle" plain label={desk ? undefined : isBtwOpen ? 'hide answers' : 'show answers'} onPress={() => void update($, btwOpen, o => !o)}>
+            <Text {...inked}>{isBtwOpen ? "▾" : `▸ ${btws.length}`}</Text>
+          </Button>
+        )}
+        {btwTitle}
+        <Box flexGrow={1} flexShrink={1} {...fit}>
+          {Input !== undefined ? (
+            <Input key="btw:input" placeholder="Ask here" submitLabel="ask" value={draft} onInput={(v: string) => void update($, btwDraft, () => v)} onSubmit={(v: string) => ask(v)} />
+          ) : (
+            <Text {...dim} wrap="truncate-end">
+              type /btw your question
+            </Text>
+          )}
         </Box>
       </Box>
-    ) : (
+    )
+    const btwBox = (
       <Box key="btw" flexDirection="column" borderStyle="round" paddingX={1} {...fill} {...fit}>
         {btwHead}
-        {btws.slice(0, 2).map(b => (
-          <Box key={`btw:${b.id}`} flexDirection="column">
-            <Text color={link} wrap="truncate-end">{`› ${headline(b.question, room)}`}</Text>
-            {b.answer !== '' && (
-              <Text {...inked} wrap="wrap">
-                {b.answer}
+        {btwTip}
+        {isBtwOpen &&
+          btws.slice(0, 2).map(b => (
+            <Box key={`btw:${b.id}`} flexDirection="column">
+              <Text color={link} wrap="truncate-end">{`› ${headline(b.question, room)}`}</Text>
+              {b.answer !== '' && (
+                <Text {...inked} wrap="wrap">
+                  {b.answer}
+                </Text>
+              )}
+              <Text {...dim} wrap="truncate-end">
+                {footer(b)}
               </Text>
-            )}
-            <Text {...dim} wrap="truncate-end">
-              {footer(b)}
-            </Text>
-            {b.status !== 'thinking' && (
-              <Button key={`btw:close:${b.id}`} plain onPress={() => void update($, btwList, l => l.filter(a => a.id !== b.id))}>
-                <Text color={link}>✕ close</Text>
-              </Button>
-            )}
-          </Box>
-        ))}
-        {Input !== undefined ? (
-          <Input key="btw:input" label="› " placeholder="ask without touching the chat" submitLabel="ask" onSubmit={(v: string) => void askBtw($, btwMax, v).then(t => $.ui.toast(t.split('\n')[0] ?? t))} />
-        ) : (
-          <Text {...dim}>type /btw your question</Text>
-        )}
+              {b.status !== 'thinking' && (
+                <Button key={`btw:close:${b.id}`} plain onPress={() => {
+                    void update($, btwList, l => l.filter(a => a.id !== b.id))
+                    void update($, btwDraft, () => '') // a fresh field for the next question
+                  }}>
+                  <Text color={link}>✕ close</Text>
+                </Button>
+              )}
+            </Box>
+          ))}
       </Box>
     )
 
@@ -1035,9 +1070,50 @@ export const register: Register = (on, options) => {
     }
     const groupTools = GROUPS.map(g => ({ g, tools: TOOLS.filter(t => t.group === g && visible(t)) })).filter(x => x.tools.length > 0)
     // One column: every card on its own line, the full width of the pane.
-    const toolCards = groupTools.map(({ g, tools }) => {
-      const nameWidth = Math.max(...tools.map(t => nameOf(t).length))
-      return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)))
+    // A group with more than GROUP_SCROLL_AT tools gets stars: starred tools first, the card sized to fit them (at least
+    // MIN_LIST_ROWS, GROUP_SCROLL_AT when none is starred), and ▲ ▼ to scroll the rest.
+    const groupTops = await read($, tops)
+    const groupStars = await starsPicked($)
+    const starOf = (t: Tool) => `tool:${t.id}`
+    const toolCards = groupTools.map(({ g, tools: listed }) => {
+      const nameWidth = Math.max(...listed.map(t => nameOf(t).length))
+      const isBig = listed.length > GROUP_SCROLL_AT
+      // Starred tools first (only big groups have stars), then switches that are on; redone on every draw.
+      const tools = rankTools(listed, t => isBig && groupStars.includes(starOf(t)), t => isOnOf(t) === true)
+      if (!isBig) return card(`group:${g}`, g, tools.map(t => line(t, nameWidth)))
+      const starredCount = tools.filter(t => groupStars.includes(starOf(t))).length
+      const shown = listSize(starredCount, GROUP_SCROLL_AT, tools.length)
+      const listId = `group:${g}`
+      const top = clampTop(groupTops[listId] ?? 0, tools.length, shown)
+      const moveTo = (to: number) => void update($, tops, t => ({ ...t, [listId]: to }))
+      const rowsShown = tools.slice(top, top + shown).map(t => (
+        <Box key={`${listId}:row:${t.id}`} columnGap={1} {...fit}>
+          <Box flexShrink={0}>
+            <Button key={`star:${starOf(t)}`} plain label={desk ? undefined : `star ${t.id}`} onPress={() => void flipStar($, starOf(t))}>
+              <Text color={groupStars.includes(starOf(t)) ? link : (ink?.desc ?? 'inactive')}>{groupStars.includes(starOf(t)) ? '★' : '☆'}</Text>
+            </Button>
+          </Box>
+          <Box flexGrow={1} flexShrink={1} {...fit}>
+            {line(t, nameWidth) as never}
+          </Box>
+        </Box>
+      ))
+      const arrow = (dir: 'up' | 'down') => (
+        <Button key={`${listId}:${dir}`} plain label={desk ? undefined : `${g} ${dir}`} onPress={() => moveTo(stepTop(top, dir === 'up' ? -1 : 1, shown, tools.length))}>
+          <Text color={(dir === 'up' ? top > 0 : top + shown < tools.length) ? link : (ink?.desc ?? 'inactive')}>{dir === 'up' ? '▲' : '▼'}</Text>
+        </Button>
+      )
+      return card(listId, `${g} · ${tools.length}`, [
+        <Box key={`${listId}:window`} columnGap={1} {...fit}>
+          <Box flexDirection="column" flexGrow={1} flexShrink={1} {...fit}>
+            {rowsShown.flatMap((r, i) => (i === 0 ? [r] : [rule(`${listId}:rule:${i}`), r])) as never}
+          </Box>
+          <Box key={`${listId}:arrows`} flexDirection="column" justifyContent="space-between" flexShrink={0}>
+            {arrow('up')}
+            {arrow('down')}
+          </Box>
+        </Box>,
+      ])
     })
 
     // Skills and saved prompts: a card each, `rows` lines at a time, with a scroll bar on the right when there are more.
@@ -1077,13 +1153,23 @@ export const register: Register = (on, options) => {
           </Box>
         </Box>
       ))
+      const cells = trackCells(shown)
+      const arrows = cells < shown
+      const moveTo = (to: number) => void update($, tops, t => ({ ...t, [id]: to }))
+      const arrow = (dir: 'up' | 'down') => (
+        <Button key={`${id}:${dir}`} plain label={desk ? undefined : `${title} ${dir}`} onPress={() => moveTo(stepTop(top, dir === 'up' ? -1 : 1, shown, items.length))}>
+          <Text color={link}>{dir === 'up' ? '▲' : '▼'}</Text>
+        </Button>
+      )
       const bar = items.length > shown && (
         <Box key={`${id}:bar`} flexDirection="column" flexShrink={0}>
-          {scrollBar(top, shown, items.length).map((cell, i) => (
-            <Button key={`${id}:bar:${i}`} plain label={desk ? undefined : `${title} scroll bar`} onPress={() => void update($, tops, t => ({ ...t, [id]: barTarget(top, shown, items.length, i) }))}>
+          {arrows && arrow('up')}
+          {scrollBar(top, shown, items.length, cells).map((cell, i) => (
+            <Button key={`${id}:bar:${i}`} plain label={desk ? undefined : `${title} scroll bar`} onPress={() => moveTo(barTarget(top, shown, items.length, i, cells))}>
               <Text color={cell === 'thumb' ? link : (ink?.desc ?? 'inactive')}>{cell === 'thumb' ? '┃' : '│'}</Text>
             </Button>
           ))}
+          {arrows && arrow('down')}
         </Box>
       )
       return card(`group:${id}`, items.length > shown ? `${title} · ${items.length}` : title, [
@@ -1104,6 +1190,7 @@ export const register: Register = (on, options) => {
               <Text {...dim}>− fewer</Text>
             </Button>
           )}
+          {(starredCount > 0 || (want >= Math.min(items.length, MAX_LIST_ROWS) && shown <= MIN_LIST_ROWS)) && <Text {...dim}>{starredCount > 0 ? '★ on top' : ' '}</Text>}
         </Box>,
       ])
     }
@@ -1120,7 +1207,7 @@ export const register: Register = (on, options) => {
     // Where the lists sit, counted from the bottom, for the wheel: the lowest first.
     const skillShown = listSize(skills.filter(k => stars.includes(k.id)).length, rowsOf('skills'), skills.length)
     const promptShown = listSize(prompts.filter(p => stars.includes(`prompt:${p.name}`)).length, rowsOf('prompts'), prompts.length)
-    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: promptShown }] : []), ...(skills.length > 0 ? [{ id: 'skills', shown: skillShown }] : [])]
+    bottomLists = [...(prompts.length > 0 ? [{ id: 'prompts', shown: promptShown, under: 2 }] : []), ...(skills.length > 0 ? [{ id: 'skills', shown: skillShown, under: 2 }] : [])]
     scrollables = { skills: { total: skills.length, shown: skillShown }, prompts: { total: prompts.length, shown: promptShown } }
 
     const wideNow = await read($, wide)

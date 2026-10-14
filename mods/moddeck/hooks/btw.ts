@@ -26,6 +26,29 @@ export function cutAnswer(text: string, max: number): { text: string; isCut: boo
   return body.length > max ? { text: `${body.slice(0, max).trimEnd()}…`, isCut: true } : { text: body, isCut: false }
 }
 
+/** Most of the transcript the fallback sends when there is nothing to fork (a resumed or reloaded session). */
+export const DIGEST_CHARS = 60_000
+const PER_MESSAGE = 4_000
+
+/** The newest user and assistant text, oldest first, as plain "User:"/"Claude:" lines, up to `max` characters. */
+export function digest(messages: readonly { role: 'user' | 'assistant'; text: string }[], max = DIGEST_CHARS): string {
+  const out: string[] = []
+  let used = 0
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!
+    const body = m.text.trim()
+    if (body === '') continue
+    const line = `${m.role === 'user' ? 'User' : 'Claude'}: ${clip(body, PER_MESSAGE)}`
+    if (used + line.length > max) break
+    out.push(line)
+    used += line.length + 2
+  }
+  return out.reverse().join('\n\n')
+}
+
+export const fallbackPrompt = (transcript: string, question: string): string =>
+  `The conversation so far (text only, newest last):\n\n${transcript}\n\n---\n\nSide question: ${question.slice(0, MAX_QUESTION_CHARS)}`
+
 type Usage = { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }
 export const tokensOf = (u: Usage): number => u.input_tokens + u.output_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens
 export const fmtTokens = (n: number): string => (n < 1000 ? String(Math.round(n)) : `${Math.round(n / 1000)}k`)

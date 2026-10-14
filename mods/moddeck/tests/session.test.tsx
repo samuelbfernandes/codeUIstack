@@ -281,14 +281,14 @@ test('context goes green, yellow at 70% and red at 85%, and at 85% the biggest c
   expect(await texts(await mount($))).not.toContain('Messages 120k')
 })
 
-test('usage pace: amber and red get a ▲, a window under 10% or on pace gets none', { ...MODS, options: { skillRows: 5 } }, async ($, on) => {
+test('usage pace: amber and red get a ▲, a window under 10% or on pace gets none', { ...MODS, options: { skillRows: 6 } }, async ($, on) => {
   const w = world(on)
   await start($, w)
   const at = (kind: string, percentUsed: number, leftMs: number) => ({ kind, percentUsed, resetsAt: new Date(w.clock.now() + leftMs).toISOString() })
   const draw = async (rateLimits: ReturnType<typeof at>[]) => {
     await measure($, { ...GOOD_USAGE, rateLimits })
     const pane = await mount($)
-    return { shown: await texts(pane), pane }
+    return { shown: (await texts(pane)).split('Side Question')[0]!, pane } // the Session box only: the lists below have ▲ arrows
   }
   // five hours, 2.5 h left: 45% is 90% projected (amber), 50% is 100% (red), 30% is on pace
   let r = await draw([at('five_hour', 45, 2.5 * H)])

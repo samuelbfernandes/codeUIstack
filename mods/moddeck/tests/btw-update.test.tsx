@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { addEntry, buildPrompt, cutAnswer, headline, isRunning, maxCharsOf, patchEntry, whyNot } from '../hooks/btw'
+import { addEntry, buildPrompt, cutAnswer, digest, fallbackPrompt, headline, isRunning, maxCharsOf, patchEntry, whyNot } from '../hooks/btw'
 import { RELEASE, installArgv, isNewer, latestRelease, manualCommand, parseVersion } from '../hooks/update'
 
 const PANE_PROPS = { title: 'Moddeck', isFocused: false, bodyColumns: 60, placement: 'dock' as const, scroll: { offset: 0, bodyRows: 40 }, view: {} }
@@ -90,6 +90,34 @@ test('btw helpers: newest first, at most five, a stale question stops blocking, 
   expect(headline('  a   b  ')).toBe('a b')
   expect(buildPrompt('why?')).toContain('Side question: why?')
   expect(whyNot({ reason: 'nothing-to-fork' })).toContain('send a message first')
+})
+
+test('digest keeps the newest text, oldest first, inside the budget; fallbackPrompt ends with the question', () => {
+  const msgs = [
+    { role: 'user' as const, text: 'first' },
+    { role: 'assistant' as const, text: '' },
+    { role: 'assistant' as const, text: 'second' },
+    { role: 'user' as const, text: 'third' },
+  ]
+  expect(digest(msgs)).toBe('User: first\n\nClaude: second\n\nUser: third')
+  expect(digest(msgs, 30)).toBe('Claude: second\n\nUser: third')
+  expect(digest([])).toBe('')
+  expect(fallbackPrompt('User: hi', 'why?')).toMatch(/User: hi[\s\S]*Side question: why\?$/)
+})
+
+test('with nothing to fork (a resumed session), the side question is answered over the transcript text', {}, async ($, on) => {
+  const w = world(on)
+  const asked: string[] = []
+  on('session.messages', () => ({ value: [{ role: 'user', text: 'We use limma for the RNA-seq.', toolUses: [] }, { role: 'assistant', text: 'Done.', toolUses: [] }] as never }))
+  on('model.complete', (_$, e) => (asked.push(String(e.prompt)), { value: { isAnswered: true, text: 'limma.', usage: USAGE } as never }))
+  await start($)
+  w.fork = () => ({ isAnswered: false, reason: 'nothing-to-fork' })
+  expect((await cmd($, 'btw', 'which package?')).text).toContain('thinking')
+  await w.clock.advance(5)
+  const pane = await mount($)
+  expect(await texts(pane)).toContain('limma.')
+  expect(asked[0]).toContain('We use limma for the RNA-seq.')
+  expect(asked[0]).toContain('Side question: which package?')
 })
 
 // ---- the update check ---------------------------------------------------------------------------------------------------
@@ -181,30 +209,39 @@ test('/btw is registered; /btw <question> opens the side bar, asks over the cach
   await w.clock.advance(5)
   const pane = await mount($)
   const shown = await texts(pane)
-  expect(shown).toContain('▾ Side Question')
+  expect(shown).toContain('Side Question')
   expect(shown).toContain('› what is a p-value?')
   expect(shown).toContain('A p-value is not the probability the null is true.')
   expect(shown).toContain('not added to the conversation · ~12k tokens est.')
 })
 
-test('the box has a field; Enter asks; a second question while one thinks is refused; no first reply is said plainly', {}, async ($, on) => {
+test('the Ask here field is always beside the title; Enter asks; the title explains itself on hover; ▸/▾ hides and shows answers', {}, async ($, on) => {
   const w = world(on)
   await start($)
   const pane = await mount($)
-  expect(await pane.find({ key: 'btw:input' })).toBeUndefined() // collapsed until the button is clicked
-  expect(await texts(pane)).toContain('▸ Side Question')
-  await pane.press({ key: 'btw:toggle' })
-  expect(await texts(pane)).toContain('▾ Side Question')
-  expect(await pane.find({ key: 'btw:input' })).toBeDefined()
-  await pane.press({ key: 'btw:toggle' })
-  expect(await pane.find({ key: 'btw:input' })).toBeUndefined()
-  await pane.press({ key: 'btw:toggle' })
+  const field = await pane.find({ key: 'btw:input' })
+  expect(JSON.stringify(field)).toContain('Ask here') // the faded placeholder; the field itself starts empty
+  expect(await pane.find({ key: 'btw:toggle' })).toBeUndefined() // nothing to hide yet
+  const box = JSON.stringify(await pane.find({ key: 'btw' }))
+  expect(box).toContain('"key":"btw:title","flexShrink":0},"hover":{"scope":"btw-tip"}') // hovering the title lights the tip's group
+  expect(box).toContain('"hover":{"scope":"btw-tip","display":"flex"}')
+  expect(box).toContain('"display":"none"')
+  expect(box).toContain('without adding anything to the chat') // the tip, hidden until then
   w.fork = () => ({ isAnswered: false, reason: 'nothing-to-fork' })
   await pane.input({ key: 'btw:input', text: 'hello?', kind: 'submit' })
   await w.clock.advance(5)
   expect(await texts(pane)).toContain('Nothing to ask about yet')
+  await pane.press({ key: 'btw:toggle' })
+  expect(await texts(pane)).not.toContain('Nothing to ask about yet')
+  expect(await texts(pane)).toContain('▸ 1')
+  await pane.press({ key: 'btw:toggle' })
+  expect(await texts(pane)).toContain('Nothing to ask about yet')
   expect((await cmd($, 'btw', '')).text).toContain('type it in the box')
-  expect(await pane.find({ key: 'btw:input' })).toBeDefined() // /btw alone expands the panel
+  await pane.input({ key: 'btw:input', text: 'half a quest', kind: 'change' })
+  expect(JSON.stringify(await pane.find({ key: 'btw:input' }))).toContain('"value":"half a quest"')
+  const close = (await pane.findAll({ type: 'Button' })).map(b => (b as { key?: string }).key).find(k => k?.startsWith('btw:close:'))!
+  await pane.press({ key: close })
+  expect(JSON.stringify(await pane.find({ key: 'btw:input' }))).toContain('"value":""') // ✕ close leaves a fresh field
 })
 
 test('a failed or empty answer says why and changes nothing else', {}, async ($, on) => {
