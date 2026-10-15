@@ -4,6 +4,13 @@ Install (Claude Code 2.1.295 or later): `/plugin install moddeck --marketplace s
 
 A side bar beside the chat with a live **Session** box on top, then the toolkit's mods and skills.
 
+![The side bar in the desktop app: Session box, Side Question, and the Prompt helpers and Model controls cards](../../docs/images/moddeck-sidebar-top.png)
+
+![The lower part: Workspace utilities, UI development, Skills and Prompts](../../docs/images/moddeck-sidebar-lower.png)
+
+Dropdowns sit right after a name: `tldr` (off, highlight, summary), `command-guard` (off, low, medium, high) and `advisor`
+(off, opus, fable). A green dot is on, red is off, and the ☀ / ☾ buttons at the top set the pane's colours.
+
 ## The Session box (top of the side bar)
 Like a status line, but inside the pane: it needs no status line and never touches `$.ui.status`. It is drawn only from
 figures the engine gives; a figure that is missing is not drawn (never as zero), and with nothing known the box is simply
@@ -39,9 +46,11 @@ Inside a card the lines are parted by thin rules. The descriptions and groups ar
 no command or state changed.
 - **A switch is the mod's name**: a pill, green while on and red while off. A click runs `/<mod> on|off` at once and shows
   the reply as a toast. Its action buttons (blue, `[like this]`) sit right after the name and show while it is on.
-- **Prompt helpers**: suggest (`[status]`, `[explain]`) and `$ reflect`.
+- **Prompt helpers**: model-picker (`[status]`, `[explain]`), `$ reflect`, `$ tldr` with its `off|highlight|summary`
+  dropdown (`summary` is the default), and concise.
 - **Model controls**: command-guard, whose name is a switch (off, or back to the level it had; medium the first time) with
-  its `off|low|medium|high` dropdown right after the name; review-cost, a plain switch (it has only on and off).
+  its `off|low|medium|high` dropdown right after the name; review-cost, a plain switch (it has only on and off); `$ advisor`
+  with its `off|opus|fable` dropdown.
 - **Guards**: secret-guard, data-guard, big-file-guard, repro-log (`[recipe]`, `[status]` while on).
 - **Automation**: auto-test (`[run]`, `[status]` while on), long-run-ping.
 - **Workspace utilities**: checkpoint, branch-janitor, cache-guard, usage-meter, progress, filetree, edit-replay,
@@ -71,7 +80,7 @@ It opens by itself at session start where the screen can dock it (fullscreen ter
 `/moddeck` shows or hides it; `/moddeck rows ...` sets the Session box. Commands are always typed with their `/`; a bare word is an ordinary prompt.
 
 ## Settings
-`autoOpen` (default on), `skillRows` (4: lines a Skills or Prompts card shows before its scroll bar), `showSession` (true), `sessionLayout` (`expanded` or `compact`), `sessionRows` (comma list of
+`autoOpen` (default on), `skillRows` (5: lines a Skills or Prompts card shows before its scroll bar), `showSession` (true), `sessionLayout` (`expanded` or `compact`), `sessionRows` (comma list of
 row ids in display order, default `model,context,usage,cost,cache,git,tokens,activity,environment`; ids left out are hidden),
 `usageSevenDayAt` (80), `toolsMaxVisible` (4), `pushWarn` (5), `envThreshold` (0 = always). What `/moddeck rows` saved wins over
 `sessionRows` and `sessionLayout`.
@@ -92,7 +101,7 @@ row ids in display order, default `model,context,usage,cost,cache,git,tokens,act
   tested against Claude Code's simulated engine only (it checks the tree, not how a surface paints it).
 
 ## Side Question
-A `▸ Side Question` line right under the Session box; clicking it expands the chat panel (`▾`), which shows the last two answers and a field. Enter asks; `/btw <question>` does the same and expands the panel; `/btw` alone expands it. The answer is made over the main thread's cached context with every tool denied, shown only here and never added to the conversation, and costs a little credit (a cold cache costs like a full message). It needs a first reply in the session. If Claude Code's own built-in `/btw` takes priority over a mod's command of that name, use the field instead. Not verified live.
+A **Side Question** panel right under the Session box: a field and an `ask` button, with the last answers above it. Enter asks; `/btw <question>` does the same and expands the panel; `/btw` alone expands it. The answer is made over the main thread's cached context with every tool denied, shown only here and never added to the conversation, and costs a little credit (a cold cache costs like a full message). It needs a first reply in the session. If Claude Code's own built-in `/btw` takes priority over a mod's command of that name, use the field instead. Not verified live.
 
 ## Updates
 Every time the side bar is turned on (session start, or opened again), moddeck runs `git ls-remote --tags` against its GitHub repository (at most every 6 hours; `updateCheck` turns it off) and, if a newer release exists, asks Update now / Later / Skip this version. Update now runs the installer's own one-liner (`pipx run --spec git+https://github.com/samuelbfernandes/moddeck@vX.Y.Z moddeck update --scope user -y`, else `uvx`; `-y` because there is no terminal to answer questions); restart Claude Code afterwards. `/moddeck update` checks at once. Nothing is installed without your yes. Not verified live.
