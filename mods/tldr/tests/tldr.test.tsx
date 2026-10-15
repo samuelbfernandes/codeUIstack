@@ -2,7 +2,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { HIGHLIGHT, MARK, addMarks, markText, parseDigest, splitBlocks } from '../hooks/lib'
+import { HIGHLIGHT, addMarks, markText, parseDigest, splitBlocks } from '../hooks/lib'
 
 const REPLY = [
   'I renamed the eight mods and ran every test.',
@@ -50,10 +50,10 @@ test('parseDigest reads fenced JSON and keeps only must-read sentences that are 
   expect(parseDigest('{"summary": ""}', REPLY)).toBeUndefined()
 })
 
-test('markText bolds and flags each must-read sentence, but never inside code', () => {
+test('markText bolds each must-read sentence, but never inside code', () => {
   const out = markText(REPLY, ['You need to restart the app before the new names load.'])!
-  expect(out).toContain(`**${MARK} You need to restart the app before the new names load.**`)
-  expect(out.split(MARK).length - 1).toBe(1) // the copy inside the code fence is left exact
+  expect(out).toContain(`**You need to restart the app before the new names load.**`)
+  expect(out.split('**You need').length - 1).toBe(1) // the copy inside the code fence is left exact
   expect(markText('nothing here', ['You need to restart'])).toBeUndefined()
   expect(markText(out, ['You need to restart the app before the new names load.'])).toBeUndefined() // already marked
   expect(addMarks(['a', 'b'], ['b', 'c'])).toEqual(['b', 'c', 'a'])
@@ -67,7 +67,7 @@ test('off by default: a long reply makes no model call', async ($, on) => {
   expect(w.calls).toBe(0)
 })
 
-test('on: a long reply gets one call, a box above the prompt and ⚑ on the must-read sentence in the reply', async ($, on) => {
+test('on: a long reply gets one call, a box above the prompt and the must-read sentence in bold in the reply', async ($, on) => {
   const w = world(on)
   await $.session.start({ cwd: '/p', surface: 'terminal', isInteractive: true } as never)
   expect(await cmd($, 'on')).toContain('tldr · on')
@@ -83,7 +83,7 @@ test('on: a long reply gets one call, a box above the prompt and ⚑ on the must
   expect(shown).toContain('⚑ Needs you')
   expect(shown).toContain('Restart the app')
   await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AssistantMessage', props: { text: REPLY, isFirstOfReply: true } } as never)
-  expect(w.drawn.at(-1)).toContain(`**${MARK} You need to restart the app before the new names load.**`) // the engine draws the marked text
+  expect(w.drawn.at(-1)).toContain(`**You need to restart the app before the new names load.**`) // the engine draws the marked text
   await band.press({ key: 'tldr:close' })
   expect(await texts(band)).not.toContain('Eight mods renamed')
   expect(await cmd($, 'off')).toBe('tldr · off')
@@ -99,7 +99,7 @@ test('highlight: the must-read sentences are marked but the box above the prompt
   const band = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AbovePrompt', props: BAND } as never)
   expect(await texts(band)).not.toContain('Eight mods renamed; tests pass.')
   await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AssistantMessage', props: { text: REPLY, isFirstOfReply: true } } as never)
-  expect(w.drawn.at(-1)).toContain(`**${MARK} You need to restart the app before the new names load.**`)
+  expect(w.drawn.at(-1)).toContain(`**You need to restart the app before the new names load.**`)
   expect(await cmd($, 'summary')).toContain('tldr · on · summary')
   const again = await $.ui.mount({ plugin: 'tldr', surface: 'terminal', component: 'AbovePrompt', props: BAND } as never)
   expect(await texts(again)).toContain('Eight mods renamed; tests pass.')

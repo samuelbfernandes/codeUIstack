@@ -59,7 +59,7 @@ export const addMarks = (list: readonly string[], fresh: readonly string[]): str
   [...fresh, ...list.filter(s => !fresh.includes(s))].slice(0, MAX_MARKS)
 
 /**
- * The block's markdown with each must-read sentence bolded and flagged. A sentence inside a code fence or inline code is
+ * The block's markdown with each must-read sentence bolded. A sentence inside a code fence or inline code is
  * left alone, so code stays exact; so is one already bold. Undefined when nothing changes.
  */
 export function markText(text: string, marks: readonly string[]): string | undefined {
@@ -71,12 +71,12 @@ export function markText(text: string, marks: readonly string[]): string | undef
     for (;;) {
       const at = out.indexOf(m, from)
       if (at < 0) break
-      const isMarked = out.slice(Math.max(0, at - MARK.length - 3), at) === `**${MARK} ` || out.slice(Math.max(0, at - 2), at) === '**'
+      const isMarked = out.slice(Math.max(0, at - 2), at) === '**'
       if (isInCode(out, at) || isMarked) {
         from = at + m.length
         continue
       }
-      const wrapped = `**${MARK} ${m}**`
+      const wrapped = `**${m}**`
       out = out.slice(0, at) + wrapped + out.slice(at + m.length)
       from = at + wrapped.length
       changed = true

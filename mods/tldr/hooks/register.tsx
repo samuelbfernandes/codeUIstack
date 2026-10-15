@@ -1,5 +1,5 @@
 // tldr: while switched on, after each long reply a small model (Haiku) picks the sentences the reader must not skip and
-// sums the reply up. The sentences are marked inside the reply (bold, with ⚑) wherever the transcript draws them, and a
+// sums the reply up. The sentences are marked inside the reply (in bold) wherever the transcript draws them, and a
 // box above the prompt shows Summary, Needs you and Next. One model call per long reply, run after the turn has ended,
 // so nothing waits on it; nothing is added to the conversation. Off until `/tldr on` or the moddeck switch.
 // FAIL OPEN: if anything here fails, the reply is drawn as it was and the box stays empty.
@@ -7,7 +7,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { TldrDigest, TldrMode } from '../types'
-import { HIGHLIGHT_COLORS, HIGHLIGHT_DEFAULT, MARK, SYSTEM, addMarks, isHighlightColor, markText, parseDigest, promptFor, splitBlocks, type HighlightColor } from './lib'
+import { HIGHLIGHT_COLORS, HIGHLIGHT_DEFAULT, SYSTEM, addMarks, isHighlightColor, markText, parseDigest, promptFor, splitBlocks, type HighlightColor } from './lib'
 
 type Dollar = EngineInterface
 
@@ -159,12 +159,13 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  // The reply itself: each must-read sentence in bold with ⚑, so it stands out while scrolling.
+  // The reply itself: each must-read sentence in bold, so it stands out while scrolling.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (!(await isOn($))) return next(e)
-    const marked = markText(e.props.text, await read($, marks))
+    const list = await read($, marks)
+    const marked = markText(e.props.text, list)
     if (marked === undefined) return next(e)
-    // The terminal draws the rewritten markdown (bold with ⚑). The app also tints each paragraph holding a must-read
+    // The terminal draws the rewritten markdown (in bold). The app also tints each paragraph holding a must-read
     // sentence pale yellow: the reply is drawn here paragraph by paragraph, the marked ones on the tint.
     if (e.surface !== 'desktop') return next({ ...e, props: { ...e.props, text: marked } })
     const { Box, Markdown } = $.ui.resolve(e)
@@ -172,7 +173,7 @@ export const register: Register = (on, options) => {
     return (
       <Box key="tldr-reply" flexDirection="column" gap={1}>
         {splitBlocks(marked).map((block, i) =>
-          block.includes(MARK) ? (
+          list.some(m => block.includes(`**${m}**`)) ? (
             <Box key={`tldr-p${i}`} backgroundColor={tint}>
               <Markdown text={block} />
             </Box>

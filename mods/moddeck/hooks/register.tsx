@@ -11,7 +11,7 @@ import { GROUPS, MAX_LIST_ROWS, MIN_LIST_ROWS, TOOLS, allSkills, listRowsOf, lis
 import type { Action, InstalledSkill, Option, SavedPrompt, Tool } from './catalog'
 import { CARD_CHROME, barTarget, listAt, pillText, scrollBar, stepTop, trackCells } from './layout'
 import type { BottomList } from './layout'
-import { linkedWorktree, parseStatusV2 } from './gitinfo'
+import { isDirty, linkedWorktree, parseStatusV2 } from './gitinfo'
 import type { GitInfo } from './gitinfo'
 import {
   DEFAULT_BOX,
@@ -155,6 +155,8 @@ const measure = atom({ plugin: 'moddeck', key: 'measure' } as const, null as Mea
 const meta = atom({ plugin: 'moddeck', key: 'meta' } as const, {} as MetaAtom)
 /** Git state of the working directory, refreshed at session start and after each turn; null = not a repository. */
 const gitState = atom({ plugin: 'moddeck', key: 'git' } as const, null as GitInfo | null)
+/** The working directory, shown with the branch in the line above the prompt. */
+const cwdState = atom({ plugin: 'moddeck', key: 'cwd' } as const, '' as string)
 const tokenTotals = atom({ plugin: 'moddeck', key: 'tokens' } as const, null as TokenTotals | null)
 const activity = atom({ plugin: 'moddeck', key: 'activity' } as const, EMPTY_ACTIVITY as Activity)
 /** The newest commit or checkpoint, ms; null = none, undefined (never set) = not read. */
@@ -529,6 +531,8 @@ async function refreshGit($: Dollar): Promise<void> {
   } catch {
     info = null
   }
+  const dir = await attempt(() => $.session.cwd())
+  if (typeof dir === 'string') await safe(() => update($, cwdState, () => dir))
   await safe(() => update($, gitState, () => info))
   if (info === null) return // no repository: the backup row needs git anyway
   // The newest of the last commit and the last checkpoint: what a dirty tree could be recovered from.
@@ -887,6 +891,34 @@ export const register: Register = (on, options) => {
     await update($, tops, t => ({ ...t, [hit.id]: clampTop((t[hit.id] ?? 0) + e.by, list.total, list.shown) }))
     return {}
   }).catch(($, e, next) => next(e)) // a failed list scroll still scrolls the pane
+
+  // The line above the prompt: the folder and the branch, like the path line in RStudio's console.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const [dir, g] = [await read($, cwdState), await read($, gitState)]
+    if (dir === '' && !g) return next(e)
+    const { Box, Text } = $.ui.resolve(e)
+    const home = dir.replace(/^\/(Users|home)\/[^/]+/, '~')
+    const line = (
+      <Box key="moddeck-where" columnGap={1}>
+        {g && <Text bold color={isDirty(g) ? 'warning' : 'success'}>{`⎇ ${g.branch}${isDirty(g) ? '*' : ''}`}</Text>}
+        {home !== '' && <Text dimColor wrap="truncate-start">{home}</Text>}
+      </Box>
+    )
+    let below: unknown
+    try {
+      below = await next(e)
+    } catch {
+      below = undefined
+    }
+    return below !== null && typeof below === 'object' ? (
+      <Box key="moddeck-where-band" flexDirection="column">
+        {line}
+        {below as never}
+      </Box>
+    ) : (
+      line
+    )
+  }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const R = $.ui.resolve(e) as ReturnType<typeof $.ui.resolve> & { Input?: (p: Record<string, unknown>) => unknown }

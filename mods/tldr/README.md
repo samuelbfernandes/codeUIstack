@@ -7,7 +7,7 @@ Long replies are easy to skim past the one line that mattered. While tldr is on,
 goes once to a small model (Haiku), which:
 
 - picks the sentences you must not skip (a question asked of you, a decision made for you, a warning, a failure, a
-  required action, a number you need), copied word for word. Those sentences are drawn **bold with ⚑** inside the reply,
+  required action, a number you need), copied word for word. Those sentences are drawn **bold** inside the reply,
   so they stand out while you scroll; in the desktop app the paragraph that holds one is also tinted (green by default, `/tldr color` to change it). Code is never touched.
 - writes a box above the prompt: **TL;DR** (two or three sentences), **⚑ Needs you**, **→ Next**. ▾ folds it to one line,
   ✕ puts it away until the next long reply.
