@@ -39,6 +39,7 @@ ALLOW_PROGRAMS: dict[str, set[str]] = {
     "prompt-library": set(),
     "checkpoint": {"git", "rm", "cmd"},          # rm / del only on a confirmed restore, only paths the dialog listed
     "long-run-ping": set(),
+    "ssh-connect": {"ssh", "cmd"},          # opens a terminal window (osascript / cmd start / a Linux terminal) running `ssh <host>` for a Host the person named; host names validated, argv arrays only, no password or code ever handled
     # Adapted from whyashthakker/awesome-claude-code-mods (MIT): read-only git for staged-diff, nothing else.
     "staged-diff": {"git"},
     "contrast-check": set(),

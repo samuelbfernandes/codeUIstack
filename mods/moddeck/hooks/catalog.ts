@@ -157,6 +157,19 @@ export const TOOLS: Tool[] = [
     ],
   },
   {
+    id: 'ssh-connect',
+    label: 'ssh',
+    group: 'Automation',
+    icon: '⇄',
+    desc: 'Opens your terminal on a host from ~/.ssh/config; you type any 2FA code there',
+    click: { text: '/ssh connect', run: true },
+    options: [
+      { label: 'shell', text: '/ssh shell', run: true },
+      { label: 'status', text: '/ssh status', run: true },
+      { label: 'off', text: '/ssh disconnect', run: true },
+    ],
+  },
+  {
     id: 'branch-janitor',
     label: 'branch-janitor',
     group: 'Workspace utilities',
