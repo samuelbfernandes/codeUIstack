@@ -1,0 +1,21 @@
+{
+  "name": "ssh-connect",
+  "version": "0.1.0",
+  "description": "One-click SSH from the moddeck side bar: /ssh connect|shell|status|disconnect opens your terminal on a host from ~/.ssh/config, so you type any password or 2FA code yourself. macOS, Linux and Windows.",
+  "author": { "name": "Samuel Fernandes" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enable /ssh",
+      "description": "Turn off to make /ssh do nothing.",
+      "default": true
+    },
+    "defaultHost": {
+      "type": "string",
+      "title": "Default host",
+      "description": "A Host name from your ~/.ssh/config, used when /ssh is given none. Empty: the only host in your config, or a list to pick from.",
+      "default": ""
+    }
+  }
+}

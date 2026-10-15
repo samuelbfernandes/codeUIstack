@@ -133,6 +133,11 @@
       "description": "Keeps secrets (API keys, tokens, passwords, private keys) out of the model's context: hides them in tool output and asks before a typed prompt that contains one is sent."
     },
     {
+      "name": "ssh-connect",
+      "source": "./mods/ssh-connect",
+      "description": "One-click SSH from the moddeck side bar: /ssh connect|shell|status|disconnect opens your terminal on a host from ~/.ssh/config, so you type any password or 2FA code yourself. macOS, Linux and Windows."
+    },
+    {
       "name": "staged-diff",
       "source": "./mods/staged-diff",
       "description": "Shows what is staged for the next commit (git diff --cached, stat and diff) in a pane, with a Refresh button. Read-only."

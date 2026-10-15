@@ -32,6 +32,7 @@ file writes and model use. It is a tripwire and a summary, not a proof: read the
 | review-cost | no | git | no | no | command.run, session.start, tool.call, ui.render |
 | scope-watch | no | none | no | no | command.run, session.start, tool.call |
 | secret-guard | no | none | no | no | command.run, prompt.submit, session.append, session.start, tool.call |
+| ssh-connect | no | cmd, ssh | no | no | command.run, session.start |
 | staged-diff | no | git | no | no | command.run, session.start, ui.render |
 | table-preview | no | none | no | no | command.run, session.start, ui.render |
 | test-ledger | no | none | no | no | command.run, session.start, tool.call, ui.render |
