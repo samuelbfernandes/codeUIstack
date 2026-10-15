@@ -1,6 +1,6 @@
 {
   "name": "branch-janitor",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Watches your git branches by itself (nothing to run) and notices when a branch's work is done (merged, squash-merged, pull request merged), even if you merged in a plain terminal. Checks it is safe to delete and offers to delete it. Never deletes without a click; the remote copy is a second, separate question.",
   "author": {
     "name": "Samuel Fernandes"

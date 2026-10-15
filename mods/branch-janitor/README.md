@@ -12,8 +12,7 @@ pull request is never offered: the list says `#42 still open`. Each question say
 
 ## Use
 Nothing to type. Every prompt costs one quick `git for-each-ref`; only if your branches changed does it look properly,
-so a merge done in a plain terminal is noticed on your next prompt. It also looks after Claude's own `git merge/pull/push/
-checkout/fetch --prune`, `gh pr merge`, and at session start. To look on demand, run a slash command:
+so a merge done in a plain terminal is noticed on your next prompt. It also looks after Claude's own `git merge/pull/push/fetch` and `gh pr merge` at once (no waiting), `git checkout/switch` and `remote prune` at most every `minMinutes`, and at session start. To look on demand, run a slash command:
 - `/branch-janitor` lists every branch and deletes nothing. With `gh`, it ends with one line per local branch that has an open pull request:
   `#42 open · checks passing · review approved · my-branch` (checks: passing, failing, pending, none; review: approved, changes requested, none).
 - `/branch-janitor clean` scans now and offers. `/branch-janitor off` / `on` stops / resumes it in this repository.

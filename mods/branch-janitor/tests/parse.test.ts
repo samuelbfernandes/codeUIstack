@@ -100,18 +100,18 @@ test('segments: splits on && || ; | newline outside quotes, drops quotes', () =>
   expect(segments("echo 'git merge x && y'")).toEqual([['echo', 'git merge x && y']])
 })
 
-test('triggerOf: merges and merged PRs are "merge"', () => {
-  for (const c of ['git merge feature', 'git merge --no-ff feature -m "msg"', 'gh pr merge 12 --squash --delete-branch', 'gh pr merge', 'gh -R o/r pr merge 3', 'cd repo && git merge x', 'GIT_EDITOR=true git merge x', 'git -C ../other merge x', '/usr/bin/git.exe merge x'])
+test('triggerOf: merges, merged PRs, pulls, pushes and fetches are "merge"', () => {
+  for (const c of ['git merge feature', 'git merge --no-ff feature -m "msg"', 'gh pr merge 12 --squash --delete-branch', 'gh pr merge', 'gh -R o/r pr merge 3', 'cd repo && git merge x', 'git pull', 'git pull --rebase origin main', 'git push', 'git push -u origin feature', 'git push origin merge-both:main', 'git fetch', 'git fetch origin', 'git fetch --prune', 'git fetch -p origin', 'git fetch --all --prune', 'GIT_EDITOR=true git merge x', 'git -C ../other merge x', '/usr/bin/git.exe merge x'])
     expect(triggerOf(c)).toBe('merge')
 })
 
-test('triggerOf: the quieter triggers are "other"', () => {
-  for (const c of ['git pull', 'git pull --rebase origin main', 'git push', 'git push -u origin feature', 'git checkout main', 'git switch main', 'git switch -', 'git fetch --prune', 'git fetch -p origin', 'git fetch --all --prune', 'git remote prune origin', 'git remote update --prune', 'git add . && git commit -m x && git push'])
+test('triggerOf: switching branches and pruning remotes are "other"', () => {
+  for (const c of ['git checkout main', 'git switch main', 'git switch -', 'git remote prune origin', 'git remote update --prune'])
     expect(triggerOf(c)).toBe('other')
 })
 
 test('triggerOf: everything else is nothing', () => {
-  for (const c of ['git status', 'git log --oneline', 'git commit -m "git merge"', 'echo "git merge x"', 'git merge --abort', 'git checkout -b newbranch', 'git switch -c newbranch', 'git checkout -- file.txt', 'git checkout .', 'git checkout', 'git fetch', 'git fetch origin', 'git remote -v', 'gh pr list', 'gh pr view 3', 'ls -la', ''])
+  for (const c of ['git status', 'git log --oneline', 'git commit -m "git merge"', 'echo "git merge x"', 'git merge --abort', 'git checkout -b newbranch', 'git switch -c newbranch', 'git checkout -- file.txt', 'git checkout .', 'git checkout', 'git remote -v', 'gh pr list', 'gh pr view 3', 'ls -la', ''])
     expect(triggerOf(c)).toBeUndefined()
 })
 

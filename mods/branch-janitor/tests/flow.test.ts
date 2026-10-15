@@ -113,18 +113,24 @@ test('"Never ask again" and /branch-janitor on: on forgets what was turned down'
   expect(w.asks).toHaveLength(2)
 })
 
-test('rate limit: one scan per repo per minMinutes unless the command was a merge', async ($, on) => {
+test('rate limit: one scan per repo per minMinutes unless the command was a merge, pull, push or fetch', async ($, on) => {
   const w = world(on, repo({ wip: { sha: SHA('3'), cherry: `+ ${SHA('3')}\n` } }))
   const scans = () => w.cmds.filter(c => c[6] === 'for-each-ref' && c[7]!.startsWith('--format=%(HEAD)%09')).length
-  await merge($, 'git pull')
+  await merge($, 'git checkout main')
   expect(scans()).toBe(1)
-  await merge($, 'git pull')
-  expect(scans()).toBe(1)
+  await merge($, 'git checkout main')
+  expect(scans()).toBe(1) // a quiet trigger waits for minMinutes
   await merge($, 'git merge x')
   expect(scans()).toBe(2) // a merge bypasses the limit
+  await merge($, 'git push origin work:main')
+  expect(scans()).toBe(3) // so does a push
+  await merge($, 'git pull')
+  expect(scans()).toBe(4) // a pull
+  await merge($, 'git fetch')
+  expect(scans()).toBe(5) // and a fetch
   await w.clock.advance(31 * 60_000)
-  await merge($, 'git fetch --prune')
-  expect(scans()).toBe(3)
+  await merge($, 'git remote prune origin')
+  expect(scans()).toBe(6)
 })
 
 test('delete (merged): git branch -d, one toast and transcript lines with the restore command', async ($, on) => {

@@ -68,15 +68,14 @@ function classifyGit(args: string[]): Trigger | undefined {
     case 'merge':
       return has('--abort', '--quit') ? undefined : 'merge'
     case 'pull':
-    case 'push':
-      return 'other'
+    case 'push': // a push to the default branch, or a pull / fetch that brings a merge in, is how a branch usually finishes
+    case 'fetch':
+      return 'merge'
     case 'checkout':
     case 'switch': {
       const positional = rest.filter(a => a === '-' || !a.startsWith('-')) // a lone '-' is "the previous branch"
       return positional.length > 0 && !rest.some(a => NOT_A_BRANCH_SWITCH.has(a)) ? 'other' : undefined
     }
-    case 'fetch':
-      return rest.some(a => a === '--prune' || /^-[a-zA-Z]*p[a-zA-Z]*$/.test(a)) ? 'other' : undefined
     case 'remote':
       return rest[0] === 'prune' || (rest[0] === 'update' && has('-p', '--prune')) ? 'other' : undefined
     default:
@@ -84,7 +83,7 @@ function classifyGit(args: string[]): Trigger | undefined {
   }
 }
 
-/** `merge` for a merge or a merged PR (always worth a look), `other` for the quieter triggers, else undefined. */
+/** `merge` for a merge, a merged PR, a pull, a push or a fetch (always worth a look, never rate-limited), `other` for the quieter triggers, else undefined. */
 export function triggerOf(command: string): Trigger | undefined {
   let found: Trigger | undefined
   for (const seg of segments(command)) {

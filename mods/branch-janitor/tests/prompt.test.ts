@@ -139,7 +139,7 @@ test('minMinutes still limits the quiet triggers after a prompt look; a change a
   passthrough(on)
   await typed($, w, 'a')
   expect(scans(w)).toHaveLength(1)
-  await $.tool.call({ tool: 'Bash', command: 'git pull' })
+  await $.tool.call({ tool: 'Bash', command: 'git checkout main' })
   expect(scans(w)).toHaveLength(1) // quiet trigger, 30 minutes not passed
   model.branches.main!.sha = SHA('8')
   await typed($, w, 'b')
