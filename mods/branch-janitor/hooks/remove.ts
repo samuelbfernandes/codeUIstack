@@ -39,13 +39,14 @@ export type RemoteOffer = { remote: string; branch: string; tip: string }
 /**
  * The remote copy to offer deleting, or undefined. Uses only local refs (no network): the remote-tracking
  * ref must exist, the upstream must not be `[gone]`, and its tip must equal the sha we deleted or already
- * be an ancestor of a base (the default branch).
+ * be an ancestor of a base (the default branch). Never the server's default or a protected branch, whatever a local
+ * branch tracks: a branch whose upstream is `origin/main` must not lead to deleting `origin/main`.
  */
-export async function remoteOffer(run: Run, root: string, v: Verdict, bases: string[]): Promise<RemoteOffer | undefined> {
+export async function remoteOffer(run: Run, root: string, v: Verdict, bases: string[], isProtected: (branch: string) => boolean = () => false): Promise<RemoteOffer | undefined> {
   const git = gitIn(run, root)
   if (v.ref.isGone) return undefined
   const { remote, branch } = remoteTarget(v)
-  if (remote === '' || !isSafeName(remote) || !isSafeName(branch)) return undefined
+  if (remote === '' || !isSafeName(remote) || !isSafeName(branch) || isProtected(branch)) return undefined
   const tip = lines((await git('rev-parse', '--verify', '--quiet', `refs/remotes/${remote}/${branch}^{commit}`)).stdout)[0]
   if (!tip) return undefined
   if (tip === v.sha) return { remote, branch, tip }

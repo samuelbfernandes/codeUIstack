@@ -215,6 +215,13 @@ test('remote copy: a remote tip that is already inside main is offered', async (
   expect(w.asks).toHaveLength(2)
 })
 
+test('remote copy: a branch that tracks origin/main never leads to deleting origin/main', async ($, on) => {
+  const w = world(on, repo({ done: { ...merged(), upstream: 'refs/remotes/origin/main', remoteTip: DONE, remoteAncestorOfBase: true } }), { answer: 'Delete branch' })
+  await merge($)
+  expect(w.asks.filter(a => a.header === 'Remote')).toHaveLength(0)
+  expect(w.cmds.filter(c => c[6] === 'push')).toHaveLength(0)
+})
+
 test('remote copy: [gone] upstream means no remote question at all', async ($, on) => {
   const w = world(on, repo({ done: { ...merged(), upstream: 'refs/remotes/origin/done', track: '[gone]', remoteTip: DONE } }), { answer: 'Delete branch' })
   await merge($)

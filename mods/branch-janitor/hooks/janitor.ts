@@ -3,7 +3,7 @@
 // integration script (real git, scripted answers).
 import type { Verdict } from './decide'
 import { repoFingerprint } from './fingerprint'
-import { gitIn, lines } from './git'
+import { gitIn, lines, matchesPattern } from './git'
 import type { Run } from './git'
 import { dialogText, neverAskText, remoteDialogText, reportText, singleDialogText, toastText } from './format'
 import { deleteLocal, deleteRemote, remoteOffer } from './remove'
@@ -302,7 +302,7 @@ async function finish(d: Deps, res: ScanResult, chosen: Verdict[], base: { text?
 async function askRemotes(d: Deps, res: ScanResult, deleted: Verdict[], failed: { name: string; why: string }[]): Promise<string[]> {
   const offers: { v: Verdict; offer: RemoteOffer }[] = []
   for (const v of deleted) {
-    const ro = await remoteOffer(d.run, res.root, v, res.bases)
+    const ro = await remoteOffer(d.run, res.root, v, res.bases, b => b === res.defaultName || d.settings.protectedBranches.some(p => matchesPattern(b, p)))
     if (ro) offers.push({ v, offer: ro })
   }
   const done: string[] = []
